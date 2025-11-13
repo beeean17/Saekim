@@ -188,13 +188,52 @@
 }
 
 /* Mermaid diagrams */
-#preview .mermaid {
-    margin: 1em 0;
+#preview .mermaid,
+#preview .mermaid-container {
+    margin: 1.5em 0;
     text-align: center;
-    background: white;
-    padding: 1em;
-    border-radius: 4px;
+    background: #f9f9f9;
+    padding: 1.5em;
+    border-radius: 6px;
     border: 1px solid var(--border-color);
+    overflow-x: auto;
+}
+
+#preview .mermaid-container svg {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Mermaid error display */
+#preview .mermaid-error {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 1em;
+    margin: 1em 0;
+    text-align: left;
+}
+
+#preview .mermaid-error strong {
+    color: #856404;
+}
+
+#preview .mermaid-error pre {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    padding: 0.5em;
+    margin: 0.5em 0;
+    font-size: 0.85em;
+}
+
+#preview .mermaid-error details {
+    margin-top: 0.5em;
+}
+
+#preview .mermaid-error summary {
+    cursor: pointer;
+    color: #856404;
+    font-weight: 500;
 }
 
 /* Syntax highlighting will be handled by Highlight.js */
