@@ -42,21 +42,36 @@ class MainWindow(QMainWindow):
         if not ui_path.exists():
             print(f"Warning: UI file not found at {ui_path}")
 
-        # Load the HTML file
-        self.webview.load(QUrl.fromLocalFile(str(ui_path)))
-
         # Set as central widget
         self.setCentralWidget(self.webview)
 
-        # Enable DevTools for debugging (right-click → Inspect)
-        from PyQt6.QtWebEngineCore import QWebEngineSettings
-        settings = self.webview.settings()
+        # Enable DevTools and settings
+        from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
+
+        # Capture console messages for debugging
+        class WebPage(QWebEnginePage):
+            def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
+                print(f"[JS Console] {message} (line {lineNumber})")
+
+        page = WebPage(self.webview)
+        self.webview.setPage(page)
+
+        settings = page.settings()
         settings.setAttribute(
             QWebEngineSettings.WebAttribute.JavascriptEnabled,
             True
         )
+        # Enable remote URLs for CDN resources
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls,
+            True
+        )
+
+        # Load the HTML file
+        self.webview.load(QUrl.fromLocalFile(str(ui_path)))
 
         print(f"[OK] UI loaded from: {ui_path}")
+        print("[OK] JavaScript console logging enabled")
 
     def setup_menu_and_toolbar(self):
         """Setup menu bar, toolbar, and status bar"""

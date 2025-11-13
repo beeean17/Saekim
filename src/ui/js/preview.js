@@ -109,6 +109,11 @@ const PreviewModule = {
                     mangle: false,
                     sanitize: false, // We'll use DOMPurify instead
                     highlight: function(code, lang) {
+                        // Skip highlighting for mermaid diagrams (will be rendered separately)
+                        if (lang === 'mermaid') {
+                            return code;
+                        }
+
                         // Use Highlight.js for syntax highlighting
                         if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
                             try {
@@ -118,7 +123,7 @@ const PreviewModule = {
                             }
                         }
                         // Auto-detect language if not specified
-                        if (typeof hljs !== 'undefined') {
+                        if (typeof hljs !== 'undefined' && lang !== 'mermaid') {
                             try {
                                 return hljs.highlightAuto(code).value;
                             } catch (err) {
@@ -134,7 +139,10 @@ const PreviewModule = {
 
                 // Sanitize HTML to prevent XSS attacks
                 if (typeof DOMPurify !== 'undefined') {
-                    html = DOMPurify.sanitize(html);
+                    html = DOMPurify.sanitize(html, {
+                        ADD_ATTR: ['class'], // Preserve class attributes for code blocks
+                        ADD_TAGS: ['pre', 'code']
+                    });
                 }
 
                 this.previewElement.innerHTML = html;
@@ -150,6 +158,9 @@ const PreviewModule = {
 
                 // Add copy buttons to code blocks
                 this.addCopyButtons();
+
+                // Render Mermaid diagrams
+                this.renderMermaidDiagrams();
             } else {
                 // Fallback to basic rendering if Marked.js not loaded
                 let html = this.basicMarkdownToHtml(markdown);
@@ -158,6 +169,71 @@ const PreviewModule = {
         } catch (error) {
             console.error('❌ Preview rendering error:', error);
             this.previewElement.innerHTML = `<div class="error">Preview rendering error: ${error.message}</div>`;
+        }
+    },
+
+    /**
+     * Render Mermaid diagrams
+     */
+    renderMermaidDiagrams() {
+        if (typeof mermaid === 'undefined') {
+            console.warn('⚠️ Mermaid.js not loaded');
+            return;
+        }
+
+        try {
+            // Initialize Mermaid with configuration
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: 'default',
+                securityLevel: 'loose',
+                fontFamily: 'var(--font-sans)',
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                    curve: 'basis'
+                }
+            });
+
+            // Find all code blocks with language "mermaid"
+            const mermaidBlocks = this.previewElement.querySelectorAll('pre code.language-mermaid, pre code[class*="mermaid"]');
+            console.log(`🔍 Found ${mermaidBlocks.length} Mermaid code blocks`);
+
+            mermaidBlocks.forEach((block, index) => {
+                const code = block.textContent;
+                const pre = block.parentElement;
+
+                // Create a container for the diagram
+                const diagramId = `mermaid-diagram-${Date.now()}-${index}`;
+                const diagramContainer = document.createElement('div');
+                diagramContainer.className = 'mermaid-container';
+                diagramContainer.id = diagramId;
+
+                // Render the diagram
+                mermaid.render(`mermaid-svg-${Date.now()}-${index}`, code).then(({ svg }) => {
+                    diagramContainer.innerHTML = svg;
+                    // Replace the code block with the rendered diagram
+                    pre.replaceWith(diagramContainer);
+                }).catch(err => {
+                    console.error('❌ Mermaid render error:', err);
+                    // Show error in the diagram container
+                    diagramContainer.innerHTML = `
+                        <div class="mermaid-error">
+                            <p><strong>Mermaid Diagram Error:</strong></p>
+                            <pre>${err.message}</pre>
+                            <details>
+                                <summary>Show diagram code</summary>
+                                <pre>${code}</pre>
+                            </details>
+                        </div>
+                    `;
+                    pre.replaceWith(diagramContainer);
+                });
+            });
+
+            console.log(`✅ Rendered ${mermaidBlocks.length} Mermaid diagrams`);
+        } catch (error) {
+            console.error('❌ Mermaid initialization error:', error);
         }
     },
 
