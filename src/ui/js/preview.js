@@ -95,198 +95,244 @@ const PreviewModule = {
         `;
     },
 
-    /**
-     * Render markdown using Marked.js
-     */
-    renderMarkdown(markdown) {
-        try {
-            // Protect math expressions from Marked.js parsing
-            const mathExpressions = [];
-            let processedMarkdown = markdown;
+/**
+ * Render markdown using Marked.js
+ */
+renderMarkdown(markdown) {
+    try {
+        // Protect math expressions from Marked.js parsing
+        const mathExpressions = [];
+        let processedMarkdown = markdown;
 
-            // Protect display math ($$...$$)
-            processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
-                const placeholder = `MATHDISPLAYPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
-                mathExpressions.push({ type: 'display', content: math, placeholder });
-                console.log(`📊 Display math protected: "${math.substring(0, 50)}..." → ${placeholder}`);
-                return placeholder;
+        // Protect display math ($$...$$)
+        processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
+            const placeholder = `MATHDISPLAYPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
+            // content에 순수 LaTeX만 저장 ($$는 제거)
+            mathExpressions.push({ type: 'display', content: math.trim(), placeholder });
+            console.log(`📊 Display math protected: "${math.substring(0, 50)}..." → ${placeholder}`);
+            return placeholder;
+        });
+
+        // Protect inline math ($...$)
+        processedMarkdown = processedMarkdown.replace(/\$([^\$\n]+?)\$/g, (match, math) => {
+            const placeholder = `MATHINLINEPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
+            // content에 순수 LaTeX만 저장 ($는 제거)
+            mathExpressions.push({ type: 'inline', content: math.trim(), placeholder });
+            console.log(`📝 Inline math protected: "${math}" → ${placeholder}`);
+            return placeholder;
+        });
+
+        // Configure Marked.js
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: true,
+                mangle: false,
+                sanitize: false,
+                highlight: function(code, lang) {
+                    if (lang === 'mermaid') {
+                        return code;
+                    }
+                    if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                        try {
+                            return hljs.highlight(code, { language: lang }).value;
+                        } catch (err) {
+                            console.error('Highlight error:', err);
+                        }
+                    }
+                    if (typeof hljs !== 'undefined' && lang !== 'mermaid') {
+                        try {
+                            return hljs.highlightAuto(code).value;
+                        } catch (err) {
+                            console.error('Highlight auto error:', err);
+                        }
+                    }
+                    return code;
+                }
             });
 
-            // Protect inline math ($...$)
-            processedMarkdown = processedMarkdown.replace(/\$([^\$\n]+?)\$/g, (match, math) => {
-                const placeholder = `MATHINLINEPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
-                mathExpressions.push({ type: 'inline', content: math, placeholder });
-                console.log(`📝 Inline math protected: "${math}" → ${placeholder}`);
-                return placeholder;
+            // Convert markdown to HTML
+            let html = marked.parse(processedMarkdown);
+
+            // Restore math expressions - content에 이미 순수 LaTeX만 있음
+            console.log(`🔄 Restoring ${mathExpressions.length} math expressions...`);
+            mathExpressions.forEach(({ type, content, placeholder }) => {
+                if (type === 'display') {
+                    // div 태그 사용 + data attribute로 LaTeX 저장
+                    html = html.replaceAll(placeholder,
+                        `<div class="math-display" data-math="${this.escapeHtml(content)}"></div>`);
+                    console.log(`📊 Display restore: ${placeholder}, content="${content.substring(0, 30)}..."`);
+                } else {
+                    html = html.replaceAll(placeholder,
+                        `<span class="math-inline" data-math="${this.escapeHtml(content)}"></span>`);
+                    console.log(`📝 Inline restore: ${placeholder}, content="${content}"`);
+                }
             });
 
-            // Configure Marked.js
-            if (typeof marked !== 'undefined') {
-                marked.setOptions({
-                    breaks: true, // Convert \n to <br>
-                    gfm: true, // GitHub Flavored Markdown
-                    headerIds: true,
-                    mangle: false,
-                    sanitize: false, // We'll use DOMPurify instead
-                    highlight: function(code, lang) {
-                        // Skip highlighting for mermaid diagrams (will be rendered separately)
-                        if (lang === 'mermaid') {
-                            return code;
-                        }
-
-                        // Use Highlight.js for syntax highlighting
-                        if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
-                            try {
-                                return hljs.highlight(code, { language: lang }).value;
-                            } catch (err) {
-                                console.error('Highlight error:', err);
-                            }
-                        }
-                        // Auto-detect language if not specified
-                        if (typeof hljs !== 'undefined' && lang !== 'mermaid') {
-                            try {
-                                return hljs.highlightAuto(code).value;
-                            } catch (err) {
-                                console.error('Highlight auto error:', err);
-                            }
-                        }
-                        return code; // Fallback to plain code
-                    }
+            // Sanitize HTML
+            if (typeof DOMPurify !== 'undefined') {
+                html = DOMPurify.sanitize(html, {
+                    ADD_ATTR: ['class', 'style', 'id', 'data-math'],
+                    ADD_TAGS: ['pre', 'code', 'span', 'div'],
+                    ALLOW_DATA_ATTR: true,
+                    KEEP_CONTENT: true
                 });
-
-                // Convert markdown to HTML
-                let html = marked.parse(processedMarkdown);
-
-                // Restore math expressions
-                console.log(`🔄 Restoring ${mathExpressions.length} math expressions...`);
-                mathExpressions.forEach(({ type, content, placeholder }) => {
-                    const before = html.includes(placeholder);
-                    if (type === 'display') {
-                        html = html.replace(placeholder, `<span class="math-display">$$${content}$$</span>`);
-                        console.log(`📊 Display restore: ${placeholder} found=${before}, content="${content.substring(0, 30)}..."`);
-                    } else {
-                        html = html.replace(placeholder, `<span class="math-inline">$${content}$</span>`);
-                        console.log(`📝 Inline restore: ${placeholder} found=${before}, content="${content}"`);
-                    }
-                });
-
-                // Sanitize HTML to prevent XSS attacks
-                if (typeof DOMPurify !== 'undefined') {
-                    html = DOMPurify.sanitize(html, {
-                        ADD_ATTR: ['class'], // Preserve class attributes for code blocks
-                        ADD_TAGS: ['pre', 'code', 'span']
-                    });
-                }
-
-                this.previewElement.innerHTML = html;
-
-                // Apply syntax highlighting to any code blocks that weren't caught
-                if (typeof hljs !== 'undefined') {
-                    this.previewElement.querySelectorAll('pre code').forEach((block) => {
-                        if (!block.classList.contains('hljs')) {
-                            hljs.highlightElement(block);
-                        }
-                    });
-                }
-
-                // Add copy buttons to code blocks
-                this.addCopyButtons();
-
-                // Render Mermaid diagrams
-                this.renderMermaidDiagrams();
-
-                // Render math equations
-                this.renderMathEquations();
-            } else {
-                // Fallback to basic rendering if Marked.js not loaded
-                let html = this.basicMarkdownToHtml(markdown);
-                this.previewElement.innerHTML = html;
             }
-        } catch (error) {
-            console.error('❌ Preview rendering error:', error);
-            this.previewElement.innerHTML = `<div class="error">Preview rendering error: ${error.message}</div>`;
+
+            this.previewElement.innerHTML = html;
+
+            // p 태그로 감싸진 math-display를 unwrap
+            this.unwrapMathDisplays();
+
+            if (typeof hljs !== 'undefined') {
+                this.previewElement.querySelectorAll('pre code').forEach((block) => {
+                    if (!block.classList.contains('hljs')) {
+                        hljs.highlightElement(block);
+                    }
+                });
+            }
+
+            this.addCopyButtons();
+            this.renderMermaidDiagrams();
+            this.renderMathEquations();
+        } else {
+            let html = this.basicMarkdownToHtml(markdown);
+            this.previewElement.innerHTML = html;
         }
-    },
+    } catch (error) {
+        console.error('❌ Preview rendering error:', error);
+        this.previewElement.innerHTML = `<div class="error">Preview rendering error: ${error.message}</div>`;
+    }
+},
 
-    /**
-     * Render math equations using KaTeX
-     */
-    renderMathEquations() {
-        if (typeof katex === 'undefined') {
-            console.warn('⚠️ KaTeX not loaded');
-            return;
+/**
+ * Escape HTML for attributes
+ */
+escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+},
+
+/**
+ * Unwrap math-display elements from p tags
+ */
+unwrapMathDisplays() {
+    if (!this.previewElement) return;
+
+    // p 태그 내부에 math-display만 있는 경우를 찾아서 p 태그 제거
+    const paragraphs = this.previewElement.querySelectorAll('p');
+    paragraphs.forEach(p => {
+        // p 태그의 자식이 하나뿐이고, 그것이 math-display인 경우
+        if (p.children.length === 1 && p.children[0].classList.contains('math-display')) {
+            // p 태그를 math-display로 교체
+            const mathDisplay = p.children[0];
+            p.replaceWith(mathDisplay);
+            console.log('✅ Unwrapped math-display from p tag');
         }
-
-        try {
-            console.log('🔢 Starting KaTeX rendering...');
-
-            // Render display math
-            const displayMath = this.previewElement.querySelectorAll('.math-display');
-            console.log(`📊 Found ${displayMath.length} display math elements`);
-            displayMath.forEach((element, index) => {
-                const math = element.textContent.trim();
-                console.log(`📊 Display[${index}] raw text: "${math}"`);
-                // Remove $$ delimiters
-                const cleanMath = math.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
-                console.log(`📊 Display[${index}] cleaned: "${cleanMath}"`);
-                try {
-                    katex.render(cleanMath, element, {
-                        displayMode: true,
-                        throwOnError: false,
-                        errorColor: '#cc0000',
-                        strict: false,
-                        trust: false,
-                        macros: {
-                            "\\RR": "\\mathbb{R}",
-                            "\\NN": "\\mathbb{N}",
-                            "\\ZZ": "\\mathbb{Z}",
-                            "\\QQ": "\\mathbb{Q}",
-                            "\\CC": "\\mathbb{C}"
-                        }
-                    });
-                    console.log(`✅ Display[${index}] rendered successfully`);
-                } catch (error) {
-                    console.error('❌ KaTeX display error:', error);
-                    element.textContent = `[Math Error: ${error.message}]`;
-                    element.style.color = '#cc0000';
-                }
-            });
-
-            // Render inline math
-            const inlineMath = this.previewElement.querySelectorAll('.math-inline');
-            inlineMath.forEach((element) => {
-                const math = element.textContent.trim();
-                // Remove $ delimiters
-                const cleanMath = math.replace(/^\$/, '').replace(/\$$/, '').trim();
-                try {
-                    katex.render(cleanMath, element, {
-                        displayMode: false,
-                        throwOnError: false,
-                        errorColor: '#cc0000',
-                        strict: false,
-                        trust: false,
-                        macros: {
-                            "\\RR": "\\mathbb{R}",
-                            "\\NN": "\\mathbb{N}",
-                            "\\ZZ": "\\mathbb{Z}",
-                            "\\QQ": "\\mathbb{Q}",
-                            "\\CC": "\\mathbb{C}"
-                        }
-                    });
-                } catch (error) {
-                    console.error('❌ KaTeX inline error:', error);
-                    element.textContent = `[Math Error: ${error.message}]`;
-                    element.style.color = '#cc0000';
-                }
-            });
-
-            // Count rendered equations
-            const equations = this.previewElement.querySelectorAll('.katex');
-            console.log(`✅ Rendered ${equations.length} math equations (${displayMath.length} display + ${inlineMath.length} inline)`);
-        } catch (error) {
-            console.error('❌ KaTeX rendering error:', error);
+        // p 태그의 텍스트 내용이 비어있고 math-display만 있는 경우
+        else if (p.textContent.trim() === '' && p.querySelector('.math-display')) {
+            const mathDisplay = p.querySelector('.math-display');
+            if (mathDisplay) {
+                p.replaceWith(mathDisplay);
+                console.log('✅ Unwrapped math-display from empty p tag');
+            }
         }
-    },
+    });
+},
+
+/**
+ * Render math equations using KaTeX
+ */
+renderMathEquations() {
+    if (typeof katex === 'undefined') {
+        console.warn('⚠️ KaTeX not loaded');
+        return;
+    }
+
+    try {
+        console.log('🔢 Starting KaTeX rendering...');
+
+        // Render display math
+        const displayMath = this.previewElement.querySelectorAll('.math-display');
+        console.log(`📊 Found ${displayMath.length} display math elements`);
+        displayMath.forEach((element, index) => {
+            // data-math 속성에서 LaTeX 가져오기
+            let math = element.getAttribute('data-math') || element.textContent.trim();
+
+            // 줄바꿈 처리: \n을 LaTeX 줄바꿈 \\로 변환
+            // 단, 이미 \\가 있는 경우는 제외
+            // 먼저 \\를 임시 플레이스홀더로 대체
+            const placeholder = '___LATEX_NEWLINE___';
+            math = math.replace(/\\\\/g, placeholder);
+            // 일반 줄바꿈을 \\로 변환
+            math = math.replace(/\n/g, ' \\\\ ');
+            // 플레이스홀더를 다시 \\로 복원
+            math = math.replace(new RegExp(placeholder, 'g'), '\\\\');
+
+            console.log(`📊 Display[${index}] math (after newline conversion): "${math}"`);
+
+            try {
+                katex.render(math, element, {
+                    displayMode: true,
+                    throwOnError: false,
+                    errorColor: '#cc0000',
+                    strict: false,
+                    trust: false,
+                    macros: {
+                        "\\RR": "\\mathbb{R}",
+                        "\\NN": "\\mathbb{N}",
+                        "\\ZZ": "\\mathbb{Z}",
+                        "\\QQ": "\\mathbb{Q}",
+                        "\\CC": "\\mathbb{C}"
+                    }
+                });
+                console.log(`✅ Display[${index}] rendered successfully`);
+            } catch (error) {
+                console.error('❌ KaTeX display error:', error, 'Math:', math);
+                element.textContent = `[Math Error: ${error.message}]`;
+                element.style.color = '#cc0000';
+            }
+        });
+
+        // Render inline math
+        const inlineMath = this.previewElement.querySelectorAll('.math-inline');
+        console.log(`📝 Found ${inlineMath.length} inline math elements`);
+        inlineMath.forEach((element, index) => {
+            // data-math 속성에서 LaTeX 가져오기
+            const math = element.getAttribute('data-math') || element.textContent.trim();
+            console.log(`📝 Inline[${index}] math: "${math}"`);
+
+            try {
+                katex.render(math, element, {
+                    displayMode: false,
+                    throwOnError: false,
+                    errorColor: '#cc0000',
+                    strict: false,
+                    trust: false,
+                    macros: {
+                        "\\RR": "\\mathbb{R}",
+                        "\\NN": "\\mathbb{N}",
+                        "\\ZZ": "\\mathbb{Z}",
+                        "\\QQ": "\\mathbb{Q}",
+                        "\\CC": "\\mathbb{C}"
+                    }
+                });
+                console.log(`✅ Inline[${index}] rendered successfully`);
+            } catch (error) {
+                console.error('❌ KaTeX inline error:', error, 'Math:', math);
+                element.textContent = `[Math Error: ${error.message}]`;
+                element.style.color = '#cc0000';
+            }
+        });
+
+        const equations = this.previewElement.querySelectorAll('.katex');
+        console.log(`✅ Rendered ${equations.length} math equations (${displayMath.length} display + ${inlineMath.length} inline)`);
+    } catch (error) {
+        console.error('❌ KaTeX rendering error:', error);
+    }
+},
 
     /**
      * Render Mermaid diagrams

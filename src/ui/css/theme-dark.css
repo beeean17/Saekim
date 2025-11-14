@@ -45,6 +45,63 @@ body[data-theme="dark"] #preview .mermaid {
     background: var(--bg-secondary);
 }
 
+/* Math equations styling for dark theme */
+body[data-theme="dark"] #preview .math-display {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body[data-theme="dark"] #preview .katex-display {
+    border: none;
+}
+
+/* KaTeX text color override for dark theme */
+body[data-theme="dark"] #preview .katex {
+    color: var(--text-primary);
+}
+
+body[data-theme="dark"] #preview .katex .mord,
+body[data-theme="dark"] #preview .katex .mop,
+body[data-theme="dark"] #preview .katex .mbin,
+body[data-theme="dark"] #preview .katex .mrel,
+body[data-theme="dark"] #preview .katex .mopen,
+body[data-theme="dark"] #preview .katex .mclose,
+body[data-theme="dark"] #preview .katex .mpunct,
+body[data-theme="dark"] #preview .katex .minner {
+    color: var(--text-primary);
+}
+
+/* KaTeX fraction lines and other borders */
+body[data-theme="dark"] #preview .katex .frac-line,
+body[data-theme="dark"] #preview .katex .rule {
+    border-bottom-color: var(--text-primary);
+    background-color: var(--text-primary);
+}
+
+/* KaTeX root symbols */
+body[data-theme="dark"] #preview .katex .sqrt > .root {
+    color: var(--text-primary);
+}
+
+/* KaTeX accent marks */
+body[data-theme="dark"] #preview .katex .accent .accent-body {
+    color: var(--text-primary);
+}
+
+/* Force all KaTeX elements to use theme colors */
+body[data-theme="dark"] #preview .katex * {
+    color: var(--text-primary) !important;
+}
+
+body[data-theme="dark"] #preview .katex .vlist-t {
+    color: var(--text-primary);
+}
+
+body[data-theme="dark"] #preview .katex .strut {
+    border-color: var(--text-primary);
+}
+
+/* Scrollbar styling for dark theme */
 body[data-theme="dark"] ::-webkit-scrollbar-thumb {
     background: #4a4a4a;
 }

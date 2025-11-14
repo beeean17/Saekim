@@ -182,15 +182,32 @@
 }
 
 /* Math equations (KaTeX) */
-#preview .katex-display {
-    margin: 1.5em 0;
+#preview .math-display {
+    display: block;
+    margin: 0.5em 0;
     overflow-x: auto;
     overflow-y: hidden;
     text-align: center;
     padding: 1em;
-    background: #f8f9fa;
+    background: var(--bg-secondary);
     border-radius: 4px;
     border: 1px solid var(--border-color);
+}
+
+/* 연속된 수식의 경우 테두리가 겹치도록 */
+#preview .math-display + .math-display {
+    margin-top: -1px;
+}
+
+#preview .math-inline {
+    display: inline-block;
+    margin: 0 0.2em;
+}
+
+#preview .katex-display {
+    margin: 0;
+    padding: 0;
+    border: none;
 }
 
 #preview .katex {
