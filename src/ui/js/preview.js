@@ -100,6 +100,26 @@ const PreviewModule = {
      */
     renderMarkdown(markdown) {
         try {
+            // Protect math expressions from Marked.js parsing
+            const mathExpressions = [];
+            let processedMarkdown = markdown;
+
+            // Protect display math ($$...$$)
+            processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
+                const placeholder = `MATHDISPLAYPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
+                mathExpressions.push({ type: 'display', content: math, placeholder });
+                console.log(`📊 Display math protected: "${math.substring(0, 50)}..." → ${placeholder}`);
+                return placeholder;
+            });
+
+            // Protect inline math ($...$)
+            processedMarkdown = processedMarkdown.replace(/\$([^\$\n]+?)\$/g, (match, math) => {
+                const placeholder = `MATHINLINEPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
+                mathExpressions.push({ type: 'inline', content: math, placeholder });
+                console.log(`📝 Inline math protected: "${math}" → ${placeholder}`);
+                return placeholder;
+            });
+
             // Configure Marked.js
             if (typeof marked !== 'undefined') {
                 marked.setOptions({
@@ -135,13 +155,26 @@ const PreviewModule = {
                 });
 
                 // Convert markdown to HTML
-                let html = marked.parse(markdown);
+                let html = marked.parse(processedMarkdown);
+
+                // Restore math expressions
+                console.log(`🔄 Restoring ${mathExpressions.length} math expressions...`);
+                mathExpressions.forEach(({ type, content, placeholder }) => {
+                    const before = html.includes(placeholder);
+                    if (type === 'display') {
+                        html = html.replace(placeholder, `<span class="math-display">$$${content}$$</span>`);
+                        console.log(`📊 Display restore: ${placeholder} found=${before}, content="${content.substring(0, 30)}..."`);
+                    } else {
+                        html = html.replace(placeholder, `<span class="math-inline">$${content}$</span>`);
+                        console.log(`📝 Inline restore: ${placeholder} found=${before}, content="${content}"`);
+                    }
+                });
 
                 // Sanitize HTML to prevent XSS attacks
                 if (typeof DOMPurify !== 'undefined') {
                     html = DOMPurify.sanitize(html, {
                         ADD_ATTR: ['class'], // Preserve class attributes for code blocks
-                        ADD_TAGS: ['pre', 'code']
+                        ADD_TAGS: ['pre', 'code', 'span']
                     });
                 }
 
@@ -161,6 +194,9 @@ const PreviewModule = {
 
                 // Render Mermaid diagrams
                 this.renderMermaidDiagrams();
+
+                // Render math equations
+                this.renderMathEquations();
             } else {
                 // Fallback to basic rendering if Marked.js not loaded
                 let html = this.basicMarkdownToHtml(markdown);
@@ -169,6 +205,86 @@ const PreviewModule = {
         } catch (error) {
             console.error('❌ Preview rendering error:', error);
             this.previewElement.innerHTML = `<div class="error">Preview rendering error: ${error.message}</div>`;
+        }
+    },
+
+    /**
+     * Render math equations using KaTeX
+     */
+    renderMathEquations() {
+        if (typeof katex === 'undefined') {
+            console.warn('⚠️ KaTeX not loaded');
+            return;
+        }
+
+        try {
+            console.log('🔢 Starting KaTeX rendering...');
+
+            // Render display math
+            const displayMath = this.previewElement.querySelectorAll('.math-display');
+            console.log(`📊 Found ${displayMath.length} display math elements`);
+            displayMath.forEach((element, index) => {
+                const math = element.textContent.trim();
+                console.log(`📊 Display[${index}] raw text: "${math}"`);
+                // Remove $$ delimiters
+                const cleanMath = math.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
+                console.log(`📊 Display[${index}] cleaned: "${cleanMath}"`);
+                try {
+                    katex.render(cleanMath, element, {
+                        displayMode: true,
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        strict: false,
+                        trust: false,
+                        macros: {
+                            "\\RR": "\\mathbb{R}",
+                            "\\NN": "\\mathbb{N}",
+                            "\\ZZ": "\\mathbb{Z}",
+                            "\\QQ": "\\mathbb{Q}",
+                            "\\CC": "\\mathbb{C}"
+                        }
+                    });
+                    console.log(`✅ Display[${index}] rendered successfully`);
+                } catch (error) {
+                    console.error('❌ KaTeX display error:', error);
+                    element.textContent = `[Math Error: ${error.message}]`;
+                    element.style.color = '#cc0000';
+                }
+            });
+
+            // Render inline math
+            const inlineMath = this.previewElement.querySelectorAll('.math-inline');
+            inlineMath.forEach((element) => {
+                const math = element.textContent.trim();
+                // Remove $ delimiters
+                const cleanMath = math.replace(/^\$/, '').replace(/\$$/, '').trim();
+                try {
+                    katex.render(cleanMath, element, {
+                        displayMode: false,
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        strict: false,
+                        trust: false,
+                        macros: {
+                            "\\RR": "\\mathbb{R}",
+                            "\\NN": "\\mathbb{N}",
+                            "\\ZZ": "\\mathbb{Z}",
+                            "\\QQ": "\\mathbb{Q}",
+                            "\\CC": "\\mathbb{C}"
+                        }
+                    });
+                } catch (error) {
+                    console.error('❌ KaTeX inline error:', error);
+                    element.textContent = `[Math Error: ${error.message}]`;
+                    element.style.color = '#cc0000';
+                }
+            });
+
+            // Count rendered equations
+            const equations = this.previewElement.querySelectorAll('.katex');
+            console.log(`✅ Rendered ${equations.length} math equations (${displayMath.length} display + ${inlineMath.length} inline)`);
+        } catch (error) {
+            console.error('❌ KaTeX rendering error:', error);
         }
     },
 

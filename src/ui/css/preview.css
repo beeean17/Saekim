@@ -183,8 +183,39 @@
 
 /* Math equations (KaTeX) */
 #preview .katex-display {
-    margin: 1em 0;
-    overflow: auto;
+    margin: 1.5em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-align: center;
+    padding: 1em;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+#preview .katex {
+    font-size: 1.1em;
+}
+
+#preview .katex-html {
+    /* Ensure proper rendering */
+    display: inline-block;
+}
+
+/* Inline math */
+#preview p .katex {
+    font-size: 1em;
+    vertical-align: middle;
+}
+
+/* Math error display */
+#preview .katex-error {
+    color: #cc0000;
+    background: #fff3cd;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
 }
 
 /* Mermaid diagrams */
