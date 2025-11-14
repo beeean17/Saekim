@@ -46,15 +46,16 @@ python src/main.py
 - ✅ PyQt6 기본 윈도우 생성
 - 📝 QWebEngineView 통합 (다음 단계)
 
-## 문서
+## 주요 기능
 
-자세한 프로젝트 문서는 `Continuity/` 디렉토리에서 확인하세요:
-
-- [기능 명세서](./Continuity/FEATURES.md)
-- [기술 스택](./Continuity/TECH_STACK.md)
-- [개발 로드맵](./Continuity/ROADMAP.md)
-- [아키텍처](./Continuity/ARCHITECTURE.md)
-- [프로젝트 구조](./Continuity/PROJECT_STRUCTURE.md)
+- ✅ 실시간 마크다운 미리보기
+- ✅ 코드 하이라이팅 (Highlight.js)
+- ✅ 다이어그램 렌더링 (Mermaid.js)
+- ✅ 수학 수식 렌더링 (KaTeX)
+- ✅ 파일 열기/저장
+- ✅ 자동 저장
+- ✅ 라이트/다크 테마
+- ⏳ PDF/DOCX 변환 (개발 중)
 
 ## 라이선스
 
