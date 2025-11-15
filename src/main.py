@@ -6,9 +6,14 @@ Initializes the PyQt6 application and creates the main window.
 """
 
 import sys
+import os
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
+
+# Suppress GTK3 GLib-GIO warnings on Windows (harmless UWP app scanning messages)
+if sys.platform == 'win32':
+    os.environ['G_MESSAGES_DEBUG'] = ''
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))

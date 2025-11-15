@@ -319,6 +319,107 @@ class BackendAPI(QObject):
             return json.dumps({"success": False, "filepath": "", "error": str(e)})
 
     @pyqtSlot(result=str)
+    def get_pdf_save_path(self) -> str:
+        """
+        Show file save dialog and return the selected path
+        This is called first, before showing progress dialog
+
+        Returns:
+            JSON string with {success, filepath, error}
+        """
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self.main_window,
+                "PDF로 내보내기",
+                "document.pdf",
+                "PDF Files (*.pdf)"
+            )
+
+            if not file_path:
+                return json.dumps({"success": False, "filepath": "", "error": "Cancelled"})
+
+            logger.info(f"PDF save path selected: {file_path}")
+
+            return json.dumps({
+                "success": True,
+                "filepath": file_path,
+                "error": ""
+            })
+
+        except Exception as e:
+            logger.error(f"Error in get_pdf_save_path: {e}")
+            return json.dumps({"success": False, "filepath": "", "error": str(e)})
+
+    @pyqtSlot(str, str, str, result=str)
+    def generate_pdf_from_html(self, rendered_html: str, title: str, file_path: str) -> str:
+        """
+        Generate PDF from rendered HTML to the specified path
+        This is called after the user selects the save location
+
+        Args:
+            rendered_html: Fully rendered HTML from preview pane
+            title: Document title
+            file_path: Path to save the PDF
+
+        Returns:
+            JSON string with {success, filepath, error}
+        """
+        try:
+            success, error = self.converter.html_to_pdf(rendered_html, file_path, title)
+
+            if success:
+                logger.info(f"PDF exported from HTML: {file_path}")
+
+            return json.dumps({
+                "success": success,
+                "filepath": file_path if success else "",
+                "error": error
+            })
+
+        except Exception as e:
+            logger.error(f"Error in generate_pdf_from_html: {e}")
+            return json.dumps({"success": False, "filepath": "", "error": str(e)})
+
+    @pyqtSlot(str, str, result=str)
+    def export_to_pdf_html(self, rendered_html: str, title: str) -> str:
+        """
+        Export rendered HTML content to PDF (legacy method - kept for compatibility)
+        This preserves Mermaid diagrams and KaTeX equations
+
+        Args:
+            rendered_html: Fully rendered HTML from preview pane
+            title: Document title
+
+        Returns:
+            JSON string with {success, filepath, error}
+        """
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self.main_window,
+                "PDF로 내보내기",
+                "document.pdf",
+                "PDF Files (*.pdf)"
+            )
+
+            if not file_path:
+                return json.dumps({"success": False, "filepath": "", "error": "Cancelled"})
+
+            success, error = self.converter.html_to_pdf(rendered_html, file_path, title)
+
+            if success:
+                logger.info(f"PDF exported from HTML: {file_path}")
+
+            return json.dumps({
+                "success": success,
+                "filepath": file_path if success else "",
+                "error": error
+            })
+
+        except Exception as e:
+            logger.error(f"Error in export_to_pdf_html: {e}")
+            return json.dumps({"success": False, "filepath": "", "error": str(e)})
+
+    @pyqtSlot(result=str)
     def import_from_pdf(self) -> str:
         """
         Import PDF and convert to markdown

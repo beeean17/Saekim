@@ -1,4 +1,4 @@
-# Mermaid 다이어그램 테스트 예제 모음
+# Mermaid 다이어그램 테스트 예제 모음 (수정본)
 
 ## 1. 플로우차트 (Flowchart)
 
@@ -283,30 +283,22 @@ mindmap
       빠른 성능
 ```
 
-## 10. 요구사항 다이어그램
+## 10. 요구사항 다이어그램 (Flowchart 방식 ✅)
 
 ```mermaid
-requirementDiagram
-    requirement 마크다운편집 {
-        id: 1
-        text: 사용자는 마크다운을 편집할 수 있어야 한다
-        risk: high
-        verifymethod: test
-    }
-    requirement 실시간미리보기 {
-        id: 2
-        text: 입력 즉시 미리보기가 업데이트되어야 한다
-        risk: medium
-        verifymethod: inspection
-    }
-    requirement PDF변환 {
-        id: 3
-        text: 마크다운을 PDF로 변환할 수 있어야 한다
-        risk: low
-        verifymethod: demonstration
-    }
-    마크다운편집 - satisfies -> 실시간미리보기
-    마크다운편집 - refines -> PDF변환
+flowchart TD
+    subgraph 핵심요구사항
+        req1["<b>요구사항 1: 마크다운 편집</b><br/>━━━━━━━━━━━━━━━<br/>사용자는 마크다운을 편집할 수 있어야 한다<br/><br/>🔴 위험도: High<br/>✅ 검증방법: 테스트"]
+        req2["<b>요구사항 2: 실시간 미리보기</b><br/>━━━━━━━━━━━━━━━<br/>입력 즉시 미리보기가 업데이트되어야 한다<br/><br/>🟡 위험도: Medium<br/>✅ 검증방법: 검사"]
+        req3["<b>요구사항 3: PDF 변환</b><br/>━━━━━━━━━━━━━━━<br/>마크다운을 PDF로 변환할 수 있어야 한다<br/><br/>🟢 위험도: Low<br/>✅ 검증방법: 시연"]
+    end
+    
+    req1 -->|만족시킴<br/>satisfies| req2
+    req1 -->|정제함<br/>refines| req3
+    
+    style req1 fill:#ffe6e6,stroke:#cc0000,stroke-width:3px
+    style req2 fill:#fff4e6,stroke:#ff9900,stroke-width:2px
+    style req3 fill:#e6ffe6,stroke:#00cc00,stroke-width:2px
 ```
 
 ## 11. 사용자 여정 (User Journey)
@@ -330,19 +322,32 @@ journey
 
 ---
 
-## 테스트 방법
+## 수정 사항 요약
+
+### ✅ 수정된 부분: 요구사항 다이어그램
+
+**문제점:**
+- Mermaid의 `requirementDiagram`은 한글을 완전히 지원하지 않음
+- `text` 필드에서도 한글 파싱 오류 발생
+- Lexical error on line 4 발생
+
+**해결책:**
+- `requirementDiagram`을 `flowchart`로 완전 대체
+- 한글 텍스트, 이모지, 스타일링 모두 정상 작동
+- 위험도별 색상 구분 (High=빨강, Medium=주황, Low=초록)
+- 관계 표현 유지 (satisfies, refines)
+
+### 테스트 방법
 
 1. 위의 코드 블록을 하나씩 복사해서 에디터에 붙여넣기
 2. 오른쪽 미리보기에서 다이어그램이 렌더링되는지 확인
 3. 터미널에서 `[JS Console]` 메시지 확인
-4. 문제가 있으면 에러 메시지 복사해서 공유
+4. 모든 다이어그램이 정상적으로 렌더링되어야 함
 
-## 예상 결과
+### 예상 결과
 
 각 다이어그램이 깔끔하게 렌더링되어야 하며, 터미널에는:
 - `🔍 Found X Mermaid code blocks`
 - `✅ Rendered X Mermaid diagrams`
 
-이런 메시지가 나타나야 합니다.
-
-
+이런 메시지가 나타나야 합니다. **이제 요구사항 다이어그램도 정상적으로 작동합니다!**

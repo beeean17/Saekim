@@ -107,7 +107,7 @@ debug.log
 .coverage
 htmlcov/
 .tox/
-
+*.pdf
 # ============ Security ============
 
 # Environment variables
@@ -132,3 +132,4 @@ secrets.json
 # Only claude.md is excluded (AI instructions)
 # private/ is managed as a Git submodule
 # ========================================
+nul

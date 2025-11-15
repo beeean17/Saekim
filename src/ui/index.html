@@ -45,6 +45,27 @@
 </head>
 <body>
     <div id="app">
+        <!-- PDF Export Progress Modal -->
+        <div id="pdf-progress-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>PDF 변환 중...</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="progress-info">
+                        <span id="progress-text">준비 중...</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                    <div class="progress-details">
+                        <small id="progress-details">변환 작업을 시작하는 중...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Main container with split layout -->
         <div class="split-container">
             <!-- Editor pane -->

@@ -349,11 +349,16 @@ renderMathEquations() {
                 startOnLoad: false,
                 theme: 'default',
                 securityLevel: 'loose',
-                fontFamily: 'var(--font-sans)',
+                fontFamily: 'Malgun Gothic, 맑은 고딕, Segoe UI, Arial, sans-serif',
+                fontSize: 14,
                 flowchart: {
                     useMaxWidth: true,
                     htmlLabels: true,
                     curve: 'basis'
+                },
+                themeVariables: {
+                    fontFamily: 'Malgun Gothic, 맑은 고딕, Segoe UI, Arial, sans-serif',
+                    fontSize: '14px'
                 }
             });
 

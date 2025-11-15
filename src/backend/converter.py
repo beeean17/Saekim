@@ -58,6 +58,62 @@ class DocumentConverter:
             logger.error(error_msg)
             return False, error_msg
 
+    def html_to_pdf(self, rendered_html: str, output_path: str,
+                    title: str = "Document") -> Tuple[bool, str]:
+        """
+        Convert rendered HTML to PDF
+        This method preserves all formatting including Mermaid diagrams and KaTeX equations
+
+        Args:
+            rendered_html: Fully rendered HTML from frontend
+            output_path: Path to save PDF
+            title: Document title
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        try:
+            # Lazy import to avoid GTK3 dependency at startup
+            from weasyprint import HTML, CSS
+
+            # Wrap the rendered HTML in a complete HTML document
+            full_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{title}</title>
+    <style>
+        /* Import KaTeX styles for math rendering */
+        @import url('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css');
+    </style>
+</head>
+<body>
+    <div class="content">
+        {rendered_html}
+    </div>
+</body>
+</html>
+"""
+
+            # Create PDF from HTML
+            HTML(string=full_html).write_pdf(
+                output_path,
+                stylesheets=[CSS(string=self._get_pdf_css())]
+            )
+
+            logger.info(f"PDF created from HTML successfully: {output_path}")
+            return True, ""
+
+        except ImportError as e:
+            error_msg = "WeasyPrint requires GTK3. Please install GTK3 runtime for Windows: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
+            logger.error(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = f"PDF conversion from HTML failed: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
     def _markdown_to_html(self, markdown: str, title: str) -> str:
         """
         Convert Markdown to HTML for PDF generation
@@ -126,6 +182,7 @@ class DocumentConverter:
     def _get_pdf_css(self) -> str:
         """
         CSS styling for PDF output
+        Enhanced to support Mermaid diagrams and KaTeX equations
         """
         return """
 @page {
@@ -146,6 +203,10 @@ body {
     font-size: 11pt;
     line-height: 1.6;
     color: #333;
+}
+
+.content {
+    max-width: 100%;
 }
 
 h1 {
@@ -179,7 +240,7 @@ p {
 }
 
 code {
-    font-family: 'Courier New', monospace;
+    font-family: 'Courier New', 'Consolas', monospace;
     background: #f4f4f4;
     padding: 2pt 4pt;
     border-radius: 3pt;
@@ -194,6 +255,7 @@ pre {
     overflow-x: auto;
     font-size: 9pt;
     line-height: 1.4;
+    page-break-inside: avoid;
 }
 
 pre code {
@@ -246,14 +308,106 @@ a {
 }
 
 img {
-    max-width: 100%;
+    max-width: 14cm;
+    max-height: 20cm;
     height: auto;
+    display: block;
+    margin: 6pt auto;
+    page-break-inside: avoid;
 }
 
 hr {
     border: none;
     border-top: 2px solid #bdc3c7;
     margin: 18pt 0;
+}
+
+/* Mermaid diagram styling */
+.mermaid-container {
+    margin: 18pt 0;
+    padding: 12pt;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4pt;
+    text-align: center;
+    page-break-inside: avoid;
+    overflow: hidden;
+}
+
+/* Mermaid as PNG images */
+.mermaid-container img {
+    max-width: 14cm !important;
+    max-height: 20cm !important;
+    width: auto !important;
+    height: auto !important;
+    display: block;
+    margin: 0 auto;
+    page-break-inside: avoid;
+}
+
+/* Fallback for SVG if not converted */
+.mermaid-container svg {
+    max-width: 15cm !important;
+    max-height: 20cm !important;
+    width: auto !important;
+    height: auto !important;
+    display: inline-block;
+}
+
+/* Force SVG text to use system fonts */
+.mermaid-container svg text,
+.mermaid-container svg tspan {
+    font-family: 'Malgun Gothic', '맑은 고딕', 'Segoe UI', Arial, sans-serif !important;
+    font-size: 14px !important;
+}
+
+.mermaid-error {
+    color: #c00;
+    background: #fee;
+    padding: 12pt;
+    border-radius: 4pt;
+    border: 1px solid #fcc;
+}
+
+/* KaTeX math equation styling */
+.katex {
+    font-size: 1.1em;
+}
+
+.katex-display {
+    margin: 12pt 0;
+    text-align: center;
+    page-break-inside: avoid;
+}
+
+.math-display {
+    margin: 18pt 0;
+    padding: 12pt;
+    text-align: center;
+    page-break-inside: avoid;
+}
+
+.math-inline {
+    display: inline;
+    vertical-align: baseline;
+}
+
+/* Code copy button - hide in PDF */
+.code-copy-btn {
+    display: none;
+}
+
+/* Ensure diagrams don't get cut off */
+svg {
+    max-width: 15cm !important;
+    max-height: 20cm !important;
+    page-break-inside: avoid;
+}
+
+/* Fix SVG text rendering */
+svg text,
+svg tspan {
+    font-family: 'Malgun Gothic', '맑은 고딕', 'Segoe UI', Arial, sans-serif !important;
 }
 """
 
