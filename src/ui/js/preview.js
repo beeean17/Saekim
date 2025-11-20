@@ -216,6 +216,7 @@ renderMarkdown(markdown) {
                 });
             }
 
+            this.addCodeLanguageLabels();
             this.addCopyButtons();
             this.renderMermaidDiagrams();
             this.renderMathEquations();
@@ -593,6 +594,104 @@ renderMathEquations() {
         if (maxScroll === 0) return 0;
 
         return this.previewElement.scrollTop / maxScroll;
+    },
+
+    /**
+     * Add language labels to code blocks
+     */
+    addCodeLanguageLabels() {
+        if (!this.previewElement) return;
+
+        // Language code to display name mapping
+        const languageMap = {
+            'cpp': 'C++',
+            'c++': 'C++',
+            'csharp': 'C#',
+            'cs': 'C#',
+            'js': 'JavaScript',
+            'javascript': 'JavaScript',
+            'ts': 'TypeScript',
+            'typescript': 'TypeScript',
+            'py': 'Python',
+            'python': 'Python',
+            'java': 'Java',
+            'kt': 'Kotlin',
+            'kotlin': 'Kotlin',
+            'rb': 'Ruby',
+            'ruby': 'Ruby',
+            'go': 'Go',
+            'rs': 'Rust',
+            'rust': 'Rust',
+            'php': 'PHP',
+            'swift': 'Swift',
+            'objc': 'Objective-C',
+            'scala': 'Scala',
+            'r': 'R',
+            'matlab': 'MATLAB',
+            'sql': 'SQL',
+            'bash': 'Bash',
+            'sh': 'Shell',
+            'shell': 'Shell',
+            'powershell': 'PowerShell',
+            'html': 'HTML',
+            'css': 'CSS',
+            'scss': 'SCSS',
+            'sass': 'Sass',
+            'json': 'JSON',
+            'xml': 'XML',
+            'yaml': 'YAML',
+            'yml': 'YAML',
+            'toml': 'TOML',
+            'md': 'Markdown',
+            'markdown': 'Markdown',
+            'tex': 'LaTeX',
+            'latex': 'LaTeX'
+        };
+
+        this.previewElement.querySelectorAll('pre code').forEach((codeElement) => {
+            const pre = codeElement.parentElement;
+
+            // Skip if already wrapped
+            if (pre.parentElement && pre.parentElement.classList.contains('code-block-wrapper')) {
+                return;
+            }
+
+            // Extract language from code element's class
+            let language = '';
+            const classList = Array.from(codeElement.classList);
+
+            for (const className of classList) {
+                if (className.startsWith('language-')) {
+                    language = className.replace('language-', '');
+                    break;
+                } else if (className.startsWith('lang-')) {
+                    language = className.replace('lang-', '');
+                    break;
+                }
+            }
+
+            // Skip if no language detected or if it's mermaid (handled separately)
+            if (!language || language === 'mermaid') {
+                return;
+            }
+
+            // Convert language code to display name
+            const displayName = languageMap[language.toLowerCase()] || language.toUpperCase();
+
+            // Create wrapper div
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-block-wrapper';
+
+            // Create language label
+            const label = document.createElement('span');
+            label.className = 'code-language-label';
+            label.textContent = displayName;
+
+            // Wrap the pre element
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+            wrapper.appendChild(label);
+        });
     },
 
     /**

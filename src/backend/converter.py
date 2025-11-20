@@ -406,6 +406,11 @@ hr {
     display: none;
 }
 
+/* Code language label - hide in PDF */
+.code-language-label {
+    display: none;
+}
+
 /* Ensure diagrams don't get cut off */
 svg {
     max-width: 15cm !important;
