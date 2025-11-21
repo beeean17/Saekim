@@ -290,3 +290,26 @@
     padding: 1em;
     border-radius: 4px;
 }
+
+/* Code block language label */
+#preview .code-block-wrapper {
+    position: relative;
+    margin: 1em 0;
+}
+
+#preview .code-language-label {
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
+    font-size: 0.75em;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    padding: 0.2em 0.6em;
+    border-radius: 3px;
+    opacity: 0.7;
+    text-transform: uppercase;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 1;
+}
