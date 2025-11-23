@@ -39,13 +39,13 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 
 ### PDF Processing
 
-#### 3. WeasyPrint
-- **Version**: ≥60.0
-- **License**: BSD 3-Clause License
-- **Homepage**: https://weasyprint.org/
-- **Repository**: https://github.com/Kozea/WeasyPrint
-- **Copyright**: © 2011-2024 Simon Sapin and contributors
-- **Usage**: Converting HTML/CSS to PDF (Markdown → PDF export)
+#### 3. Playwright
+- **Version**: ≥1.40.0
+- **License**: Apache License 2.0
+- **Homepage**: https://playwright.dev/python/
+- **Repository**: https://github.com/microsoft/playwright-python
+- **Copyright**: © Microsoft Corporation
+- **Usage**: Headless browser automation for PDF generation (Markdown → PDF export)
 
 #### 4. pdfplumber
 - **Version**: ≥0.11.0
@@ -245,6 +245,14 @@ These JavaScript libraries are used in the web-based editor interface:
 - **Copyright**: © 2013-2020 Khan Academy and other contributors
 - **Usage**: Fast math typesetting for LaTeX equations
 
+#### 24. DOMPurify
+- **Version**: 3.x
+- **License**: Apache License 2.0 / Mozilla Public License 2.0 (Dual License)
+- **Homepage**: https://github.com/cure53/DOMPurify
+- **Repository**: https://github.com/cure53/DOMPurify
+- **Copyright**: © 2015-2024 Mario Heiderich and contributors
+- **Usage**: XSS sanitizer for HTML content
+
 ---
 
 ## License Compatibility
@@ -254,9 +262,10 @@ This project is licensed under GPL-3.0 due to PyQt6's license requirements. All 
 
 - **GPL-3.0/GPL-2.0**: Compatible (PyQt6, PyQt6-WebEngine, pylint)
 - **MIT License**: Compatible (most dependencies)
-- **BSD Licenses**: Compatible (WeasyPrint, PyPDF2, lxml, sphinx, Highlight.js)
-- **Apache 2.0**: Compatible (python-dateutil)
+- **BSD Licenses**: Compatible (PyPDF2, lxml, sphinx, Highlight.js)
+- **Apache 2.0**: Compatible (Playwright, python-dateutil, DOMPurify)
 - **HPND**: Compatible (Pillow)
+- **MPL 2.0**: Compatible (DOMPurify)
 
 ### Commercial Use Note
 While this project is GPL-3.0 licensed (due to PyQt6), for commercial/proprietary use, consider:
@@ -364,15 +373,16 @@ limitations under the License.
 | Date | Version | Changes |
 |------|---------|---------|
 | 2024-11-08 | 1.0.0 | Initial license documentation with all current dependencies |
+| 2025-11-23 | 1.1.0 | WeasyPrint → Playwright 변경, DOMPurify 추가 |
 
 ---
 
 ## Contact
 
 For questions about licensing or attribution:
-- Project Repository: [Add your repository URL]
-- Issues: [Add your issues URL]
+- Project Repository: https://github.com/beeean17/Saekim
+- Issues: https://github.com/beeean17/Saekim/issues
 
 ---
 
-**Last Updated**: 2024-11-08
+**Last Updated**: 2025-11-23

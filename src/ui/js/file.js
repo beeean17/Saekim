@@ -549,5 +549,76 @@ const FileModule = {
             console.error('❌ 파일 가져오기 실패:', error);
             Utils.showToast('파일 가져오기에 실패했습니다', 'error');
         }
+    },
+
+    /**
+     * Import from PDF - convert PDF to Markdown
+     */
+    async importFromPDF() {
+        if (!App.backend) {
+            if (typeof Utils !== 'undefined') {
+                Utils.showToast('PDF 가져오기는 앱에서만 사용할 수 있습니다', 'warning');
+            }
+            return;
+        }
+
+        try {
+            console.log('📄 PDF에서 마크다운으로 변환 중...');
+
+            if (typeof Utils !== 'undefined') {
+                Utils.showToast('PDF 파일을 선택해주세요...', 'info');
+            }
+
+            // Call backend to import PDF
+            App.backend.import_from_pdf((resultJson) => {
+                const result = JSON.parse(resultJson);
+
+                if (result.success) {
+                    console.log('✅ PDF 변환 성공');
+                    console.log('  - 원본 파일:', result.filepath);
+                    if (result.images_dir) {
+                        console.log('  - 이미지 폴더:', result.images_dir);
+                    }
+
+                    // Set converted content to editor
+                    if (typeof EditorModule !== 'undefined') {
+                        EditorModule.setContent(result.content);
+                    }
+
+                    // Show success message
+                    let message = 'PDF를 마크다운으로 변환했습니다';
+                    if (result.images_dir) {
+                        message += `\n이미지가 ${result.images_dir}에 저장되었습니다`;
+                    }
+
+                    if (typeof Utils !== 'undefined') {
+                        Utils.showToast(message, 'success');
+                    }
+                } else if (result.error !== 'Cancelled') {
+                    console.error('❌ PDF 변환 실패:', result.error);
+
+                    // Provide helpful error messages
+                    let errorMessage = 'PDF 변환 실패';
+                    if (result.error.includes('PyMuPDF') || result.error.includes('fitz')) {
+                        errorMessage = 'PyMuPDF가 필요합니다.\npip install PyMuPDF';
+                    } else if (result.error.includes('pdfplumber')) {
+                        errorMessage = 'pdfplumber가 필요합니다.\npip install pdfplumber';
+                    } else {
+                        errorMessage = `PDF 변환 실패: ${result.error}`;
+                    }
+
+                    if (typeof Utils !== 'undefined') {
+                        Utils.showToast(errorMessage, 'error');
+                    }
+                } else {
+                    console.log('PDF 가져오기 취소됨');
+                }
+            });
+        } catch (error) {
+            console.error('❌ PDF 가져오기 실패:', error);
+            if (typeof Utils !== 'undefined') {
+                Utils.showToast(`PDF 가져오기 오류: ${error.message}`, 'error');
+            }
+        }
     }
 };

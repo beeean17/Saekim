@@ -424,10 +424,15 @@ class BackendAPI(QObject):
     @pyqtSlot(result=str)
     def import_from_pdf(self) -> str:
         """
-        Import PDF and convert to markdown
+        Import PDF and convert to markdown with enhanced extraction
+
+        Features:
+        - Text extraction with heading/formatting detection
+        - Table extraction
+        - Image extraction (saved to {pdf_name}_images folder)
 
         Returns:
-            JSON string with {success, content, error}
+            JSON string with {success, content, filepath, images_dir, error}
         """
         try:
             file_path, _ = QFileDialog.getOpenFileName(
@@ -438,22 +443,45 @@ class BackendAPI(QObject):
             )
 
             if not file_path:
-                return json.dumps({"success": False, "content": "", "error": "Cancelled"})
+                return json.dumps({
+                    "success": False,
+                    "content": "",
+                    "filepath": "",
+                    "images_dir": "",
+                    "error": "Cancelled"
+                })
 
-            success, content, error = self.converter.pdf_to_markdown(file_path)
+            # Determine images output directory
+            pdf_path = Path(file_path)
+            images_dir = pdf_path.parent / f"{pdf_path.stem}_images"
+
+            success, content, error = self.converter.pdf_to_markdown(
+                file_path,
+                output_dir=str(images_dir)
+            )
 
             if success:
                 logger.info(f"PDF imported: {file_path}")
+                if images_dir.exists():
+                    logger.info(f"Images extracted to: {images_dir}")
 
             return json.dumps({
                 "success": success,
                 "content": content,
+                "filepath": file_path,
+                "images_dir": str(images_dir) if images_dir.exists() else "",
                 "error": error
             })
 
         except Exception as e:
             logger.error(f"Error in import_from_pdf: {e}")
-            return json.dumps({"success": False, "content": "", "error": str(e)})
+            return json.dumps({
+                "success": False,
+                "content": "",
+                "filepath": "",
+                "images_dir": "",
+                "error": str(e)
+            })
 
     @pyqtSlot(str, result=str)
     def export_to_docx(self, markdown_content: str) -> str:

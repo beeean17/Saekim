@@ -1,0 +1,11 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+<body>
+    <p>``<code>python<br>def main() -> None:<br>    # 첫 줄에서 도시 수와 제한 비용을 받아 둔다<br>    n, k = map(int, input().split())<br>    # 이동 비용 행렬은 그대로 2차원 리스트로 저장<br>    cost = [list(map(int, input().split())) for _ in range(n)]<br>    INF = float("inf")<br>    best = INF<br>    start = 0  # 문제에서 출발 도시는 1번이지만, 인덱스는 0부터<br>    def dfs(city: int, visited: int, total: int) -> None:<br>        nonlocal best<br>        # 이미 제한이나 현재 최소보다 비용이 크면 더 볼 필요가 없다<br>        if total >= best or total > k:<br>            return<br>        # 모든 도시를 다 찍었으면 출발지로 돌아갈 수 있는지만 확인<br>        if visited == (1 << n) - 1:<br>            back = cost[city][start]<br>            if back != 0:<br>                final_cost = total + back<br>                if final_cost <= k and final_cost < best:<br>                    best = final_cost<br>            return<br>        # 아직 안 간 도시들을 하나씩 시도해 본다<br>        for nxt in range(n):<br>            if visited & (1 << nxt):<br>                continue<br>            step = cost[city][nxt]<br>            if step == 0:<br>                continue  # 못 가는 경로는 건너뜀<br>            new_total = total + step<br>            if new_total > k or new_total >= best:<br>                continue<br>            dfs(nxt, visited | (1 << nxt), new_total)<br>    dfs(start, 1 << start, 0)<br>    print(best if best != INF else -1)<br>if __name__ == "__main__":<br>    main()<br></code>``</p>
+</body>
+</html>

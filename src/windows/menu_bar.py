@@ -58,27 +58,37 @@ class MenuBar(QMenuBar):
 
         file_menu.addSeparator()
 
+        # Import submenu
+        import_menu = file_menu.addMenu("가져오기(&I)")
+
+        # Import from PDF
+        import_pdf_action = QAction("PDF에서 가져오기...", self)
+        import_pdf_action.setStatusTip("PDF 파일을 마크다운으로 변환하여 가져오기")
+        import_pdf_action.triggered.connect(self.import_from_pdf)
+        import_menu.addAction(import_pdf_action)
+
         # Export submenu
         export_menu = file_menu.addMenu("내보내기(&E)")
 
-        # PDF export (requires GTK3)
+        # PDF export (Playwright)
         export_pdf_action = QAction("PDF로 내보내기...", self)
         export_pdf_action.setShortcut("Ctrl+P")
-        export_pdf_action.setStatusTip("PDF로 내보내기 (GTK3 필요)")
+        export_pdf_action.setStatusTip("PDF로 내보내기")
         export_pdf_action.triggered.connect(self.export_pdf)
         export_menu.addAction(export_pdf_action)
 
-        export_menu.addSeparator()
-
-        export_docx_action = QAction("DOCX로 내보내기...", self)
-        export_docx_action.setStatusTip("문서를 DOCX로 내보내기")
-        export_docx_action.triggered.connect(self.export_docx)
-        export_menu.addAction(export_docx_action)
-
-        export_html_action = QAction("HTML로 내보내기...", self)
-        export_html_action.setStatusTip("문서를 HTML로 내보내기")
-        export_html_action.triggered.connect(self.export_html)
-        export_menu.addAction(export_html_action)
+        # TODO: DOCX/HTML 내보내기 기능 개선 후 활성화
+        # export_menu.addSeparator()
+        #
+        # export_docx_action = QAction("DOCX로 내보내기...", self)
+        # export_docx_action.setStatusTip("문서를 DOCX로 내보내기")
+        # export_docx_action.triggered.connect(self.export_docx)
+        # export_menu.addAction(export_docx_action)
+        #
+        # export_html_action = QAction("HTML로 내보내기...", self)
+        # export_html_action.setStatusTip("문서를 HTML로 내보내기")
+        # export_html_action.triggered.connect(self.export_html)
+        # export_menu.addAction(export_html_action)
 
         file_menu.addSeparator()
 
@@ -340,4 +350,9 @@ class MenuBar(QMenuBar):
     def insert_horizontal_rule(self):
         """Insert horizontal rule"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.horizontalRule(); }"
+        self.parent.webview.page().runJavaScript(js_code)
+
+    def import_from_pdf(self):
+        """Import PDF and convert to markdown"""
+        js_code = "if (typeof FileModule !== 'undefined') { FileModule.importFromPDF(); }"
         self.parent.webview.page().runJavaScript(js_code)
