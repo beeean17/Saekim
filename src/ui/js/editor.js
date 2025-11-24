@@ -7,7 +7,7 @@ const EditorModule = {
     wordCountDisplay: null,
     autoSaveTimeout: null,
     autoSaveDelay: 5000, // 5 seconds
-    autoSaveEnabled: true,
+    autoSaveEnabled: false, // TODO: 임시 비활성화
 
     /**
      * Initialize the editor
