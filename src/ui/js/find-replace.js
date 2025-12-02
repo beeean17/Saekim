@@ -20,13 +20,6 @@ const FindReplaceModule = {
         this.createFindDialog();
     },
 
-    /**
-     * Show find and replace dialog
-     */
-    showReplace() {
-        this.replaceDialogOpen = true;
-        this.createReplaceDialog();
-    },
 
     /**
      * Create find dialog
@@ -67,56 +60,22 @@ const FindReplaceModule = {
         document.getElementById('find-input').focus();
 
         // Enter key to find next
-        document.getElementById('find-input').addEventListener('keypress', (e) => {
+        const findInput = document.getElementById('find-input');
+        findInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.findNext();
             }
         });
-    },
 
-    /**
-     * Create replace dialog
-     */
-    createReplaceDialog() {
-        // Remove existing dialog
-        this.closeDialog();
-
-        const dialog = document.createElement('div');
-        dialog.id = 'replace-dialog';
-        dialog.className = 'find-replace-dialog';
-        dialog.innerHTML = `
-            <div class="dialog-header">
-                <h3>찾아 바꾸기</h3>
-                <button class="close-btn" onclick="FindReplaceModule.closeDialog()">✕</button>
-            </div>
-            <div class="dialog-body">
-                <div class="input-group">
-                    <input type="text" id="find-input" placeholder="찾을 텍스트" />
-                </div>
-                <div class="input-group">
-                    <input type="text" id="replace-input" placeholder="바꿀 텍스트" />
-                </div>
-                <div class="button-group">
-                    <button onclick="FindReplaceModule.findNext()">다음 찾기</button>
-                    <button onclick="FindReplaceModule.replace()">바꾸기</button>
-                    <button onclick="FindReplaceModule.replaceAll()">모두 바꾸기</button>
-                </div>
-                <div class="options">
-                    <label>
-                        <input type="checkbox" id="case-sensitive" onchange="FindReplaceModule.toggleCaseSensitive()">
-                        대소문자 구분
-                    </label>
-                    <label>
-                        <input type="checkbox" id="use-regex" onchange="FindReplaceModule.toggleRegex()">
-                        정규식 사용
-                    </label>
-                </div>
-                <div class="match-count" id="match-count">0개 찾음</div>
-            </div>
-        `;
-
-        document.body.appendChild(dialog);
-        document.getElementById('find-input').focus();
+        // Auto-search as user types
+        findInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value;
+            if (searchTerm) {
+                this.highlightMatches(searchTerm);
+            } else {
+                this.clearHighlights();
+            }
+        });
     },
 
     /**
@@ -124,13 +83,10 @@ const FindReplaceModule = {
      */
     closeDialog() {
         const findDialog = document.getElementById('find-dialog');
-        const replaceDialog = document.getElementById('replace-dialog');
 
         if (findDialog) findDialog.remove();
-        if (replaceDialog) replaceDialog.remove();
 
         this.findDialogOpen = false;
-        this.replaceDialogOpen = false;
         this.clearHighlights();
     },
 
@@ -250,83 +206,20 @@ const FindReplaceModule = {
     },
 
     /**
-     * Replace current occurrence
+     * Highlight all matches in the editor
      */
-    replace() {
-        const searchTerm = document.getElementById('find-input')?.value;
-        const replaceTerm = document.getElementById('replace-input')?.value || '';
-
+    highlightMatches(searchTerm) {
         if (!searchTerm || typeof EditorModule === 'undefined' || !EditorModule.editor) return;
 
         const editor = EditorModule.editor;
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+        const content = editor.value;
 
-        // Check if current selection matches search term
-        const matches = this.caseSensitive
-            ? selectedText === searchTerm
-            : selectedText.toLowerCase() === searchTerm.toLowerCase();
+        // Update match count
+        this.updateMatchCount(content, searchTerm);
 
-        if (matches) {
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
-            const before = editor.value.substring(0, start);
-            const after = editor.value.substring(end);
-
-            editor.value = before + replaceTerm + after;
-            editor.setSelectionRange(start, start + replaceTerm.length);
-
-            // Trigger change event
-            editor.dispatchEvent(new Event('input'));
-        }
-
-        // Find next
-        this.findNext();
-    },
-
-    /**
-     * Replace all occurrences
-     */
-    replaceAll() {
-        const searchTerm = document.getElementById('find-input')?.value;
-        const replaceTerm = document.getElementById('replace-input')?.value || '';
-
-        if (!searchTerm || typeof EditorModule === 'undefined' || !EditorModule.editor) return;
-
-        const editor = EditorModule.editor;
-        let content = editor.value;
-        let count = 0;
-
-        if (this.useRegex) {
-            try {
-                const regex = new RegExp(searchTerm, this.caseSensitive ? 'g' : 'gi');
-                content = content.replace(regex, (match) => {
-                    count++;
-                    return replaceTerm;
-                });
-            } catch (e) {
-                console.error('Invalid regex:', e);
-                return;
-            }
-        } else {
-            const regex = new RegExp(
-                searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-                this.caseSensitive ? 'g' : 'gi'
-            );
-            content = content.replace(regex, (match) => {
-                count++;
-                return replaceTerm;
-            });
-        }
-
-        if (count > 0) {
-            editor.value = content;
-            editor.dispatchEvent(new Event('input'));
-
-            const matchCount = document.getElementById('match-count');
-            if (matchCount) {
-                matchCount.textContent = `${count}개 바꿈`;
-            }
-        }
+        // Note: Actual highlighting in a textarea is not directly possible
+        // This would require using a more advanced editor like CodeMirror
+        // For now, we just update the count and the first match will be selected on Enter
     },
 
     /**

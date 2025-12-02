@@ -44,10 +44,15 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, content, error}
         """
         try:
+            # Use current file's directory as default path
+            default_dir = ""
+            if self.file_manager.current_file:
+                default_dir = str(self.file_manager.current_file.parent)
+
             file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
                 "파일 열기",
-                "",
+                default_dir,
                 "Markdown Files (*.md *.markdown);;Text Files (*.txt);;All Files (*.*)"
             )
 
@@ -137,10 +142,15 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
+            # Use current file's directory and name as default
+            default_path = "untitled.md"
+            if self.file_manager.current_file:
+                default_path = str(self.file_manager.current_file)
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
                 "다른 이름으로 저장",
-                "untitled.md",
+                default_path,
                 "Markdown Files (*.md);;Text Files (*.txt);;All Files (*.*)"
             )
 
@@ -330,10 +340,15 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
+            # Use current file's directory as default
+            default_path = "document.pdf"
+            if self.file_manager.current_file:
+                default_path = str(self.file_manager.current_file.with_suffix('.pdf'))
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
                 "PDF로 내보내기",
-                "document.pdf",
+                default_path,
                 "PDF Files (*.pdf)"
             )
 
@@ -435,10 +450,15 @@ class BackendAPI(QObject):
             JSON string with {success, content, filepath, images_dir, error}
         """
         try:
+            # Use current file's directory as default
+            default_dir = ""
+            if self.file_manager.current_file:
+                default_dir = str(self.file_manager.current_file.parent)
+
             file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
                 "PDF 가져오기",
-                "",
+                default_dir,
                 "PDF Files (*.pdf)"
             )
 
@@ -495,10 +515,15 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
+            # Use current file's directory as default
+            default_path = "document.docx"
+            if self.file_manager.current_file:
+                default_path = str(self.file_manager.current_file.with_suffix('.docx'))
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
                 "DOCX로 내보내기",
-                "document.docx",
+                default_path,
                 "Word Documents (*.docx)"
             )
 
@@ -532,10 +557,15 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
+            # Use current file's directory as default
+            default_path = "document.html"
+            if self.file_manager.current_file:
+                default_path = str(self.file_manager.current_file.with_suffix('.html'))
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
                 "HTML로 내보내기",
-                "document.html",
+                default_path,
                 "HTML Files (*.html)"
             )
 
@@ -578,10 +608,15 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, relative_path, error}
         """
         try:
+            # Use current file's directory as default
+            default_dir = ""
+            if self.file_manager.current_file:
+                default_dir = str(self.file_manager.current_file.parent)
+
             file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
                 "이미지 선택",
-                "",
+                default_dir,
                 "Image Files (*.png *.jpg *.jpeg *.gif *.bmp *.svg *.webp);;All Files (*.*)"
             )
 
@@ -605,6 +640,10 @@ class BackendAPI(QObject):
 
             project_root = Path(__file__).parent.parent.parent
 
+            # Sanitize filename: replace spaces with underscores
+            original_filename = source_path.name
+            sanitized_filename = original_filename.replace(' ', '_')
+
             # Determine destination based on whether file is saved
             if self.file_manager.current_file:
                 # Saved file: copy to {md_filename}_images/ folder
@@ -612,7 +651,7 @@ class BackendAPI(QObject):
                 images_dir = md_path.parent / f"{md_path.stem}_images"
                 images_dir.mkdir(exist_ok=True)
 
-                dest_filename = source_path.name
+                dest_filename = sanitized_filename
                 dest_path = images_dir / dest_filename
 
                 # Handle duplicate filenames
@@ -635,7 +674,7 @@ class BackendAPI(QObject):
                 temp_images_dir = project_root / 'data' / 'temp' / 'images'
                 temp_images_dir.mkdir(parents=True, exist_ok=True)
 
-                dest_filename = source_path.name
+                dest_filename = sanitized_filename
                 dest_path = temp_images_dir / dest_filename
 
                 # Handle duplicate filenames

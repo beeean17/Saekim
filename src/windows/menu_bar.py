@@ -18,7 +18,6 @@ class MenuBar(QMenuBar):
         """Create all menus"""
         self.create_file_menu()
         self.create_edit_menu()
-        self.create_insert_menu()
         self.create_view_menu()
         self.create_help_menu()
 
@@ -149,51 +148,6 @@ class MenuBar(QMenuBar):
         find_action.triggered.connect(self.find)
         edit_menu.addAction(find_action)
 
-        # Replace
-        replace_action = QAction("바꾸기(&H)...", self)
-        replace_action.setShortcut(QKeySequence.StandardKey.Replace)
-        replace_action.setStatusTip("텍스트 찾아 바꾸기")
-        replace_action.triggered.connect(self.replace)
-        edit_menu.addAction(replace_action)
-
-    def create_insert_menu(self):
-        """Create Insert menu"""
-        insert_menu = self.addMenu("삽입(&I)")
-
-        # Image
-        image_action = QAction("이미지(&I)...", self)
-        image_action.setShortcut("Ctrl+Shift+I")
-        image_action.setStatusTip("이미지 삽입")
-        image_action.triggered.connect(self.insert_image)
-        insert_menu.addAction(image_action)
-
-        # Link
-        link_action = QAction("링크(&L)...", self)
-        link_action.setShortcut("Ctrl+K")
-        link_action.setStatusTip("하이퍼링크 삽입")
-        link_action.triggered.connect(self.insert_link)
-        insert_menu.addAction(link_action)
-
-        insert_menu.addSeparator()
-
-        # Table
-        table_action = QAction("표(&T)...", self)
-        table_action.setStatusTip("표 삽입")
-        table_action.triggered.connect(self.insert_table)
-        insert_menu.addAction(table_action)
-
-        # Code block
-        code_block_action = QAction("코드 블록(&C)", self)
-        code_block_action.setStatusTip("코드 블록 삽입")
-        code_block_action.triggered.connect(self.insert_code_block)
-        insert_menu.addAction(code_block_action)
-
-        # Horizontal rule
-        hr_action = QAction("구분선(&H)", self)
-        hr_action.setStatusTip("수평선 삽입")
-        hr_action.triggered.connect(self.insert_horizontal_rule)
-        insert_menu.addAction(hr_action)
-
     def create_view_menu(self):
         """Create View menu"""
         view_menu = self.addMenu("보기(&V)")
@@ -303,11 +257,6 @@ class MenuBar(QMenuBar):
     def find(self):
         """Find text"""
         js_code = "if (typeof FindReplaceModule !== 'undefined') { FindReplaceModule.showFind(); }"
-        self.parent.webview.page().runJavaScript(js_code)
-
-    def replace(self):
-        """Replace text"""
-        js_code = "if (typeof FindReplaceModule !== 'undefined') { FindReplaceModule.showReplace(); }"
         self.parent.webview.page().runJavaScript(js_code)
 
     def set_theme(self, theme):
