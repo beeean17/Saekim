@@ -5,7 +5,7 @@ Provides a file system tree view for navigating and opening markdown files
 
 from pathlib import Path
 from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
-                              QHBoxLayout, QPushButton, QToolButton)
+                              QHBoxLayout, QPushButton, QToolButton, QLabel)
 from PyQt6.QtCore import pyqtSignal, Qt, QDir
 from PyQt6.QtGui import QFileSystemModel
 
@@ -34,6 +34,13 @@ class FileExplorer(QDockWidget):
         main_widget = QWidget()
         layout = QVBoxLayout(main_widget)
         layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create path label to show current directory
+        self.path_label = QLabel()
+        self.path_label.setWordWrap(True)
+        self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.update_path_label_style()  # Apply initial styling
+        layout.addWidget(self.path_label)
 
         # Create navigation toolbar
         nav_layout = QHBoxLayout()
@@ -158,6 +165,9 @@ class FileExplorer(QDockWidget):
         root_index = self.model.setRootPath(path_str)
         self.tree.setRootIndex(root_index)
 
+        # Update path label
+        self.path_label.setText(f"📁 {path_str}")
+
         # Expand the root
         self.tree.expand(root_index)
 
@@ -233,3 +243,33 @@ class FileExplorer(QDockWidget):
         """Update enabled state of navigation buttons"""
         self.back_button.setEnabled(self.history_index > 0)
         self.forward_button.setEnabled(self.history_index < len(self.path_history) - 1)
+
+    def update_path_label_style(self, is_dark_mode=False):
+        """
+        Update path label styling based on theme
+
+        Args:
+            is_dark_mode: Whether to use dark mode colors
+        """
+        if is_dark_mode:
+            style = """
+                QLabel {
+                    padding: 8px 10px;
+                    background-color: #2b2b2b;
+                    border-bottom: 1px solid #3c3c3c;
+                    font-size: 12px;
+                    color: #e0e0e0;
+                }
+            """
+        else:
+            style = """
+                QLabel {
+                    padding: 8px 10px;
+                    background-color: #f5f5f5;
+                    border-bottom: 1px solid #ddd;
+                    font-size: 12px;
+                    color: #555;
+                }
+            """
+        self.path_label.setStyleSheet(style)
+

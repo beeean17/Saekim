@@ -307,10 +307,19 @@ class MenuBar(QMenuBar):
 
     def set_theme(self, theme):
         """Set theme"""
+        # Update webview theme
         js_code = f"if (typeof ThemeModule !== 'undefined') {{ ThemeModule.setTheme('{theme}'); }}"
         webview = self.get_active_webview()
         if webview:
             webview.page().runJavaScript(js_code)
+
+        # Update tab styling based on theme
+        is_dark = theme == 'dark'
+        self.parent.apply_tab_styling(is_dark_mode=is_dark)
+
+        # Update file explorer styling
+        if hasattr(self.parent, 'file_explorer'):
+            self.parent.file_explorer.update_path_label_style(is_dark_mode=is_dark)
 
     def toggle_fullscreen(self):
         """Toggle fullscreen"""

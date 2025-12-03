@@ -66,6 +66,109 @@ class MainWindow(QMainWindow):
         self.tab_widget.setMovable(True)
         self.tab_widget.setDocumentMode(True)
 
+        # Apply initial styling
+        self.apply_tab_styling()
+
+    def apply_tab_styling(self, is_dark_mode=False):
+        """
+        Apply Chrome-style tab styling based on theme
+
+        Args:
+            is_dark_mode: Whether to use dark mode colors
+        """
+        if is_dark_mode:
+            # Dark mode colors - matching file explorer (system default colors)
+            style = """
+                QTabWidget::pane {
+                    border: 1px solid #454545;
+                    background: #353535;
+                }
+                QTabBar {
+                    background: #353535;
+                }
+                QTabBar::tab {
+                    background: #454545;
+                    color: #d0d0d0;
+                    border: 1px solid #454545;
+                    border-bottom: none;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                    padding: 8px 12px;
+                    margin-right: 2px;
+                }
+                QTabBar::tab:selected {
+                    background: #353535;
+                    color: #ffffff;
+                    border-bottom: 1px solid #353535;
+                }
+                QTabBar::tab:hover {
+                    background: #505050;
+                    color: #ffffff;
+                }
+                QTabBar::close-button {
+                    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNIDQsNCBMIDEyLDEyIE0gNCwxMiBMIDEyLDQiIHN0cm9rZT0iI2QwZDBkMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+);
+                    subcontrol-position: right;
+                    subcontrol-origin: padding;
+                    background: transparent;
+                    border: none;
+                    border-radius: 9px;
+                    width: 18px;
+                    height: 18px;
+                    margin: 0px 4px 0px 8px;
+                }
+                QTabBar::close-button:hover {
+                    background-color: rgba(255, 255, 255, 0.1);
+                }
+                QTabBar::close-button:pressed {
+                    background-color: rgba(255, 255, 255, 0.15);
+                }
+            """
+        else:
+            # Light mode colors
+            style = """
+                QTabWidget::pane {
+                    border: 1px solid #c0c0c0;
+                    background: white;
+                }
+                QTabBar::tab {
+                    background: #f0f0f0;
+                    color: #333333;
+                    border: 1px solid #c0c0c0;
+                    border-bottom: none;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                    padding: 8px 12px;
+                    margin-right: 2px;
+                }
+                QTabBar::tab:selected {
+                    background: white;
+                    color: #000000;
+                    border-bottom: 1px solid white;
+                }
+                QTabBar::tab:hover {
+                    background: #e8e8e8;
+                }
+                QTabBar::close-button {
+                    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNIDQsNCBMIDEyLDEyIE0gNCwxMiBMIDEyLDQiIHN0cm9rZT0iIzVmNjM2OCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+);
+                    subcontrol-position: right;
+                    subcontrol-origin: padding;
+                    background: transparent;
+                    border: none;
+                    border-radius: 9px;
+                    width: 18px;
+                    height: 18px;
+                    margin: 0px 4px 0px 8px;
+                }
+                QTabBar::close-button:hover {
+                    background-color: rgba(95, 99, 104, 0.08);
+                }
+                QTabBar::close-button:pressed {
+                    background-color: rgba(95, 99, 104, 0.15);
+                }
+            """
+
+        self.tab_widget.setStyleSheet(style)
+
         # Connect tab signals
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         self.tab_widget.tabCloseRequested.connect(self.on_tab_close_requested)
