@@ -60,114 +60,21 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         """Initialize UI components with tab interface"""
+        # Get UI path first
+        self.ui_path = Path(__file__).parent.parent / 'ui' / 'index.html'
+        if not self.ui_path.exists():
+            print(f"Warning: UI file not found at {self.ui_path}")
+
+        # Create file explorer first (needed for styling)
+        self.file_explorer = FileExplorer(self)
+        self.file_explorer.file_double_clicked.connect(self.open_file_in_new_tab)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.file_explorer)
+
         # Create tab widget
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.setMovable(True)
         self.tab_widget.setDocumentMode(True)
-
-        # Apply initial styling
-        self.apply_tab_styling()
-
-    def apply_tab_styling(self, is_dark_mode=False):
-        """
-        Apply Chrome-style tab styling based on theme
-
-        Args:
-            is_dark_mode: Whether to use dark mode colors
-        """
-        if is_dark_mode:
-            # Dark mode colors - matching file explorer (system default colors)
-            style = """
-                QTabWidget::pane {
-                    border: 1px solid #454545;
-                    background: #353535;
-                }
-                QTabBar {
-                    background: #353535;
-                }
-                QTabBar::tab {
-                    background: #454545;
-                    color: #d0d0d0;
-                    border: 1px solid #454545;
-                    border-bottom: none;
-                    border-top-left-radius: 4px;
-                    border-top-right-radius: 4px;
-                    padding: 8px 12px;
-                    margin-right: 2px;
-                }
-                QTabBar::tab:selected {
-                    background: #353535;
-                    color: #ffffff;
-                    border-bottom: 1px solid #353535;
-                }
-                QTabBar::tab:hover {
-                    background: #505050;
-                    color: #ffffff;
-                }
-                QTabBar::close-button {
-                    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNIDQsNCBMIDEyLDEyIE0gNCwxMiBMIDEyLDQiIHN0cm9rZT0iI2QwZDBkMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+);
-                    subcontrol-position: right;
-                    subcontrol-origin: padding;
-                    background: transparent;
-                    border: none;
-                    border-radius: 9px;
-                    width: 18px;
-                    height: 18px;
-                    margin: 0px 4px 0px 8px;
-                }
-                QTabBar::close-button:hover {
-                    background-color: rgba(255, 255, 255, 0.1);
-                }
-                QTabBar::close-button:pressed {
-                    background-color: rgba(255, 255, 255, 0.15);
-                }
-            """
-        else:
-            # Light mode colors
-            style = """
-                QTabWidget::pane {
-                    border: 1px solid #c0c0c0;
-                    background: white;
-                }
-                QTabBar::tab {
-                    background: #f0f0f0;
-                    color: #333333;
-                    border: 1px solid #c0c0c0;
-                    border-bottom: none;
-                    border-top-left-radius: 4px;
-                    border-top-right-radius: 4px;
-                    padding: 8px 12px;
-                    margin-right: 2px;
-                }
-                QTabBar::tab:selected {
-                    background: white;
-                    color: #000000;
-                    border-bottom: 1px solid white;
-                }
-                QTabBar::tab:hover {
-                    background: #e8e8e8;
-                }
-                QTabBar::close-button {
-                    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNIDQsNCBMIDEyLDEyIE0gNCwxMiBMIDEyLDQiIHN0cm9rZT0iIzVmNjM2OCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+);
-                    subcontrol-position: right;
-                    subcontrol-origin: padding;
-                    background: transparent;
-                    border: none;
-                    border-radius: 9px;
-                    width: 18px;
-                    height: 18px;
-                    margin: 0px 4px 0px 8px;
-                }
-                QTabBar::close-button:hover {
-                    background-color: rgba(95, 99, 104, 0.08);
-                }
-                QTabBar::close-button:pressed {
-                    background-color: rgba(95, 99, 104, 0.15);
-                }
-            """
-
-        self.tab_widget.setStyleSheet(style)
 
         # Connect tab signals
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
@@ -176,17 +83,88 @@ class MainWindow(QMainWindow):
         # Set as central widget
         self.setCentralWidget(self.tab_widget)
 
-        # Create file explorer
-        self.file_explorer = FileExplorer(self)
-        self.file_explorer.file_double_clicked.connect(self.open_file_in_new_tab)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.file_explorer)
-
-        # Get UI path for later use
-        self.ui_path = Path(__file__).parent.parent / 'ui' / 'index.html'
-        if not self.ui_path.exists():
-            print(f"Warning: UI file not found at {self.ui_path}")
+        # Apply tab styling after file explorer is created
+        self.apply_tab_styling()
 
         print("[OK] Tab interface and file explorer initialized")
+
+    def apply_tab_styling(self):
+        """
+        Apply tab styling to match file explorer colors
+        Uses system palette from file explorer for consistency
+        """
+        # Get colors from file explorer's tree view palette
+        palette = self.file_explorer.tree.palette()
+        base_bg_color = palette.color(palette.ColorRole.Base)
+        text_color = palette.color(palette.ColorRole.Text).name()
+        border_color = palette.color(palette.ColorRole.Mid).name()
+
+        # Detect if we're in dark mode based on text color brightness
+        text_brightness = palette.color(palette.ColorRole.Text).lightness()
+        is_dark_mode = text_brightness > 128
+
+        # Create colors for different tab states
+        if is_dark_mode:
+            # Dark mode: selected tab is brighter, inactive is darker
+            selected_bg = base_bg_color.name()  # Keep original (brightest)
+            inactive_bg = base_bg_color.darker(130).name()  # Much darker for contrast
+            hover_bg = base_bg_color.darker(115).name()  # Between selected and inactive
+            close_icon_color = "#d0d0d0"
+        else:
+            # Light mode: selected tab is lighter, inactive is darker
+            selected_bg = base_bg_color.name()  # Keep original (lightest)
+            inactive_bg = base_bg_color.darker(115).name()  # Darker for contrast
+            hover_bg = base_bg_color.darker(107).name()  # Slightly darker on hover
+            close_icon_color = "#5f6368"
+
+        # Apply styling matching file explorer colors
+        style = f"""
+            QTabWidget::pane {{
+                border: 1px solid {border_color};
+                background: {selected_bg};
+            }}
+            QTabBar {{
+                background: {selected_bg};
+            }}
+            QTabBar::tab {{
+                background: {inactive_bg};
+                color: {text_color};
+                border: 1px solid {border_color};
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                padding: 8px 12px;
+                margin-right: 2px;
+            }}
+            QTabBar::tab:selected {{
+                background: {selected_bg};
+                color: {text_color};
+                border-bottom: 1px solid {selected_bg};
+            }}
+            QTabBar::tab:hover {{
+                background: {hover_bg};
+                color: {text_color};
+            }}
+            QTabBar::close-button {{
+                image: url(data:image/svg+xml;utf8,<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 4,4 L 12,12 M 4,12 L 12,4" stroke="{close_icon_color}" stroke-width="2" stroke-linecap="round"/></svg>);
+                subcontrol-position: right;
+                subcontrol-origin: padding;
+                background: transparent;
+                border: none;
+                border-radius: 9px;
+                width: 18px;
+                height: 18px;
+                margin: 0px 4px 0px 8px;
+            }}
+            QTabBar::close-button:hover {{
+                background-color: rgba(128, 128, 128, 0.15);
+            }}
+            QTabBar::close-button:pressed {{
+                background-color: rgba(128, 128, 128, 0.25);
+            }}
+        """
+
+        self.tab_widget.setStyleSheet(style)
 
     def create_webview(self, tab_id: str) -> QWebEngineView:
         """
@@ -335,11 +313,19 @@ class MainWindow(QMainWindow):
         """Evict least recently used webview from cache"""
         lru_tab_id = self.tab_manager.get_least_recently_used()
 
-        if lru_tab_id and lru_tab_id in self.webview_cache:
-            # Save content before evicting
-            webview = self.webview_cache[lru_tab_id]
+        # If LRU returns None or tab not in cache, evict first cached webview
+        if not lru_tab_id or lru_tab_id not in self.webview_cache:
+            if self.webview_cache:
+                # Evict first item in cache as fallback
+                lru_tab_id = next(iter(self.webview_cache))
+                print(f"[WARN] LRU failed, evicting first cached tab: {lru_tab_id}")
+            else:
+                print("[WARN] No webviews to evict")
+                return
 
+        if lru_tab_id in self.webview_cache:
             # Remove from cache
+            webview = self.webview_cache[lru_tab_id]
             del self.webview_cache[lru_tab_id]
 
             # Cleanup webview
@@ -516,12 +502,14 @@ class MainWindow(QMainWindow):
                     if success:
                         self.create_new_tab(file_path, content)
 
-            # If any tabs were restored, we're done
+            # If any tabs were restored, we're done (ignore initial_file)
             if self.tab_widget.count() > 0:
                 print(f"[OK] Session restored: {self.tab_widget.count()} tabs")
+                # Clear initial_file to prevent opening it again
+                self.initial_file = None
                 return
 
-        # No session or initial file specified
+        # No session - use initial file if provided
         if self.initial_file:
             self.open_file_in_new_tab(self.initial_file)
         else:

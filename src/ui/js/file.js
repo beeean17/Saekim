@@ -575,18 +575,16 @@ const FileModule = {
 
                 if (result.success) {
                     console.log('✅ PDF 변환 성공');
-                    console.log('  - 원본 파일:', result.filepath);
+                    console.log('  - 저장된 파일:', result.filepath);
                     if (result.images_dir) {
                         console.log('  - 이미지 폴더:', result.images_dir);
                     }
 
-                    // Set converted content to editor
-                    if (typeof EditorModule !== 'undefined') {
-                        EditorModule.setContent(result.content);
-                    }
+                    // File is already opened in new tab by backend
+                    // No need to set content here
 
                     // Show success message
-                    let message = 'PDF를 마크다운으로 변환했습니다';
+                    let message = 'PDF를 마크다운으로 변환하여 새 탭에서 열었습니다';
                     if (result.images_dir) {
                         message += `\n이미지가 ${result.images_dir}에 저장되었습니다`;
                     }
@@ -594,7 +592,7 @@ const FileModule = {
                     if (typeof Utils !== 'undefined') {
                         Utils.showToast(message, 'success');
                     }
-                } else if (result.error !== 'Cancelled') {
+                } else if (result.error !== 'Cancelled' && result.error !== 'Save cancelled') {
                     console.error('❌ PDF 변환 실패:', result.error);
 
                     // Provide helpful error messages

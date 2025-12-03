@@ -5,7 +5,8 @@ Provides a file system tree view for navigating and opening markdown files
 
 from pathlib import Path
 from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
-                              QHBoxLayout, QPushButton, QToolButton, QLabel)
+                              QHBoxLayout, QPushButton, QToolButton, QLabel,
+                              QSizePolicy)
 from PyQt6.QtCore import pyqtSignal, Qt, QDir
 from PyQt6.QtGui import QFileSystemModel
 
@@ -25,6 +26,9 @@ class FileExplorer(QDockWidget):
         self.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
                         QDockWidget.DockWidgetFeature.DockWidgetClosable)
 
+        # Set minimum width to prevent resizing below navigation buttons
+        self.setMinimumWidth(100)
+
         # Path history for navigation
         self.path_history = []
         self.history_index = -1
@@ -39,7 +43,9 @@ class FileExplorer(QDockWidget):
         self.path_label = QLabel()
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.update_path_label_style()  # Apply initial styling
+        self.path_label.setMinimumHeight(0)  # Allow label to shrink
+        # Set size policy to Ignored so label doesn't affect minimum width
+        self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(self.path_label)
 
         # Create navigation toolbar
@@ -168,6 +174,9 @@ class FileExplorer(QDockWidget):
         # Update path label
         self.path_label.setText(f"📁 {path_str}")
 
+        # Update path label styling to match tree view
+        self.update_path_label_style()
+
         # Expand the root
         self.tree.expand(root_index)
 
@@ -244,32 +253,24 @@ class FileExplorer(QDockWidget):
         self.back_button.setEnabled(self.history_index > 0)
         self.forward_button.setEnabled(self.history_index < len(self.path_history) - 1)
 
-    def update_path_label_style(self, is_dark_mode=False):
+    def update_path_label_style(self):
         """
-        Update path label styling based on theme
+        Update path label styling to match tree view colors
+        """
+        # Get colors from tree view palette
+        palette = self.tree.palette()
+        bg_color = palette.color(palette.ColorRole.Base)
+        text_color = palette.color(palette.ColorRole.Text)
+        border_color = palette.color(palette.ColorRole.Mid)
 
-        Args:
-            is_dark_mode: Whether to use dark mode colors
+        style = f"""
+            QLabel {{
+                padding: 8px 10px;
+                background-color: {bg_color.name()};
+                border-bottom: 1px solid {border_color.name()};
+                font-size: 12px;
+                color: {text_color.name()};
+            }}
         """
-        if is_dark_mode:
-            style = """
-                QLabel {
-                    padding: 8px 10px;
-                    background-color: #2b2b2b;
-                    border-bottom: 1px solid #3c3c3c;
-                    font-size: 12px;
-                    color: #e0e0e0;
-                }
-            """
-        else:
-            style = """
-                QLabel {
-                    padding: 8px 10px;
-                    background-color: #f5f5f5;
-                    border-bottom: 1px solid #ddd;
-                    font-size: 12px;
-                    color: #555;
-                }
-            """
         self.path_label.setStyleSheet(style)
 

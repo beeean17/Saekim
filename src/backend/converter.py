@@ -646,9 +646,17 @@ svg tspan {
                 page_rect = page.rect
                 page_height = page_rect.height
 
-                # Define header/footer regions (top 12%, bottom 10%)
-                header_threshold = page_height * 0.12
-                footer_threshold = page_height * 0.90
+                # Define header/footer regions - only for multi-page documents
+                # Single page PDFs often don't have headers/footers
+                use_filtering = total_pages > 2
+                if use_filtering:
+                    # Use conservative thresholds (top 5%, bottom 5%)
+                    header_threshold = page_height * 0.05
+                    footer_threshold = page_height * 0.95
+                else:
+                    # No filtering for short documents
+                    header_threshold = 0
+                    footer_threshold = page_height
 
                 # Extract text blocks with font information
                 blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
@@ -665,20 +673,23 @@ svg tspan {
 
                     if all_fonts:
                         logger.info(f"PDF fonts detected: {sorted(all_fonts)}")
+                    logger.info(f"PDF pages: {total_pages}, using header/footer filtering: {use_filtering}")
 
                 for block in blocks:
                     # Get block's vertical position (y0 = top, y1 = bottom)
                     block_y0 = block.get("bbox", [0, 0, 0, 0])[1]
                     block_y1 = block.get("bbox", [0, 0, 0, 0])[3]
 
-                    # Skip header/footer regions based on BBox (applies to ALL block types)
-                    if block_y0 < header_threshold:
-                        # Header region - skip unless we're in a code block
-                        if not in_code_block:
-                            continue
-                    if block_y1 > footer_threshold:
-                        # Footer region - always skip (page numbers, copyright, logos, etc.)
-                        continue
+                    # Skip header/footer regions based on BBox (only if filtering is enabled)
+                    if use_filtering:
+                        if block_y0 < header_threshold:
+                            # Header region - skip unless we're in a code block
+                            if not in_code_block:
+                                continue
+                        if block_y1 > footer_threshold:
+                            # Footer region - skip unless we're in a code block
+                            if not in_code_block:
+                                continue
 
                     if block["type"] == 0:  # Text block
                         # Process block with code detection
@@ -1770,12 +1781,20 @@ svg tspan {
             with pdfplumber.open(pdf_path) as pdf:
                 total_pages = len(pdf.pages)
 
+                # Define header/footer regions - only for multi-page documents
+                use_filtering = total_pages > 2
+
                 for page_num, page in enumerate(pdf.pages, 1):
                     page_height = page.height
 
-                    # Define header/footer regions (top 12%, bottom 10%)
-                    header_threshold = page_height * 0.12
-                    footer_threshold = page_height * 0.90
+                    if use_filtering:
+                        # Use conservative thresholds (top 5%, bottom 5%)
+                        header_threshold = page_height * 0.05
+                        footer_threshold = page_height * 0.95
+                    else:
+                        # No filtering for short documents
+                        header_threshold = 0
+                        footer_threshold = page_height
 
                     # Extract tables first (with BBox filtering)
                     tables = page.extract_tables()
@@ -1804,10 +1823,10 @@ svg tspan {
 
                         # Sort by y position and process each line
                         for y in sorted(lines_by_y.keys()):
-                            # Skip header/footer regions
-                            if y < header_threshold and not in_code_block:
+                            # Skip header/footer regions (only if filtering enabled)
+                            if use_filtering and y < header_threshold and not in_code_block:
                                 continue
-                            if y > footer_threshold:
+                            if use_filtering and y > footer_threshold and not in_code_block:
                                 continue
 
                             # Build line text from chars

@@ -83,7 +83,7 @@ class BackendAPI(QObject):
 
             if success:
                 logger.info(f"File opened in new tab: {file_path}")
-                self.file_opened.emit(file_path, content)
+                # Don't emit file_opened signal - new tab handles its own content loading
 
             return json.dumps({
                 "success": success,
@@ -494,64 +494,110 @@ class BackendAPI(QObject):
     def import_from_pdf(self) -> str:
         """
         Import PDF and convert to markdown with enhanced extraction
+        Prompts user to save the markdown file and opens it in a new tab
 
         Features:
         - Text extraction with heading/formatting detection
         - Table extraction
         - Image extraction (saved to {pdf_name}_images folder)
+        - Saves to user-selected location and opens in new tab
 
         Returns:
-            JSON string with {success, content, filepath, images_dir, error}
+            JSON string with {success, filepath, images_dir, error}
         """
         try:
+            # Step 1: Select PDF file to import
             # Use active tab's file directory as default
             default_dir = ""
             if self.active_tab and self.active_tab.file_path:
                 default_dir = str(self.active_tab.file_path.parent)
 
-            file_path, _ = QFileDialog.getOpenFileName(
+            pdf_file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
                 "PDF 가져오기",
                 default_dir,
                 "PDF Files (*.pdf)"
             )
 
-            if not file_path:
+            if not pdf_file_path:
                 return json.dumps({
                     "success": False,
-                    "content": "",
                     "filepath": "",
                     "images_dir": "",
                     "error": "Cancelled"
                 })
 
-            # Determine images output directory
-            pdf_path = Path(file_path)
+            # Step 2: Convert PDF to markdown
+            pdf_path = Path(pdf_file_path)
             images_dir = pdf_path.parent / f"{pdf_path.stem}_images"
 
             success, content, error = self.converter.pdf_to_markdown(
-                file_path,
+                pdf_file_path,
                 output_dir=str(images_dir)
             )
 
-            if success:
-                logger.info(f"PDF imported: {file_path}")
-                if images_dir.exists():
-                    logger.info(f"Images extracted to: {images_dir}")
+            if not success:
+                return json.dumps({
+                    "success": False,
+                    "filepath": "",
+                    "images_dir": "",
+                    "error": error
+                })
+
+            logger.info(f"PDF converted to markdown: {pdf_file_path}")
+            if images_dir.exists():
+                logger.info(f"Images extracted to: {images_dir}")
+
+            # Step 3: Prompt user to save markdown file
+            # Default path is PDF directory with .md extension
+            default_save_path = str(pdf_path.with_suffix('.md'))
+
+            md_file_path, _ = QFileDialog.getSaveFileName(
+                self.main_window,
+                "마크다운 파일 저장",
+                default_save_path,
+                "Markdown Files (*.md);;All Files (*.*)"
+            )
+
+            if not md_file_path:
+                return json.dumps({
+                    "success": False,
+                    "filepath": "",
+                    "images_dir": "",
+                    "error": "Save cancelled"
+                })
+
+            # Step 4: Save markdown file
+            save_success, final_content, save_error = FileManager.save_file(
+                content,
+                md_file_path,
+                None  # No old file path
+            )
+
+            if not save_success:
+                return json.dumps({
+                    "success": False,
+                    "filepath": "",
+                    "images_dir": "",
+                    "error": f"Failed to save: {save_error}"
+                })
+
+            logger.info(f"Markdown file saved: {md_file_path}")
+
+            # Step 5: Open saved file in new tab
+            self.main_window.open_file_in_new_tab(md_file_path)
 
             return json.dumps({
-                "success": success,
-                "content": content,
-                "filepath": file_path,
+                "success": True,
+                "filepath": md_file_path,
                 "images_dir": str(images_dir) if images_dir.exists() else "",
-                "error": error
+                "error": ""
             })
 
         except Exception as e:
             logger.error(f"Error in import_from_pdf: {e}")
             return json.dumps({
                 "success": False,
-                "content": "",
                 "filepath": "",
                 "images_dir": "",
                 "error": str(e)
