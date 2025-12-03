@@ -1,0 +1,235 @@
+"""
+File Explorer Widget
+Provides a file system tree view for navigating and opening markdown files
+"""
+
+from pathlib import Path
+from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
+                              QHBoxLayout, QPushButton, QToolButton)
+from PyQt6.QtCore import pyqtSignal, Qt, QDir
+from PyQt6.QtGui import QFileSystemModel
+
+
+class FileExplorer(QDockWidget):
+    """File explorer dock widget with tree view and history navigation"""
+
+    # Signal emitted when a file is double-clicked
+    file_double_clicked = pyqtSignal(str)  # file_path
+
+    def __init__(self, parent=None):
+        super().__init__("파일 탐색기", parent)
+
+        # Set dock properties
+        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea |
+                            Qt.DockWidgetArea.RightDockWidgetArea)
+        self.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
+                        QDockWidget.DockWidgetFeature.DockWidgetClosable)
+
+        # Path history for navigation
+        self.path_history = []
+        self.history_index = -1
+        self.navigating_history = False  # Flag to prevent adding to history during navigation
+
+        # Create main widget and layout
+        main_widget = QWidget()
+        layout = QVBoxLayout(main_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create navigation toolbar
+        nav_layout = QHBoxLayout()
+        nav_layout.setContentsMargins(5, 2, 5, 2)
+
+        # Back button
+        self.back_button = QToolButton()
+        self.back_button.setText("←")
+        self.back_button.setToolTip("이전 경로")
+        self.back_button.setEnabled(False)
+        self.back_button.clicked.connect(self.go_back)
+        nav_layout.addWidget(self.back_button)
+
+        # Forward button
+        self.forward_button = QToolButton()
+        self.forward_button.setText("→")
+        self.forward_button.setToolTip("다음 경로")
+        self.forward_button.setEnabled(False)
+        self.forward_button.clicked.connect(self.go_forward)
+        nav_layout.addWidget(self.forward_button)
+
+        # Up button
+        self.up_button = QToolButton()
+        self.up_button.setText("↑")
+        self.up_button.setToolTip("상위 디렉토리")
+        self.up_button.clicked.connect(self.go_up)
+        nav_layout.addWidget(self.up_button)
+
+        nav_layout.addStretch()
+
+        layout.addLayout(nav_layout)
+
+        # Create file system model
+        self.model = QFileSystemModel()
+        self.model.setRootPath("")
+
+        # Set name filters for markdown and text files
+        self.model.setNameFilters(["*.md", "*.markdown", "*.txt"])
+        self.model.setNameFilterDisables(False)  # Hide non-matching files
+
+        # Create tree view
+        self.tree = QTreeView()
+        self.tree.setModel(self.model)
+
+        # Configure tree view appearance
+        self.tree.setAnimated(True)
+        self.tree.setIndentation(20)
+        self.tree.setSortingEnabled(True)
+        self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+
+        # Hide size, type, and date columns - only show name
+        self.tree.setColumnHidden(1, True)  # Size
+        self.tree.setColumnHidden(2, True)  # Type
+        self.tree.setColumnHidden(3, True)  # Date Modified
+
+        # Set column width
+        self.tree.setColumnWidth(0, 250)
+
+        # Connect double-click signal
+        self.tree.doubleClicked.connect(self._on_double_click)
+
+        # Add tree to layout
+        layout.addWidget(self.tree)
+
+        # Set main widget
+        self.setWidget(main_widget)
+
+        # Set default root to user's home directory
+        self.set_root_path(str(Path.home()))
+
+    def _on_double_click(self, index):
+        """
+        Handle double-click on tree item
+
+        Args:
+            index: QModelIndex of clicked item
+        """
+        file_path = self.model.filePath(index)
+
+        # Only emit signal for files, not directories
+        if self.model.isDir(index):
+            # For directories, just expand/collapse
+            if self.tree.isExpanded(index):
+                self.tree.collapse(index)
+            else:
+                self.tree.expand(index)
+        else:
+            # For files, emit signal to open in new tab
+            self.file_double_clicked.emit(file_path)
+
+    def set_root_path(self, path: str):
+        """
+        Set the root path for the file explorer
+
+        Args:
+            path: Root directory path to display
+        """
+        if not path:
+            path = str(Path.home())
+
+        # Convert to Path object and resolve
+        root_path = Path(path)
+        if root_path.is_file():
+            root_path = root_path.parent
+
+        path_str = str(root_path)
+
+        # Add to history if not navigating and different from current
+        if not self.navigating_history:
+            # If we're not at the end of history, remove forward history
+            if self.history_index < len(self.path_history) - 1:
+                self.path_history = self.path_history[:self.history_index + 1]
+
+            # Only add if different from current path
+            if not self.path_history or self.path_history[-1] != path_str:
+                self.path_history.append(path_str)
+                self.history_index = len(self.path_history) - 1
+
+            self._update_navigation_buttons()
+
+        # Set root path in model
+        root_index = self.model.setRootPath(path_str)
+        self.tree.setRootIndex(root_index)
+
+        # Expand the root
+        self.tree.expand(root_index)
+
+    def focus_on_file(self, file_path: str):
+        """
+        Focus and select a specific file in the tree
+
+        Args:
+            file_path: Path to the file to focus on
+        """
+        if not file_path:
+            return
+
+        # Get the model index for the file
+        index = self.model.index(file_path)
+
+        if index.isValid():
+            # Scroll to the file and select it
+            self.tree.scrollTo(index)
+            self.tree.setCurrentIndex(index)
+
+            # Expand parent directories to make file visible
+            parent = index.parent()
+            while parent.isValid():
+                self.tree.expand(parent)
+                parent = parent.parent()
+
+    def get_current_path(self) -> str:
+        """
+        Get the currently selected path in the tree
+
+        Returns:
+            Path of selected item, or empty string if none
+        """
+        current_index = self.tree.currentIndex()
+        if current_index.isValid():
+            return self.model.filePath(current_index)
+        return ""
+
+    def refresh(self):
+        """Refresh the file system model"""
+        current_root = self.model.rootPath()
+        self.model.setRootPath("")
+        self.model.setRootPath(current_root)
+
+    def go_back(self):
+        """Navigate to previous path in history"""
+        if self.history_index > 0:
+            self.history_index -= 1
+            self.navigating_history = True
+            self.set_root_path(self.path_history[self.history_index])
+            self.navigating_history = False
+            self._update_navigation_buttons()
+
+    def go_forward(self):
+        """Navigate to next path in history"""
+        if self.history_index < len(self.path_history) - 1:
+            self.history_index += 1
+            self.navigating_history = True
+            self.set_root_path(self.path_history[self.history_index])
+            self.navigating_history = False
+            self._update_navigation_buttons()
+
+    def go_up(self):
+        """Navigate to parent directory"""
+        current_root = self.model.rootPath()
+        if current_root:
+            parent = Path(current_root).parent
+            if parent != Path(current_root):  # Not already at root
+                self.set_root_path(str(parent))
+
+    def _update_navigation_buttons(self):
+        """Update enabled state of navigation buttons"""
+        self.back_button.setEnabled(self.history_index > 0)
+        self.forward_button.setEnabled(self.history_index < len(self.path_history) - 1)

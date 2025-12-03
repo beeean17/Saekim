@@ -1,6 +1,6 @@
 """
 File Manager Module
-Handles all file I/O operations for markdown files
+Stateless utility class for file I/O operations on markdown files
 """
 
 import json
@@ -12,14 +12,13 @@ from datetime import datetime
 
 
 class FileManager:
-    """Manages file operations for markdown documents"""
+    """Stateless utility class for file operations"""
 
-    def __init__(self):
-        self.current_file: Optional[Path] = None
-        self.is_modified: bool = False
-        self.encoding: str = 'utf-8'
+    ENCODING = 'utf-8'
+    ALLOWED_EXTENSIONS = ['.md', '.txt', '.markdown']
 
-    def open_file(self, file_path: str) -> Tuple[bool, str, str]:
+    @staticmethod
+    def open_file(file_path: str) -> Tuple[bool, str, str]:
         """
         Open a markdown file
 
@@ -39,16 +38,12 @@ class FileManager:
                 return False, "", f"Not a file: {file_path}"
 
             # Check file extension
-            allowed_extensions = ['.md', '.txt', '.markdown']
-            if path.suffix.lower() not in allowed_extensions:
+            if path.suffix.lower() not in FileManager.ALLOWED_EXTENSIONS:
                 return False, "", f"Unsupported file type: {path.suffix}"
 
             # Read file content
-            with open(path, 'r', encoding=self.encoding) as f:
+            with open(path, 'r', encoding=FileManager.ENCODING) as f:
                 content = f.read()
-
-            self.current_file = path
-            self.is_modified = False
 
             return True, content, ""
 
@@ -59,25 +54,21 @@ class FileManager:
         except Exception as e:
             return False, "", f"Error opening file: {str(e)}"
 
-    def save_file(self, content: str, file_path: Optional[str] = None) -> Tuple[bool, str]:
+    @staticmethod
+    def save_file(content: str, file_path: str, old_file_path: Optional[str] = None) -> Tuple[bool, str, str]:
         """
         Save content to a file
 
         Args:
             content: The markdown content to save
-            file_path: Optional path to save to (if None, uses current_file)
+            file_path: Path to save to
+            old_file_path: Previous file path (for detecting "Save As" to move images)
 
         Returns:
-            Tuple of (success, error_message)
+            Tuple of (success, final_content, error_message)
         """
         try:
-            # Determine target path
-            if file_path:
-                path = Path(file_path)
-            elif self.current_file:
-                path = self.current_file
-            else:
-                return False, "No file path specified"
+            path = Path(file_path)
 
             # Ensure parent directory exists
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,72 +78,69 @@ class FileManager:
                 path = path.with_suffix('.md')
 
             # Move temporary images if this is a new file or "Save As"
-            is_new_location = (not self.current_file) or (file_path and Path(file_path) != self.current_file)
+            is_new_location = (not old_file_path) or (Path(file_path) != Path(old_file_path))
             if is_new_location:
-                content = self._move_temp_images_to_file_location(content, path)
+                content = FileManager._move_temp_images_to_file_location(content, path)
 
             # Write content
-            with open(path, 'w', encoding=self.encoding) as f:
+            with open(path, 'w', encoding=FileManager.ENCODING) as f:
                 f.write(content)
 
-            self.current_file = path
-            self.is_modified = False
-
-            return True, ""
+            return True, content, ""
 
         except PermissionError:
-            return False, f"Permission denied: {path}"
+            return False, content, f"Permission denied: {path}"
         except Exception as e:
-            return False, f"Error saving file: {str(e)}"
+            return False, content, f"Error saving file: {str(e)}"
 
-    def get_current_file_path(self) -> str:
-        """Get the current file path as string"""
-        if self.current_file:
-            return str(self.current_file.absolute())
-        return ""
+    @staticmethod
+    def get_file_name(file_path: Optional[str]) -> str:
+        """
+        Get file name from path
 
-    def get_current_file_name(self) -> str:
-        """Get the current file name"""
-        if self.current_file:
-            return self.current_file.name
+        Args:
+            file_path: Path to file
+
+        Returns:
+            File name or "Untitled" if no path
+        """
+        if file_path:
+            return Path(file_path).name
         return "Untitled"
 
-    def mark_modified(self, modified: bool = True):
-        """Mark the document as modified or unmodified"""
-        self.is_modified = modified
+    @staticmethod
+    def get_file_info(file_path: str) -> dict:
+        """
+        Get information about a file
 
-    def is_file_modified(self) -> bool:
-        """Check if the current file has unsaved changes"""
-        return self.is_modified
+        Args:
+            file_path: Path to file
 
-    def new_file(self):
-        """Create a new file (clear current state)"""
-        self.current_file = None
-        self.is_modified = False
+        Returns:
+            Dictionary with file information
+        """
+        path = Path(file_path)
 
-    def get_file_info(self) -> dict:
-        """Get information about the current file"""
-        if not self.current_file or not self.current_file.exists():
+        if not path.exists():
             return {
                 "name": "Untitled",
                 "path": "",
                 "size": 0,
-                "modified": False,
                 "exists": False
             }
 
-        stat = self.current_file.stat()
+        stat = path.stat()
 
         return {
-            "name": self.current_file.name,
-            "path": str(self.current_file.absolute()),
+            "name": path.name,
+            "path": str(path.absolute()),
             "size": stat.st_size,
             "modified_time": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "modified": self.is_modified,
             "exists": True
         }
 
-    def _extract_temp_image_paths(self, content: str) -> List[str]:
+    @staticmethod
+    def _extract_temp_image_paths(content: str) -> List[str]:
         """
         Extract temporary image paths from markdown content
 
@@ -166,7 +154,8 @@ class FileManager:
         pattern = r'!\[.*?\]\((data/(?:temp/)?images/[^)]+)\)'
         return re.findall(pattern, content)
 
-    def _move_temp_images_to_file_location(self, content: str, md_path: Path) -> str:
+    @staticmethod
+    def _move_temp_images_to_file_location(content: str, md_path: Path) -> str:
         """
         Move temporary images to markdown file location and update paths
 
@@ -178,7 +167,7 @@ class FileManager:
             Updated markdown content with new image paths
         """
         # Extract temporary image paths
-        temp_images = self._extract_temp_image_paths(content)
+        temp_images = FileManager._extract_temp_image_paths(content)
 
         if not temp_images:
             # No temporary images to move

@@ -20,6 +20,7 @@ class BackendAPI(QObject):
     """
     Backend API exposed to JavaScript via QWebChannel
     All methods decorated with @pyqtSlot can be called from JavaScript
+    Tab-aware version - all operations work on the active tab
     """
 
     # Signals to send data from Python to JavaScript
@@ -30,24 +31,33 @@ class BackendAPI(QObject):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-        self.file_manager = FileManager()
         self.converter = DocumentConverter()
         logger.info("Backend API initialized")
+
+    @property
+    def tab_manager(self):
+        """Get tab manager from main window"""
+        return self.main_window.tab_manager
+
+    @property
+    def active_tab(self):
+        """Get currently active tab"""
+        return self.tab_manager.get_active_tab()
 
     @pyqtSlot(result=str)
     def open_file_dialog(self) -> str:
         """
-        Open file dialog and return the selected file path
+        Open file dialog and create new tab with selected file
         Called from JavaScript when user clicks File > Open
 
         Returns:
             JSON string with {success, filepath, content, error}
         """
         try:
-            # Use current file's directory as default path
+            # Use active tab's file directory as default path
             default_dir = ""
-            if self.file_manager.current_file:
-                default_dir = str(self.file_manager.current_file.parent)
+            if self.active_tab and self.active_tab.file_path:
+                default_dir = str(self.active_tab.file_path.parent)
 
             file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
@@ -65,14 +75,15 @@ class BackendAPI(QObject):
                     "error": "Cancelled"
                 })
 
-            success, content, error = self.file_manager.open_file(file_path)
+            # Open file in new tab
+            self.main_window.open_file_in_new_tab(file_path)
+
+            # Load file content for response
+            success, content, error = FileManager.open_file(file_path)
 
             if success:
-                logger.info(f"File opened: {file_path}")
+                logger.info(f"File opened in new tab: {file_path}")
                 self.file_opened.emit(file_path, content)
-                self.main_window.setWindowTitle(
-                    f"새김 - {self.file_manager.get_current_file_name()}"
-                )
 
             return json.dumps({
                 "success": success,
@@ -93,7 +104,7 @@ class BackendAPI(QObject):
     @pyqtSlot(str, result=str)
     def save_file(self, content: str) -> str:
         """
-        Save content to the current file
+        Save content to the active tab's file
 
         Args:
             content: Markdown content to save
@@ -102,23 +113,41 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
-            if not self.file_manager.current_file:
-                # No current file, trigger Save As
+            if not self.active_tab:
+                return json.dumps({
+                    "success": False,
+                    "filepath": "",
+                    "error": "No active tab"
+                })
+
+            if not self.active_tab.file_path:
+                # No file path, trigger Save As
                 return self.save_file_as_dialog(content)
 
-            success, error = self.file_manager.save_file(content)
+            # Save file
+            old_file_path = str(self.active_tab.file_path) if self.active_tab.file_path else None
+            success, final_content, error = FileManager.save_file(
+                content,
+                str(self.active_tab.file_path),
+                old_file_path
+            )
 
             if success:
-                filepath = self.file_manager.get_current_file_path()
+                # Update tab manager
+                self.tab_manager.update_tab_content(self.active_tab.tab_id, final_content)
+                self.tab_manager.update_tab_modified(self.active_tab.tab_id, False)
+
+                filepath = str(self.active_tab.file_path)
                 logger.info(f"File saved: {filepath}")
                 self.file_saved.emit(filepath)
-                self.main_window.setWindowTitle(
-                    f"새김 - {self.file_manager.get_current_file_name()}"
-                )
+
+                # Update window title
+                title = FileManager.get_file_name(filepath)
+                self.main_window.setWindowTitle(f"새김 - {title}")
 
             return json.dumps({
                 "success": success,
-                "filepath": self.file_manager.get_current_file_path(),
+                "filepath": str(self.active_tab.file_path) if success else "",
                 "error": error
             })
 
@@ -142,10 +171,17 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
-            # Use current file's directory and name as default
+            if not self.active_tab:
+                return json.dumps({
+                    "success": False,
+                    "filepath": "",
+                    "error": "No active tab"
+                })
+
+            # Use active tab's file path as default
             default_path = "untitled.md"
-            if self.file_manager.current_file:
-                default_path = str(self.file_manager.current_file)
+            if self.active_tab.file_path:
+                default_path = str(self.active_tab.file_path)
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
@@ -162,14 +198,22 @@ class BackendAPI(QObject):
                     "error": "Cancelled"
                 })
 
-            success, error = self.file_manager.save_file(content, file_path)
+            # Save file
+            old_file_path = str(self.active_tab.file_path) if self.active_tab.file_path else None
+            success, final_content, error = FileManager.save_file(content, file_path, old_file_path)
 
             if success:
+                # Update tab manager
+                self.tab_manager.update_tab_file_path(self.active_tab.tab_id, file_path)
+                self.tab_manager.update_tab_content(self.active_tab.tab_id, final_content)
+                self.tab_manager.update_tab_modified(self.active_tab.tab_id, False)
+
                 logger.info(f"File saved as: {file_path}")
                 self.file_saved.emit(file_path)
-                self.main_window.setWindowTitle(
-                    f"새김 - {self.file_manager.get_current_file_name()}"
-                )
+
+                # Update window title
+                title = FileManager.get_file_name(file_path)
+                self.main_window.setWindowTitle(f"새김 - {title}")
 
             return json.dumps({
                 "success": success,
@@ -187,23 +231,11 @@ class BackendAPI(QObject):
 
     @pyqtSlot()
     def new_file(self):
-        """Create a new file (clear editor)"""
+        """Create a new tab with empty content"""
         try:
-            # Check if current file has unsaved changes
-            if self.file_manager.is_file_modified():
-                reply = QMessageBox.question(
-                    self.main_window,
-                    "저장하지 않은 변경사항",
-                    "현재 문서에 저장하지 않은 변경사항이 있습니다. 계속하시겠습니까?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-
-                if reply == QMessageBox.StandardButton.No:
-                    return
-
-            self.file_manager.new_file()
-            self.main_window.setWindowTitle("새김 - Untitled")
-            logger.info("New file created")
+            # Create new tab
+            self.main_window.create_new_tab()
+            logger.info("New file tab created")
 
         except Exception as e:
             logger.error(f"Error in new_file: {e}")
@@ -211,30 +243,52 @@ class BackendAPI(QObject):
     @pyqtSlot(str)
     def mark_modified(self, is_modified: str):
         """
-        Mark document as modified (called from JS when content changes)
+        Mark active tab as modified (called from JS when content changes)
 
         Args:
             is_modified: "true" or "false" string
         """
+        if not self.active_tab:
+            return
+
         modified = is_modified.lower() == "true"
-        self.file_manager.mark_modified(modified)
+        self.tab_manager.update_tab_modified(self.active_tab.tab_id, modified)
 
         # Update window title with asterisk if modified
-        title = f"새김 - {self.file_manager.get_current_file_name()}"
+        title = f"새김 - {self.active_tab.get_display_name()}"
         if modified:
-            title += " *"
+            title = f"*{title}"
         self.main_window.setWindowTitle(title)
 
     @pyqtSlot(result=str)
     def get_file_info(self) -> str:
         """
-        Get current file information
+        Get active tab's file information
 
         Returns:
             JSON string with file info
         """
         try:
-            info = self.file_manager.get_file_info()
+            if not self.active_tab:
+                return json.dumps({
+                    "name": "Untitled",
+                    "path": "",
+                    "size": 0,
+                    "exists": False
+                })
+
+            if self.active_tab.file_path:
+                info = FileManager.get_file_info(str(self.active_tab.file_path))
+                info["modified"] = self.active_tab.is_modified
+            else:
+                info = {
+                    "name": "Untitled",
+                    "path": "",
+                    "size": 0,
+                    "modified": self.active_tab.is_modified,
+                    "exists": False
+                }
+
             return json.dumps(info)
         except Exception as e:
             logger.error(f"Error in get_file_info: {e}")
@@ -340,10 +394,10 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
-            # Use current file's directory as default
+            # Use active tab's file directory as default
             default_path = "document.pdf"
-            if self.file_manager.current_file:
-                default_path = str(self.file_manager.current_file.with_suffix('.pdf'))
+            if self.active_tab and self.active_tab.file_path:
+                default_path = str(self.active_tab.file_path.with_suffix('.pdf'))
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
@@ -450,10 +504,10 @@ class BackendAPI(QObject):
             JSON string with {success, content, filepath, images_dir, error}
         """
         try:
-            # Use current file's directory as default
+            # Use active tab's file directory as default
             default_dir = ""
-            if self.file_manager.current_file:
-                default_dir = str(self.file_manager.current_file.parent)
+            if self.active_tab and self.active_tab.file_path:
+                default_dir = str(self.active_tab.file_path.parent)
 
             file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
@@ -515,10 +569,10 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
-            # Use current file's directory as default
+            # Use active tab's file directory as default
             default_path = "document.docx"
-            if self.file_manager.current_file:
-                default_path = str(self.file_manager.current_file.with_suffix('.docx'))
+            if self.active_tab and self.active_tab.file_path:
+                default_path = str(self.active_tab.file_path.with_suffix('.docx'))
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
@@ -557,10 +611,10 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
-            # Use current file's directory as default
+            # Use active tab's file directory as default
             default_path = "document.html"
-            if self.file_manager.current_file:
-                default_path = str(self.file_manager.current_file.with_suffix('.html'))
+            if self.active_tab and self.active_tab.file_path:
+                default_path = str(self.active_tab.file_path.with_suffix('.html'))
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self.main_window,
@@ -608,10 +662,10 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, relative_path, error}
         """
         try:
-            # Use current file's directory as default
+            # Use active tab's file directory as default
             default_dir = ""
-            if self.file_manager.current_file:
-                default_dir = str(self.file_manager.current_file.parent)
+            if self.active_tab and self.active_tab.file_path:
+                default_dir = str(self.active_tab.file_path.parent)
 
             file_path, _ = QFileDialog.getOpenFileName(
                 self.main_window,
@@ -644,10 +698,10 @@ class BackendAPI(QObject):
             original_filename = source_path.name
             sanitized_filename = original_filename.replace(' ', '_')
 
-            # Determine destination based on whether file is saved
-            if self.file_manager.current_file:
+            # Determine destination based on whether active tab has saved file
+            if self.active_tab and self.active_tab.file_path:
                 # Saved file: copy to {md_filename}_images/ folder
-                md_path = self.file_manager.current_file
+                md_path = self.active_tab.file_path
                 images_dir = md_path.parent / f"{md_path.stem}_images"
                 images_dir.mkdir(exist_ok=True)
 

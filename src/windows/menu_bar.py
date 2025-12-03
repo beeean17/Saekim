@@ -91,6 +91,22 @@ class MenuBar(QMenuBar):
 
         file_menu.addSeparator()
 
+        # Close tab
+        close_tab_action = QAction("탭 닫기(&W)", self)
+        close_tab_action.setShortcut("Ctrl+W")
+        close_tab_action.setStatusTip("현재 탭 닫기")
+        close_tab_action.triggered.connect(self.close_current_tab)
+        file_menu.addAction(close_tab_action)
+
+        # Close all tabs
+        close_all_action = QAction("모든 탭 닫기", self)
+        close_all_action.setShortcut("Ctrl+Shift+W")
+        close_all_action.setStatusTip("모든 탭 닫기")
+        close_all_action.triggered.connect(self.close_all_tabs)
+        file_menu.addAction(close_all_action)
+
+        file_menu.addSeparator()
+
         # Exit
         exit_action = QAction("종료(&X)", self)
         exit_action.setShortcut(QKeySequence.StandardKey.Quit)
@@ -184,41 +200,69 @@ class MenuBar(QMenuBar):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
 
-    # Action handlers (placeholders for now)
+    # Helper methods
+    def get_active_webview(self):
+        """Get the active tab's webview"""
+        active_tab = self.parent.tab_manager.get_active_tab()
+        if not active_tab:
+            return None
+        return self.parent.webview_cache.get(active_tab.tab_id)
+
+    # Action handlers
     def new_file(self):
-        """Create new file"""
-        js_code = "if (typeof FileModule !== 'undefined') { FileModule.newFile(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        """Create new file in new tab"""
+        self.parent.backend.new_file()
 
     def open_file(self):
-        """Open file"""
-        js_code = "if (typeof FileModule !== 'undefined') { FileModule.openFile(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        """Open file in new tab"""
+        # Call backend directly to avoid webview dependency
+        self.parent.backend.open_file_dialog()
 
     def save_file(self):
-        """Save file"""
+        """Save active tab's file"""
         js_code = "if (typeof FileModule !== 'undefined') { FileModule.saveFile(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def save_file_as(self):
-        """Save file as"""
+        """Save active tab's file as"""
         js_code = "if (typeof FileModule !== 'undefined') { FileModule.saveFileAs(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def export_pdf(self):
-        """Export to PDF (Advanced - requires GTK3)"""
+        """Export to PDF"""
         js_code = "if (typeof FileModule !== 'undefined') { FileModule.exportToPDF(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def export_docx(self):
         """Export to DOCX"""
         js_code = "if (typeof FileModule !== 'undefined') { FileModule.exportToDOCX(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def export_html(self):
         """Export to HTML"""
         js_code = "if (typeof FileModule !== 'undefined') { FileModule.exportToHTML(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
+
+    def close_current_tab(self):
+        """Close the current tab"""
+        current_index = self.parent.tab_widget.currentIndex()
+        if current_index >= 0:
+            self.parent.on_tab_close_requested(current_index)
+
+    def close_all_tabs(self):
+        """Close all tabs"""
+        while self.parent.tab_widget.count() > 0:
+            self.parent.on_tab_close_requested(0)
 
     def exit_app(self):
         """Exit application"""
@@ -226,43 +270,47 @@ class MenuBar(QMenuBar):
 
     def undo(self):
         """Undo"""
-        self.parent.webview.page().triggerAction(
-            self.parent.webview.page().WebAction.Undo
-        )
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().triggerAction(webview.page().WebAction.Undo)
 
     def redo(self):
         """Redo"""
-        self.parent.webview.page().triggerAction(
-            self.parent.webview.page().WebAction.Redo
-        )
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().triggerAction(webview.page().WebAction.Redo)
 
     def cut(self):
         """Cut"""
-        self.parent.webview.page().triggerAction(
-            self.parent.webview.page().WebAction.Cut
-        )
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().triggerAction(webview.page().WebAction.Cut)
 
     def copy(self):
         """Copy"""
-        self.parent.webview.page().triggerAction(
-            self.parent.webview.page().WebAction.Copy
-        )
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().triggerAction(webview.page().WebAction.Copy)
 
     def paste(self):
         """Paste"""
-        self.parent.webview.page().triggerAction(
-            self.parent.webview.page().WebAction.Paste
-        )
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().triggerAction(webview.page().WebAction.Paste)
 
     def find(self):
         """Find text"""
         js_code = "if (typeof FindReplaceModule !== 'undefined') { FindReplaceModule.showFind(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def set_theme(self, theme):
         """Set theme"""
         js_code = f"if (typeof ThemeModule !== 'undefined') {{ ThemeModule.setTheme('{theme}'); }}"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def toggle_fullscreen(self):
         """Toggle fullscreen"""
@@ -270,6 +318,13 @@ class MenuBar(QMenuBar):
             self.parent.showNormal()
         else:
             self.parent.showFullScreen()
+
+    def toggle_file_explorer(self):
+        """Toggle file explorer visibility"""
+        if self.parent.file_explorer.isVisible():
+            self.parent.file_explorer.hide()
+        else:
+            self.parent.file_explorer.show()
 
     def show_about(self):
         """Show about dialog"""
@@ -279,29 +334,41 @@ class MenuBar(QMenuBar):
     def insert_image(self):
         """Insert image"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.image(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def insert_link(self):
         """Insert link"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.link(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def insert_table(self):
         """Insert table"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.insertTable(3, 3); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def insert_code_block(self):
         """Insert code block"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.codeBlock(''); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def insert_horizontal_rule(self):
         """Insert horizontal rule"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.horizontalRule(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def import_from_pdf(self):
         """Import PDF and convert to markdown"""
         js_code = "if (typeof FileModule !== 'undefined') { FileModule.importFromPDF(); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)

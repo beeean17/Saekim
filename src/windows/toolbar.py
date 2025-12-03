@@ -19,6 +19,17 @@ class ToolBar(QToolBar):
 
     def create_actions(self):
         """Create toolbar actions"""
+        # File explorer toggle
+        explorer_action = QAction("파일 탐색기", self)
+        explorer_action.setCheckable(True)
+        explorer_action.setChecked(True)
+        explorer_action.setShortcut("F9")
+        explorer_action.setStatusTip("파일 탐색기 표시/숨기기")
+        explorer_action.triggered.connect(self.toggle_file_explorer)
+        self.addAction(explorer_action)
+
+        self.addSeparator()
+
         # Bold
         bold_action = QAction("굵게 (B)", self)
         bold_action.setShortcut("Ctrl+B")
@@ -115,17 +126,37 @@ class ToolBar(QToolBar):
         table_action.triggered.connect(lambda: self.insert_table())
         self.addAction(table_action)
 
+    def get_active_webview(self):
+        """Get the active tab's webview"""
+        active_tab = self.parent.tab_manager.get_active_tab()
+        if not active_tab:
+            return None
+        return self.parent.webview_cache.get(active_tab.tab_id)
+
+    def toggle_file_explorer(self):
+        """Toggle file explorer visibility"""
+        if self.parent.file_explorer.isVisible():
+            self.parent.file_explorer.hide()
+        else:
+            self.parent.file_explorer.show()
+
     def format_text(self, format_type):
         """Apply formatting to selected text"""
         js_code = f"if (typeof ToolbarModule !== 'undefined') {{ ToolbarModule.{format_type}(); }}"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def insert_heading(self, level):
         """Insert heading"""
         js_code = f"if (typeof ToolbarModule !== 'undefined') {{ ToolbarModule.heading({level}); }}"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
 
     def insert_table(self):
         """Insert table"""
         js_code = "if (typeof ToolbarModule !== 'undefined') { ToolbarModule.insertTable(3, 3); }"
-        self.parent.webview.page().runJavaScript(js_code)
+        webview = self.get_active_webview()
+        if webview:
+            webview.page().runJavaScript(js_code)
