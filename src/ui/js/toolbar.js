@@ -147,3 +147,18 @@ const ToolbarModule = {
         }
     }
 };
+
+// Initialize toolbar button events
+document.addEventListener('DOMContentLoaded', () => {
+    // Image button
+    const btnInsertImage = document.getElementById('btn-insert-image');
+    if (btnInsertImage) {
+        btnInsertImage.addEventListener('click', () => ToolbarModule.image());
+    }
+
+    // Table button
+    const btnInsertTable = document.getElementById('btn-insert-table');
+    if (btnInsertTable) {
+        btnInsertTable.addEventListener('click', () => ToolbarModule.insertTable());
+    }
+});

@@ -1000,3 +1000,303 @@ pre:hover .code-copy-btn {
 .mermaid-helper-dialog .preview-content::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
 }
+
+/* ========================================
+   Markdown Helper Dialog Styles
+   ======================================== */
+
+.markdown-helper-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 80px;
+    z-index: 2000;
+    backdrop-filter: blur(2px);
+}
+
+#markdown-helper-dialog {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+}
+
+#markdown-helper-dialog > * {
+    background: var(--bg-primary);
+    width: 700px;
+    max-width: 90vw;
+}
+
+#markdown-helper-dialog > .dialog-header {
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+#markdown-helper-dialog > .dialog-body {
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    max-height: 70vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.markdown-helper-dialog .dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    border-radius: 12px 12px 0 0;
+}
+
+.markdown-helper-dialog .dialog-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.markdown-helper-dialog .dialog-body {
+    padding: 16px 20px;
+    background: var(--bg-primary);
+    border-radius: 0 0 12px 12px;
+}
+
+/* Search container */
+.markdown-helper-dialog .search-container {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.markdown-helper-dialog #markdown-search {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.markdown-helper-dialog #markdown-search:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.markdown-helper-dialog #markdown-search::placeholder {
+    color: var(--text-secondary);
+}
+
+/* Suggestions dropdown */
+.markdown-helper-dialog .suggestions-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    display: none;
+    margin-top: 4px;
+}
+
+.markdown-helper-dialog .suggestion-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: background 0.15s;
+}
+
+.markdown-helper-dialog .suggestion-item:hover,
+.markdown-helper-dialog .suggestion-item.focused {
+    background: var(--bg-secondary);
+}
+
+.markdown-helper-dialog .suggestion-item strong {
+    color: var(--accent-color);
+}
+
+/* Results container */
+.markdown-helper-dialog .results-container {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(70vh - 120px);
+}
+
+.markdown-helper-dialog .results-placeholder,
+.markdown-helper-dialog .no-results {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.markdown-helper-dialog .results-placeholder p,
+.markdown-helper-dialog .no-results p {
+    margin: 8px 0;
+}
+
+.markdown-helper-dialog .hint {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+/* Result categories */
+.markdown-helper-dialog .result-category {
+    margin-bottom: 16px;
+}
+
+.markdown-helper-dialog .result-category h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Result items */
+.markdown-helper-dialog .result-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-secondary);
+}
+
+.markdown-helper-dialog .result-item:hover {
+    border-color: var(--accent-color);
+    background: var(--bg-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.markdown-helper-dialog .result-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.markdown-helper-dialog .result-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.markdown-helper-dialog .result-description {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.markdown-helper-dialog .result-syntax {
+    display: block;
+    font-size: 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+.markdown-helper-dialog .result-preview {
+    min-width: 120px;
+    max-width: 200px;
+    padding: 8px;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.markdown-helper-dialog .result-preview pre {
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: none;
+}
+
+.markdown-helper-dialog .result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.markdown-helper-dialog .result-actions button {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.markdown-helper-dialog .btn-copy {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.markdown-helper-dialog .btn-copy:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+}
+
+.markdown-helper-dialog .btn-insert {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.markdown-helper-dialog .btn-insert:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+/* Scrollbar styling */
+.markdown-helper-dialog .results-container::-webkit-scrollbar,
+.markdown-helper-dialog .suggestions-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.markdown-helper-dialog .results-container::-webkit-scrollbar-track,
+.markdown-helper-dialog .suggestions-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.markdown-helper-dialog .results-container::-webkit-scrollbar-thumb,
+.markdown-helper-dialog .suggestions-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.markdown-helper-dialog .results-container::-webkit-scrollbar-thumb:hover,
+.markdown-helper-dialog .suggestions-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
