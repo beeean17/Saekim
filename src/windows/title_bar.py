@@ -30,7 +30,10 @@ class TitleBar(QFrame):
         layout.setSpacing(8)
         
         # --- Left: Navigation ---
-        self.btn_sidebar = QPushButton(DesignManager.Icons.HAMBURGER)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.HAMBURGER)
+        self.btn_sidebar = QPushButton(text)
+        if icon:
+            self.btn_sidebar.setIcon(icon)
         self.btn_sidebar.setFixedSize(26, 26)
         self.btn_sidebar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_sidebar.setToolTip("Toggle Sidebar")
@@ -51,7 +54,10 @@ class TitleBar(QFrame):
         controls_layout = QHBoxLayout()
         controls_layout.setSpacing(4)
 
-        self.btn_min = QPushButton(DesignManager.Icons.MINIMIZE)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.MINIMIZE)
+        self.btn_min = QPushButton(text)
+        if icon:
+            self.btn_min.setIcon(icon)
         self.btn_min.setFixedSize(26, 26)
         self.btn_min.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_min.setToolTip("Minimize")
@@ -59,7 +65,10 @@ class TitleBar(QFrame):
         self.btn_min.setObjectName("TitleBarButton")
         controls_layout.addWidget(self.btn_min)
 
-        self.btn_max = QPushButton(DesignManager.Icons.MAXIMIZE)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.MAXIMIZE)
+        self.btn_max = QPushButton(text)
+        if icon:
+            self.btn_max.setIcon(icon)
         self.btn_max.setFixedSize(26, 26)
         self.btn_max.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_max.setToolTip("Maximize")
@@ -67,7 +76,10 @@ class TitleBar(QFrame):
         self.btn_max.setObjectName("TitleBarButton")
         controls_layout.addWidget(self.btn_max)
 
-        self.btn_close = QPushButton(DesignManager.Icons.CLOSE)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.CLOSE)
+        self.btn_close = QPushButton(text)
+        if icon:
+            self.btn_close.setIcon(icon)
         self.btn_close.setFixedSize(26, 26)
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_close.setToolTip("Close")
@@ -104,10 +116,16 @@ class TitleBar(QFrame):
             return
             
         if self.parent.isMaximized():
-            self.btn_max.setText(DesignManager.Icons.RESTORE) # Restore icon
+            icon, text = DesignManager.get_icon_data(DesignManager.Icons.RESTORE)
+            self.btn_max.setText(text)
+            if icon:
+                self.btn_max.setIcon(icon)
             self.btn_max.setToolTip("Restore")
         else:
-            self.btn_max.setText(DesignManager.Icons.MAXIMIZE) # Maximize icon
+            icon, text = DesignManager.get_icon_data(DesignManager.Icons.MAXIMIZE)
+            self.btn_max.setText(text)
+            if icon:
+                self.btn_max.setIcon(icon)
             self.btn_max.setToolTip("Maximize")
             
     def set_title(self, title):

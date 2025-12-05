@@ -59,14 +59,20 @@ class FileExplorer(QDockWidget):
         actions_layout.setContentsMargins(5, 5, 5, 0)
         
         # New File Button
-        self.btn_new_file = QPushButton(DesignManager.Icons.NEW_FILE)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.NEW_FILE)
+        self.btn_new_file = QPushButton(text)
+        if icon:
+            self.btn_new_file.setIcon(icon)
         self.btn_new_file.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_new_file.setToolTip("New File")
         self.btn_new_file.clicked.connect(self.new_file_requested.emit)
         actions_layout.addWidget(self.btn_new_file)
         
         # Open Folder Button
-        self.btn_open_folder = QPushButton(DesignManager.Icons.OPEN_FOLDER)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.OPEN_FOLDER)
+        self.btn_open_folder = QPushButton(text)
+        if icon:
+            self.btn_open_folder.setIcon(icon)
         self.btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_folder.setToolTip("Open Folder")
         self.btn_open_folder.setFixedSize(30, 24)
@@ -74,7 +80,10 @@ class FileExplorer(QDockWidget):
         actions_layout.addWidget(self.btn_open_folder)
         
         # Import/Export Menu Button
-        self.btn_import_export = QPushButton(DesignManager.Icons.IMPORT_EXPORT)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.IMPORT_EXPORT)
+        self.btn_import_export = QPushButton(text)
+        if icon:
+            self.btn_import_export.setIcon(icon)
         self.btn_import_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_import_export.setToolTip("Import/Export")
         self.btn_import_export.setFixedSize(30, 24)
@@ -108,7 +117,10 @@ class FileExplorer(QDockWidget):
 
         # Back button
         self.back_button = QToolButton()
-        self.back_button.setText(DesignManager.Icons.BACK)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.BACK)
+        self.back_button.setText(text)
+        if icon:
+            self.back_button.setIcon(icon)
         self.back_button.setToolTip("이전 경로")
         self.back_button.setEnabled(False)
         self.back_button.clicked.connect(self.go_back)
@@ -116,7 +128,10 @@ class FileExplorer(QDockWidget):
 
         # Forward button
         self.forward_button = QToolButton()
-        self.forward_button.setText(DesignManager.Icons.FORWARD)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.FORWARD)
+        self.forward_button.setText(text)
+        if icon:
+            self.forward_button.setIcon(icon)
         self.forward_button.setToolTip("다음 경로")
         self.forward_button.setEnabled(False)
         self.forward_button.clicked.connect(self.go_forward)
@@ -124,7 +139,10 @@ class FileExplorer(QDockWidget):
 
         # Up button
         self.up_button = QToolButton()
-        self.up_button.setText(DesignManager.Icons.UP)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.UP)
+        self.up_button.setText(text)
+        if icon:
+            self.up_button.setIcon(icon)
         self.up_button.setToolTip("상위 디렉토리")
         self.up_button.clicked.connect(self.go_up)
         nav_layout.addWidget(self.up_button)
@@ -170,7 +188,10 @@ class FileExplorer(QDockWidget):
         footer_layout = QHBoxLayout(footer_widget)
         footer_layout.setContentsMargins(5, 5, 5, 5)
         
-        self.btn_settings = QPushButton(DesignManager.Icons.SETTINGS)
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.SETTINGS)
+        self.btn_settings = QPushButton(text)
+        if icon:
+            self.btn_settings.setIcon(icon)
         self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_settings.setFlat(True)
         self.btn_settings.clicked.connect(self.settings_requested.emit)
@@ -245,8 +266,8 @@ class FileExplorer(QDockWidget):
         # Update path label styling to match tree view
         # self.update_path_label_style()  # Removed in favor of global QSS
 
-        # Expand the root
-        self.tree.expand(root_index)
+        # Expand the root - Disabled to improve startup performance
+        # self.tree.expand(root_index)
 
     def focus_on_file(self, file_path: str):
         """

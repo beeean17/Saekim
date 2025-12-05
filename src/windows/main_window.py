@@ -161,6 +161,9 @@ class MainWindow(QMainWindow):
                 print(f"[JS Console] {message} (line {lineNumber})")
 
         page = WebPage(webview)
+        # Set default background color to prevent white flash
+        from PyQt6.QtGui import QColor
+        page.setBackgroundColor(QColor("#1E1E1E"))
         webview.setPage(page)
 
         # Enable settings

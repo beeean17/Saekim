@@ -25,7 +25,12 @@ class DesignManager:
         BACK = "←"
         FORWARD = "→"
         UP = "↑"
-        SETTINGS = "⚙️ Settings"
+        SETTINGS = "⚙️"
+
+        # Tab Bar
+        # Default SVGs from QSS
+        TAB_CLOSE = 'data:image/svg+xml;utf8,<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 4,4 L 12,12 M 4,12 L 12,4" stroke="%23969696" stroke-width="2" stroke-linecap="round"/></svg>'
+        TAB_CLOSE_HOVER = 'data:image/svg+xml;utf8,<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 4,4 L 12,12 M 4,12 L 12,4" stroke="%23E81123" stroke-width="2" stroke-linecap="round"/></svg>'
 
         # Web Toolbar
         UNDO = "↩️"
@@ -68,10 +73,48 @@ class DesignManager:
             
         return font
 
+    @classmethod
+    def get_icon_data(cls, icon_value):
+        """
+        Get icon data for PyQt widgets.
+        Returns tuple (QIcon, text).
+        If icon_value is a file path, returns (QIcon(path), "").
+        If icon_value is text/emoji, returns (None, text).
+        """
+        from PyQt6.QtGui import QIcon
+        from pathlib import Path
+        
+        # Check if it's a file path or resource
+        is_file = False
+        if isinstance(icon_value, str):
+            lower_val = icon_value.lower()
+            if lower_val.startswith(":/"):
+                is_file = True
+            elif lower_val.endswith(('.png', '.svg', '.jpg', '.jpeg', '.ico')):
+                path = Path(icon_value)
+                # Check relative to resources if not absolute
+                if not path.is_absolute():
+                    # Try resolving relative to src/resources/icons or just src
+                    # Assuming basic relative path for now
+                    if path.exists():
+                        is_file = True
+                    else:
+                        # Try look in resources/icons
+                        res_path = Path(__file__).parent.parent / 'resources' / 'icons' / icon_value
+                        if res_path.exists():
+                            icon_value = str(res_path)
+                            is_file = True
+
+        if is_file:
+            return QIcon(icon_value), ""
+        else:
+            return None, icon_value
+
     @staticmethod
     def get_web_icons():
         """Return dictionary of icons for Web UI injection"""
-        return {
+        web_icons = {}
+        for key, value in {
             "btn-undo": DesignManager.Icons.UNDO,
             "btn-redo": DesignManager.Icons.REDO,
             "btn-bold": DesignManager.Icons.BOLD,
@@ -87,4 +130,27 @@ class DesignManager:
             "btn-font-decrease": DesignManager.Icons.FONT_DEC,
             "btn-font-increase": DesignManager.Icons.FONT_INC,
             "btn-sync-scroll": DesignManager.Icons.SYNC_SCROLL
-        }
+        }.items():
+            # If it looks like an image, wrap in img tag
+            lower_val = value.lower()
+            if lower_val.endswith(('.png', '.svg', '.jpg', '.jpeg')):
+                # Convert to file URI or relative path
+                # For web, we need proper path handling. 
+                # Assuming the JS side can handle relative paths or we convert to absolute file://
+                import os
+                if os.path.exists(value):
+                    from pathlib import Path
+                    abs_path = Path(value).resolve().as_uri()
+                    web_icons[key] = f'<img src="{abs_path}" class="toolbar-icon" style="width: 16px; height: 16px;">'
+                else:
+                    # Try resource path
+                    res_path = Path(__file__).parent.parent / 'resources' / 'icons' / value
+                    if res_path.exists():
+                         abs_path = res_path.resolve().as_uri()
+                         web_icons[key] = f'<img src="{abs_path}" class="toolbar-icon" style="width: 16px; height: 16px;">'
+                    else:
+                        web_icons[key] = value # Fallback
+            else:
+                web_icons[key] = value
+                
+        return web_icons

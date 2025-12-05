@@ -92,9 +92,53 @@ class ThemeManager:
                 file = QFile(str(qss_path))
                 if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
                     stream = QTextStream(file)
-                    QApplication.instance().setStyleSheet(stream.readAll())
+                    qss_content = stream.readAll()
                     file.close()
-                    print(f"[OK] Applied QSS for theme: {theme_name}")
+                    
+                    # Inject dynamic icons from DesignManager
+                    from utils.design_manager import DesignManager
+                    import re
+                    
+                    def format_icon_url(icon_value):
+                        if icon_value.startswith("data:") or icon_value.startswith(":/"):
+                            return f"url({icon_value})"
+                        elif icon_value.startswith("url("):
+                            return icon_value
+                        else:
+                            # Verify file existence and convert to absolute path
+                            import os
+                            if os.path.exists(icon_value):
+                                from pathlib import Path
+                                abs_path = Path(icon_value).resolve().as_uri()
+                                return f"url({abs_path})"
+                            # Try resource path
+                            res_path = Path(__file__).parent.parent / 'resources' / 'icons' / icon_value
+                            if res_path.exists():
+                                 abs_path = res_path.resolve().as_uri()
+                                 return f"url({abs_path})"
+                            return f"url({icon_value})"
+
+                    # Safer Regex Approach for Close Button
+                    # 1. Normal State
+                    close_url = format_icon_url(DesignManager.Icons.TAB_CLOSE)
+                    # 1. Normal State
+                    qss_content = re.sub(
+                        r'(QTabBar::close-button\s*\{[^}]*image:\s*)url\([^)]+\)([^}]*\})',
+                        f'\\1{close_url}\\2',
+                        qss_content
+                    )
+                    
+                    # 2. Hover State
+                    # We need to target the close-button:hover selector specifically
+                    close_hover_url = format_icon_url(DesignManager.Icons.TAB_CLOSE_HOVER)
+                    qss_content = re.sub(
+                        r'(QTabBar::close-button:hover\s*\{[^}]*image:\s*)url\([^)]+\)([^}]*\})',
+                        f'\\1{close_hover_url}\\2',
+                        qss_content
+                    )
+
+                    QApplication.instance().setStyleSheet(qss_content)
+                    print(f"[OK] Applied QSS for theme: {theme_name} with dynamic icons")
             else:
                 print(f"[WARN] QSS file not found: {qss_path}")
         else:
