@@ -25,6 +25,8 @@ from backend.tab_manager import TabManager
 from backend.session_manager import SessionManager
 from backend.file_manager import FileManager
 from utils.theme_manager import ThemeManager
+from .title_bar import TitleBar
+from .settings_dialog import SettingsDialog
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +36,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, initial_file=None, initial_content=None):
         super().__init__()
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setWindowTitle("새김 - 마크다운 에디터")
         self.setGeometry(100, 100, 1200, 800)
 
@@ -60,7 +63,8 @@ class MainWindow(QMainWindow):
         # Initialize theme manager before menu bar
         self.theme_manager = ThemeManager(self.session_manager.session_file)
         
-        self.setup_menu_and_toolbar()
+        # self.setup_menu_and_toolbar() # Removed for custom UI
+        self.setup_custom_title_bar()
         
         # Apply initial theme
         self.apply_theme(self.theme_manager.current_theme)
@@ -231,21 +235,76 @@ class MainWindow(QMainWindow):
 
         print(f"[OK] Tab {tab_id} content loaded")
 
-    def setup_menu_and_toolbar(self):
-        """Setup menu bar, toolbar, and status bar"""
-        # Create menu bar
-        self.menu_bar = MenuBar(self)
-        self.setMenuBar(self.menu_bar)
+    def setup_custom_title_bar(self):
+        """Setup custom title bar"""
+        self.title_bar = TitleBar(self)
+        self.setMenuWidget(self.title_bar)
+        
+        # Connect signals
+        self.title_bar.toggle_sidebar.connect(self.toggle_file_explorer)
+        
+        # Connect FileExplorer signals
+        self.file_explorer.new_file_requested.connect(self.backend.new_file)
+        self.file_explorer.open_folder_requested.connect(self.open_folder_dialog)
+        self.file_explorer.import_md_requested.connect(self.backend.open_file_dialog)
+        self.file_explorer.import_pdf_requested.connect(self.import_from_pdf)
+        self.file_explorer.export_pdf_requested.connect(self.export_pdf)
+        self.file_explorer.settings_requested.connect(self.show_settings)
+        
+        print("[OK] Custom title bar and file explorer signals connected")
 
-        # Create toolbar
-        self.toolbar = ToolBar(self)
-        self.addToolBar(self.toolbar)
+    def open_folder_dialog(self):
+        """Open folder dialog and set file explorer root"""
+        from PyQt6.QtWidgets import QFileDialog
+        folder_path = QFileDialog.getExistingDirectory(self, "Open Folder", self.file_explorer.get_current_path())
+        if folder_path:
+            self.file_explorer.set_root_path(folder_path)
 
-        # Create status bar
-        self.status_bar = StatusBar(self)
-        self.setStatusBar(self.status_bar)
+    def import_from_pdf(self):
+        """Trigger PDF import in JS"""
+        js_code = "if (typeof FileModule !== 'undefined') { FileModule.importFromPDF(); }"
+        self.run_js_in_active_tab(js_code)
 
-        print("[OK] Menu bar, toolbar, and status bar initialized")
+    def export_pdf(self):
+        """Trigger PDF export in JS"""
+        js_code = "if (typeof FileModule !== 'undefined') { FileModule.exportToPDF(); }"
+        self.run_js_in_active_tab(js_code)
+        
+    def show_settings(self):
+        """Show settings"""
+        dialog = SettingsDialog(self, self.theme_manager)
+        dialog.exec()
+        
+    def run_js_in_active_tab(self, js_code):
+        """Run JavaScript in the active tab's webview"""
+        tab = self.tab_manager.get_active_tab()
+        if tab:
+            webview = self.webview_cache.get(tab.tab_id)
+            if webview:
+                webview.page().runJavaScript(js_code)
+
+    def toggle_file_explorer(self):
+        """Toggle file explorer visibility"""
+        if self.file_explorer.isVisible():
+            self.file_explorer.hide()
+        else:
+            self.file_explorer.show()
+
+    # def setup_menu_and_toolbar(self):
+    #     """Setup menu bar, toolbar, and status bar"""
+    #     # Create menu bar
+    #     self.menu_bar = MenuBar(self)
+    #     self.setMenuBar(self.menu_bar)
+    # 
+    #     # Create toolbar
+    #     self.toolbar = ToolBar(self)
+    #     self.addToolBar(self.toolbar)
+    # 
+    #     # Create status bar
+    #     self.status_bar = StatusBar(self)
+    #     self.setStatusBar(self.status_bar)
+    # 
+    #     print("[OK] Menu bar, toolbar, and status bar initialized")
 
     def setup_backend(self):
         """Setup backend connection with QWebChannel"""
@@ -356,7 +415,11 @@ class MainWindow(QMainWindow):
             title = tab.get_display_name()
             if tab.is_modified:
                 title = f"*{title}"
+            if tab.is_modified:
+                title = f"*{title}"
             self.setWindowTitle(f"{title} - 새김")
+            if hasattr(self, 'title_bar'):
+                self.title_bar.set_title(f"{title} - 새김")
 
         # Update file explorer to show current tab's file directory
         if tab and tab.file_path:
@@ -397,6 +460,8 @@ class MainWindow(QMainWindow):
         # If no tabs left, reset window title
         if self.tab_widget.count() == 0:
             self.setWindowTitle("새김 - 마크다운 에디터")
+            if hasattr(self, 'title_bar'):
+                self.title_bar.set_title("새김 - 마크다운 에디터")
 
     def create_new_tab(self, file_path: Optional[str] = None, content: str = ""):
         """

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,7 +23,8 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 
     <!-- Highlight.js for code syntax highlighting -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
     <!-- Common languages -->
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
@@ -43,6 +45,7 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 </head>
+
 <body>
     <div id="app">
         <!-- PDF Export Progress Modal -->
@@ -66,75 +69,85 @@
             </div>
         </div>
 
-        <!-- Main container with split layout -->
-        <div class="split-container">
-            <!-- Editor pane -->
-            <div class="pane editor-pane">
-                <div class="pane-header">
-                    <span class="pane-title">편집기</span>
-                    <div class="pane-actions">
-                        <button class="btn-icon" id="btn-insert-image" title="이미지 삽입">
-                            🖼️
-                        </button>
-                        <button class="btn-icon" id="btn-insert-table" title="표 삽입">
-                            📋
-                        </button>
-                        <button class="btn-icon btn-helper" id="btn-markdown-helper" title="마크다운 문법 도우미 (Ctrl+Shift+D)">
-                            <span class="helper-icon">MD</span>
-                        </button>
-                        <button class="btn-icon btn-helper" id="btn-katex-helper" title="KaTeX 수식 도우미 (Ctrl+Shift+K)">
-                            <span class="helper-icon">fx</span>
-                        </button>
-                        <button class="btn-icon btn-helper" id="btn-mermaid-helper" title="Mermaid 다이어그램 도우미 (Ctrl+Shift+M)">
-                            <span class="helper-icon">◇</span>
-                        </button>
-                        <button class="btn-icon" id="btn-font-decrease" title="글꼴 축소 (Ctrl/Cmd + -)">
-                            A-
-                        </button>
-                        <button class="btn-icon" id="btn-font-increase" title="글꼴 확대 (Ctrl/Cmd + +)">
-                            A+
-                        </button>
-                        <button class="btn-icon" id="btn-word-count" title="단어 수">
-                            <span id="word-count">0 단어</span>
-                        </button>
-                    </div>
+        <!-- Main Area with Toolbar and Split View -->
+        <div class="main-area">
+            <!-- Toolbar (Global for Editor) -->
+            <div id="main-toolbar" class="toolbar">
+                <div class="toolbar-group left">
+                    <button class="btn-icon" id="btn-undo" title="실행 취소 (Ctrl+Z)">↩️</button>
+                    <button class="btn-icon" id="btn-redo" title="다시 실행 (Ctrl+Y)">↪️</button>
                 </div>
-                <div class="pane-content">
-                    <textarea id="editor" placeholder="# 여기에 마크다운을 작성하세요...
-
-## 환영합니다!
-
-새김 마크다운 에디터에 오신 것을 환영합니다.
-
-### 주요 기능
-- 실시간 미리보기
-- 코드 하이라이팅
-- 다이어그램 렌더링 (Mermaid.js)
-- 수식 렌더링 (KaTeX)
-- PDF/DOCX 변환
-
-시작하려면 이 텍스트를 지우고 작성을 시작하세요!"></textarea>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group center">
+                    <button class="btn-icon" id="btn-bold" title="굵게 (Ctrl+B)"><b>B</b></button>
+                    <button class="btn-icon" id="btn-italic" title="기울임 (Ctrl+I)"><i>I</i></button>
+                    <button class="btn-icon" id="btn-heading" title="제목 (Ctrl+H)">H1</button>
+                    <button class="btn-icon" id="btn-link" title="링크 (Ctrl+K)">🔗</button>
+                    <button class="btn-icon" id="btn-insert-image" title="이미지 삽입">🖼️</button>
+                    <button class="btn-icon" id="btn-insert-table" title="표 삽입">📋</button>
+                    <button class="btn-icon" id="btn-code-block" title="코드 블록">}</button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group right">
+                    <div class="view-toggle">
+                        <button class="btn-toggle active" id="btn-view-edit" title="편집 모드">Edit</button>
+                        <button class="btn-toggle" id="btn-view-split" title="분할 모드">Split</button>
+                        <button class="btn-toggle" id="btn-view-preview" title="미리보기 모드">View</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Resizer -->
-            <div class="resizer" id="resizer"></div>
-
-            <!-- Preview pane -->
-            <div class="pane preview-pane">
-                <div class="pane-header">
-                    <span class="pane-title">미리보기</span>
-                    <div class="pane-actions">
-
-                        <button class="btn-icon" id="btn-sync-scroll" title="스크롤 동기화" data-active="true">
-                            🔗
-                        </button>
+            <!-- Content Area -->
+            <div class="content-area">
+                <div class="split-container" id="split-container">
+                    <!-- Editor pane -->
+                    <div class="pane editor-pane" id="editor-pane">
+                        <div class="pane-header">
+                            <span class="pane-title">편집기</span>
+                            <div class="pane-actions">
+                                <button class="btn-icon btn-helper" id="btn-markdown-helper" title="마크다운 문법 도우미 (Ctrl+Shift+D)">
+                                    <span class="helper-icon">MD</span>
+                                </button>
+                                <button class="btn-icon btn-helper" id="btn-katex-helper" title="KaTeX 수식 도우미 (Ctrl+Shift+K)">
+                                    <span class="helper-icon">fx</span>
+                                </button>
+                                <button class="btn-icon btn-helper" id="btn-mermaid-helper" title="Mermaid 다이어그램 도우미 (Ctrl+Shift+M)">
+                                    <span class="helper-icon">◇</span>
+                                </button>
+                                <button class="btn-icon" id="btn-font-decrease" title="글꼴 축소 (Ctrl/Cmd + -)">
+                                    A-
+                                </button>
+                                <button class="btn-icon" id="btn-font-increase" title="글꼴 확대 (Ctrl/Cmd + +)">
+                                    A+
+                                </button>
+                                <button class="btn-icon" id="btn-word-count" title="단어 수">
+                                    <span id="word-count">0 단어</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="pane-content">
+                            <textarea id="editor" placeholder="# 여기에 마크다운을 작성하세요..."></textarea>
+                        </div>
                     </div>
-                </div>
-                <div class="pane-content" id="preview">
-                    <!-- Rendered markdown will appear here -->
-                    <div class="preview-placeholder">
-                        <p>마크다운 미리보기가 여기에 표시됩니다.</p>
+
+                    <!-- Resizer -->
+                    <div class="resizer" id="resizer"></div>
+
+                    <!-- Preview pane -->
+                    <div class="pane preview-pane" id="preview-pane">
+                        <div class="pane-header">
+                            <span class="pane-title">미리보기</span>
+                            <div class="pane-actions">
+                                <button class="btn-icon" id="btn-sync-scroll" title="스크롤 동기화" data-active="true">
+                                    🔗
+                                </button>
+                            </div>
+                        </div>
+                        <div class="pane-content" id="preview">
+                            <div class="preview-placeholder">
+                                <p>마크다운 미리보기가 여기에 표시됩니다.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -155,4 +168,5 @@
     <script src="js/katex-helper.js"></script>
     <script src="js/mermaid-helper.js"></script>
 </body>
+
 </html>

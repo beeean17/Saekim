@@ -31,11 +31,11 @@ class ThemeManager:
             'css': 'github_primer.css',
             'is_dark': True
         },
-        'light': {
+        'dark': {
             'name': 'Dark',
-            'qss': '', # Default Qt style
-            'css': 'theme-light.css', # Existing light theme
-            'is_dark': False
+            'qss': 'dark.qss',
+            'css': 'dark.css',
+            'is_dark': True
         }
     }
 

@@ -6,7 +6,7 @@ Provides a file system tree view for navigating and opening markdown files
 from pathlib import Path
 from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
                               QHBoxLayout, QPushButton, QToolButton, QLabel,
-                              QSizePolicy)
+                              QSizePolicy, QMenu)
 from PyQt6.QtCore import pyqtSignal, Qt, QDir
 from PyQt6.QtGui import QFileSystemModel
 
@@ -16,6 +16,14 @@ class FileExplorer(QDockWidget):
 
     # Signal emitted when a file is double-clicked
     file_double_clicked = pyqtSignal(str)  # file_path
+    
+    # New signals for UI actions
+    new_file_requested = pyqtSignal()
+    open_folder_requested = pyqtSignal()
+    import_md_requested = pyqtSignal()
+    import_pdf_requested = pyqtSignal()
+    export_pdf_requested = pyqtSignal()
+    settings_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__("파일 탐색기", parent)
@@ -39,14 +47,59 @@ class FileExplorer(QDockWidget):
         layout = QVBoxLayout(main_widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create path label to show current directory
+        # --- Header Section ---
+        header_widget = QWidget()
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(2)
+        
+        # 1. File Actions Row
+        actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(5, 5, 5, 0)
+        
+        # New File Button
+        self.btn_new_file = QPushButton("+ New")
+        self.btn_new_file.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_new_file.setToolTip("New File")
+        self.btn_new_file.clicked.connect(self.new_file_requested.emit)
+        actions_layout.addWidget(self.btn_new_file)
+        
+        # Open Folder Button
+        self.btn_open_folder = QPushButton("📂")
+        self.btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_folder.setToolTip("Open Folder")
+        self.btn_open_folder.setFixedSize(30, 24)
+        self.btn_open_folder.clicked.connect(self.open_folder_requested.emit)
+        actions_layout.addWidget(self.btn_open_folder)
+        
+        # Import/Export Menu Button
+        self.btn_import_export = QPushButton("⬇️")
+        self.btn_import_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_import_export.setToolTip("Import/Export")
+        self.btn_import_export.setFixedSize(30, 24)
+        
+        # Create menu
+        self.menu_import_export = QMenu(self)
+        self.menu_import_export.addAction("Open Markdown...", self.import_md_requested.emit)
+        self.menu_import_export.addAction("Import PDF...", self.import_pdf_requested.emit)
+        self.menu_import_export.addSeparator()
+        self.menu_import_export.addAction("Export to PDF", self.export_pdf_requested.emit)
+        self.btn_import_export.setMenu(self.menu_import_export)
+        
+        actions_layout.addWidget(self.btn_import_export)
+        
+        header_layout.addLayout(actions_layout)
+
+        # 2. Path Label
         self.path_label = QLabel()
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.path_label.setMinimumHeight(0)  # Allow label to shrink
-        # Set size policy to Ignored so label doesn't affect minimum width
+        self.path_label.setMinimumHeight(0)
         self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        layout.addWidget(self.path_label)
+        self.path_label.setContentsMargins(5, 5, 5, 0)
+        header_layout.addWidget(self.path_label)
+        
+        layout.addWidget(header_widget)
 
         # Create navigation toolbar
         nav_layout = QHBoxLayout()
@@ -110,6 +163,20 @@ class FileExplorer(QDockWidget):
 
         # Add tree to layout
         layout.addWidget(self.tree)
+        
+        # --- Footer Section ---
+        footer_widget = QWidget()
+        footer_layout = QHBoxLayout(footer_widget)
+        footer_layout.setContentsMargins(5, 5, 5, 5)
+        
+        self.btn_settings = QPushButton("⚙️ Settings")
+        self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_settings.setFlat(True)
+        self.btn_settings.clicked.connect(self.settings_requested.emit)
+        footer_layout.addWidget(self.btn_settings)
+        footer_layout.addStretch()
+        
+        layout.addWidget(footer_widget)
 
         # Set main widget
         self.setWidget(main_widget)
