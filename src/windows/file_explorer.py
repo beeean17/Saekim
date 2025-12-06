@@ -295,3 +295,27 @@ class FileExplorer(QDockWidget):
         icon, _ = DesignManager.get_icon_data(DesignManager.Icons.UP, color)
         if icon: self.up_button.setIcon(icon)
 
+    def set_empty_state(self):
+        """Set file explorer to empty state (no root path)"""
+        # Clear the tree view
+        empty_index = self.model.index("")
+        self.tree.setRootIndex(empty_index)
+
+        # Update path label
+        self.path_label.setText("폴더가 열리지 않음")
+
+        # Disable navigation buttons
+        self.back_button.setEnabled(False)
+        self.forward_button.setEnabled(False)
+        self.up_button.setEnabled(False)
+
+    def has_root_path(self):
+        """
+        Check if file explorer has a valid root path
+
+        Returns:
+            bool: True if a root path is set, False otherwise
+        """
+        current_root = self.model.rootPath()
+        return bool(current_root and current_root != "")
+

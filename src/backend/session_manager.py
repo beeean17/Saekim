@@ -26,22 +26,37 @@ class SessionManager:
         # Ensure session directory exists
         self.session_file.parent.mkdir(parents=True, exist_ok=True)
 
-    def save_session(self, tab_manager) -> bool:
+    def save_session(self, tab_manager, explorer_path: Optional[str] = None) -> bool:
         """
         Save current tab session to JSON file
 
         Args:
             tab_manager: TabManager instance
+            explorer_path: Current file explorer root path
 
         Returns:
             True if saved successfully
         """
         try:
+            # Load existing session to preserve theme
+            existing_data = {}
+            if self.session_file.exists():
+                try:
+                    with open(self.session_file, 'r', encoding='utf-8') as f:
+                        existing_data = json.load(f)
+                except:
+                    pass
+
             session_data = {
                 "version": "1.0",
                 "active_tab_id": tab_manager.active_tab_id,
+                "explorer_path": explorer_path,
                 "tabs": []
             }
+
+            # Preserve theme if it exists
+            if "theme" in existing_data:
+                session_data["theme"] = existing_data["theme"]
 
             # Save tab metadata (not content - that's in files)
             for tab_id in tab_manager.tab_order:
@@ -59,7 +74,7 @@ class SessionManager:
             with open(self.session_file, 'w', encoding='utf-8') as f:
                 json.dump(session_data, f, indent=2)
 
-            logger.info(f"Session saved: {len(session_data['tabs'])} tabs")
+            logger.info(f"Session saved: {len(session_data['tabs'])} tabs, explorer: {explorer_path}")
             return True
 
         except Exception as e:

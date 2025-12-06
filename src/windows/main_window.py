@@ -8,13 +8,16 @@ Defines the main application window with:
 - Backend connection
 """
 
+import json
 from pathlib import Path
 from typing import Dict, Optional
-from PyQt6.QtWidgets import QMainWindow, QTabWidget
+from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QStackedWidget, QWidget,
+                              QVBoxLayout, QHBoxLayout, QLabel, QPushButton)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtCore import QUrl, Qt, QFile, QTextStream, QEvent
-from PyQt6.QtGui import QCloseEvent, QShortcut, QKeySequence
+from PyQt6.QtGui import QCloseEvent, QShortcut, QKeySequence, QFont
 
 from .menu_bar import MenuBar
 from .toolbar import ToolBar
@@ -69,8 +72,8 @@ class MainWindow(QMainWindow):
         # Shared QWebChannel for all tabs
         self.channel = QWebChannel()
 
-        self.setup_ui()
         self.setup_backend()
+        self.setup_ui()
         
         # Initialize theme manager before menu bar
         self.theme_manager = ThemeManager(self.session_manager.session_file)
@@ -267,20 +270,24 @@ class MainWindow(QMainWindow):
     def apply_theme(self, theme_name: str):
         """Apply theme using ThemeManager"""
         theme_data = self.theme_manager.apply_theme(theme_name)
-        
+
         # Save preference
         self.theme_manager.save_preference()
-        
+
         # Determine icon color
         icon_color = "#D0D0D0" if theme_data.get('is_dark', True) else "#555555"
-        
+
         # Update UI icons
         if hasattr(self, 'title_bar'):
             self.title_bar.update_icons(icon_color)
-            
+
         if hasattr(self, 'file_explorer'):
             self.file_explorer.update_icons(icon_color)
-        
+
+        # Update welcome screen styling
+        if hasattr(self, 'welcome_widget'):
+            self.update_welcome_screen_theme(theme_data, icon_color)
+
         # Update webview if it exists
         if hasattr(self, 'webview_cache'):
             for webview in self.webview_cache.values():
@@ -289,6 +296,32 @@ class MainWindow(QMainWindow):
                 import json
                 icons_json = json.dumps(DesignManager.get_web_icons(icon_color))
                 webview.page().runJavaScript(f"if(window.updateIcons) window.updateIcons({icons_json});")
+
+    def update_welcome_screen_theme(self, theme_data: dict, icon_color: str):
+        """Update welcome screen styling via JS"""
+        if hasattr(self, 'welcome_widget') and isinstance(self.welcome_widget, QWebEngineView):
+            # Pass theme data to JS
+            js_code = f"if (typeof updateTheme === 'function') {{ updateTheme({json.dumps(theme_data)}); }}"
+            self.welcome_widget.page().runJavaScript(js_code)
+            
+            # Pass icons to JS
+            icons = {
+                'open_folder': DesignManager.Icons.OPEN_FOLDER.replace('{color}', '#2E3440' if theme_data.get('is_dark') else '#FFFFFF'), # Primary button text color
+                'open_file': DesignManager.Icons.OPEN_FILE.replace('{color}', icon_color),
+                'new_file': DesignManager.Icons.NEW_FILE.replace('{color}', icon_color)
+            }
+            # Adjust icon color for primary button (Open Folder)
+            # The primary button usually has a contrasting text color (e.g. white or dark grey)
+            # For now, let's use the icon_color for secondary buttons, and a specific color for primary
+            
+            # Re-evaluating colors based on theme
+            is_dark = theme_data.get('is_dark', True)
+            primary_btn_text_color = "#2E3440" if is_dark else "#FFFFFF" # Based on CSS vars
+            
+            icons['open_folder'] = DesignManager.Icons.OPEN_FOLDER.replace('{color}', primary_btn_text_color)
+            
+            js_code_icons = f"if (typeof updateIcons === 'function') {{ updateIcons({json.dumps(icons)}); }}"
+            self.welcome_widget.page().runJavaScript(js_code_icons)
 
     def update_webview_theme(self, webview: QWebEngineView, theme_data: dict):
         """Update theme in a specific webview"""
@@ -330,8 +363,21 @@ class MainWindow(QMainWindow):
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         self.tab_widget.tabCloseRequested.connect(self.on_tab_close_requested)
 
-        # Set as central widget
-        self.setCentralWidget(self.tab_widget)
+        # Create stacked widget to switch between welcome screen and tab widget
+        self.stacked_widget = QStackedWidget()
+
+        # Create welcome screen widget
+        self.welcome_widget = self._create_welcome_widget()
+
+        # Add widgets to stacked widget
+        self.stacked_widget.addWidget(self.tab_widget)  # index 0
+        self.stacked_widget.addWidget(self.welcome_widget)  # index 1
+
+        # Set stacked widget as central widget
+        self.setCentralWidget(self.stacked_widget)
+
+        # Start with tab widget visible
+        self.stacked_widget.setCurrentWidget(self.tab_widget)
 
         # Apply tab styling after file explorer is created
         # self.apply_tab_styling()  # Removed in favor of global QSS
@@ -341,6 +387,81 @@ class MainWindow(QMainWindow):
         self.shortcut_close_tab.activated.connect(self.close_current_tab)
 
         print("[OK] Tab interface and file explorer initialized")
+
+    def _create_welcome_widget(self):
+        """Create welcome screen using QWebEngineView"""
+        # Create webview
+        webview = QWebEngineView()
+        webview.setObjectName("WelcomeScreenWebView")
+        
+        # Configure page settings
+        settings = webview.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        
+        # Setup QWebChannel
+        channel = QWebChannel(webview.page())
+        channel.registerObject('backend', self.backend)
+        webview.page().setWebChannel(channel)
+        
+        # Load HTML
+        welcome_html_path = self.ui_path.parent / 'welcome.html'
+        if welcome_html_path.exists():
+            webview.setUrl(QUrl.fromLocalFile(str(welcome_html_path)))
+        else:
+            print(f"Error: Welcome HTML not found at {welcome_html_path}")
+            
+        return webview
+        card_widget.setFixedWidth(300)
+        card_layout = QVBoxLayout(card_widget)
+        card_layout.setSpacing(30)
+        card_layout.setContentsMargins(40, 50, 40, 50)
+
+        # Message only - Removed as per user request
+        # message_label = QLabel("파일을 왼쪽의 File explorer나 아래의 버튼으로 열어서 시작하세요")
+        # ...
+
+        # Buttons container
+        buttons_layout = QVBoxLayout()
+        buttons_layout.setSpacing(12)
+
+        # Open Folder button
+        folder_icon, folder_text = DesignManager.get_icon_data(DesignManager.Icons.OPEN_FOLDER)
+        self.welcome_btn_open_folder = QPushButton("폴더 열기")
+        if folder_icon:
+            self.welcome_btn_open_folder.setIcon(folder_icon)
+        self.welcome_btn_open_folder.setObjectName("WelcomeButtonPrimary")
+        self.welcome_btn_open_folder.setMinimumHeight(50)
+        self.welcome_btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        buttons_layout.addWidget(self.welcome_btn_open_folder)
+
+        # Open File button
+        file_icon, file_text = DesignManager.get_icon_data(DesignManager.Icons.OPEN_FILE)
+        self.welcome_btn_open_file = QPushButton("파일 열기")
+        if file_icon:
+            self.welcome_btn_open_file.setIcon(file_icon)
+        self.welcome_btn_open_file.setObjectName("WelcomeButtonPrimary")
+        self.welcome_btn_open_file.setMinimumHeight(50)
+        self.welcome_btn_open_file.setCursor(Qt.CursorShape.PointingHandCursor)
+        buttons_layout.addWidget(self.welcome_btn_open_file)
+
+        # New File button
+        new_icon, new_text = DesignManager.get_icon_data(DesignManager.Icons.NEW_FILE)
+        self.welcome_btn_new_file = QPushButton("새 파일")
+        if new_icon:
+            self.welcome_btn_new_file.setIcon(new_icon)
+        self.welcome_btn_new_file.setObjectName("WelcomeButtonSecondary")
+        self.welcome_btn_new_file.setMinimumHeight(50)
+        self.welcome_btn_new_file.setCursor(Qt.CursorShape.PointingHandCursor)
+        buttons_layout.addWidget(self.welcome_btn_new_file)
+
+        card_layout.addLayout(buttons_layout)
+
+        # Add card to main layout
+        main_layout.addWidget(card_widget, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Styling will be applied dynamically based on theme
+        return widget
 
     def close_current_tab(self):
         """Close the currently active tab"""
@@ -491,6 +612,9 @@ class MainWindow(QMainWindow):
         folder_path = QFileDialog.getExistingDirectory(self, "Open Folder", self.file_explorer.get_current_path())
         if folder_path:
             self.file_explorer.set_root_path(folder_path)
+            # Show file explorer if it was hidden
+            if self.file_explorer.isHidden():
+                self.file_explorer.show()
 
     def import_from_pdf(self):
         """Trigger PDF import in JS"""
@@ -689,11 +813,14 @@ class MainWindow(QMainWindow):
         # Remove from tab manager
         self.tab_manager.close_tab(tab_id)
 
-        # If no tabs left, reset window title
+        # If no tabs left, show welcome screen
         if self.tab_widget.count() == 0:
             self.setWindowTitle("새김 - 마크다운 에디터")
             if hasattr(self, 'title_bar'):
                 self.title_bar.set_title("새김 - 마크다운 에디터")
+            # Show welcome screen - check if explorer has path
+            has_explorer_path = self.file_explorer.has_root_path()
+            self.show_welcome_screen(show_folder_button=not has_explorer_path, hide_explorer=False)
 
     def create_new_tab(self, file_path: Optional[str] = None, content: str = ""):
         """
@@ -725,6 +852,10 @@ class MainWindow(QMainWindow):
 
         # Switch to new tab (this will trigger on_tab_changed)
         self.tab_widget.setCurrentIndex(index)
+
+        # Hide welcome screen if it's showing (first tab created)
+        if self.stacked_widget.currentWidget() == self.welcome_widget:
+            self.hide_welcome_screen()
 
         print(f"[OK] New tab created: {tab_id}")
 
@@ -759,33 +890,103 @@ class MainWindow(QMainWindow):
         # Update file explorer root to file's directory
         self.file_explorer.set_root_path(str(Path(file_path).parent))
 
+    def show_welcome_screen(self, show_folder_button=True, hide_explorer=False):
+        """
+        Show welcome screen and hide tab widget
+
+        Args:
+            show_folder_button: Show "Open Folder" button (True for first run, False if explorer path exists)
+            hide_explorer: Hide file explorer completely (True for first run)
+        """
+        # Hide file explorer if requested
+        if hide_explorer:
+            self.file_explorer.hide()
+
+        # Apply current theme to welcome screen
+        if hasattr(self, 'theme_manager'):
+            theme_data = self.theme_manager.THEMES.get(self.theme_manager.current_theme, {})
+            icon_color = "#D0D0D0" if theme_data.get('is_dark', True) else "#555555"
+            self.update_welcome_screen_theme(theme_data, icon_color)
+
+        # Switch to welcome screen
+        self.stacked_widget.setCurrentWidget(self.welcome_widget)
+
+        # Handle file explorer visibility
+        if hide_explorer:
+            self.file_explorer.hide()
+        else:
+            # Keep explorer visible but set to empty state if no path
+            if not self.file_explorer.has_root_path():
+                self.file_explorer.set_empty_state()
+
+        print(f"[OK] Welcome screen displayed (folder_btn={show_folder_button}, hide_explorer={hide_explorer})")
+
+    def hide_welcome_screen(self):
+        """Hide welcome screen and show tab widget"""
+        # Switch to tab widget
+        self.stacked_widget.setCurrentWidget(self.tab_widget)
+
+        # Show file explorer if it was hidden
+        if self.file_explorer.isHidden():
+            self.file_explorer.show()
+
+        print("[OK] Welcome screen hidden")
+
     def restore_session(self):
         """Restore previous session if available"""
         # Try to restore session
-        session_data = self.session_manager.load_session()
+        try:
+            session_data = self.session_manager.load_session()
+        except Exception as e:
+            print(f"[ERROR] Session corrupted: {e}")
+            self.session_manager.clear_session()
+            # No session - show full welcome screen with folder button and hide explorer
+            self.show_welcome_screen(show_folder_button=True, hide_explorer=True)
+            return
 
-        if session_data and session_data.get('tabs'):
-            # Restore tabs from session
-            for tab_data in session_data['tabs']:
+        # No session data at all - first run
+        if not session_data:
+            self.show_welcome_screen(show_folder_button=True, hide_explorer=True)
+            return
+
+        # Get explorer path from session
+        explorer_path = session_data.get('explorer_path')
+        tabs_data = session_data.get('tabs', [])
+
+        # Try to restore tabs
+        restored_tabs = 0
+        if tabs_data:
+            for tab_data in tabs_data:
                 file_path = tab_data.get('file_path')
                 if file_path and Path(file_path).exists():
                     success, content, error = FileManager.open_file(file_path)
                     if success:
                         self.create_new_tab(file_path, content)
+                        restored_tabs += 1
 
-            # If any tabs were restored, we're done (ignore initial_file)
-            if self.tab_widget.count() > 0:
-                print(f"[OK] Session restored: {self.tab_widget.count()} tabs")
-                # Clear initial_file to prevent opening it again
-                self.initial_file = None
-                return
+        # Scenario 1: Tabs were restored successfully
+        if restored_tabs > 0:
+            print(f"[OK] Session restored: {restored_tabs} tabs")
+            # Set file explorer to first tab's directory
+            first_tab = self.tab_manager.get_active_tab()
+            if first_tab and first_tab.file_path:
+                self.file_explorer.set_root_path(str(first_tab.file_path.parent))
+            elif explorer_path:
+                self.file_explorer.set_root_path(explorer_path)
+            self.initial_file = None
+            return
 
-        # No session - use initial file if provided
-        if self.initial_file:
-            self.open_file_in_new_tab(self.initial_file)
-        else:
-            # Create empty tab
-            self.create_new_tab()
+        # Scenario 2: Session exists with explorer path but no tabs
+        if explorer_path:
+            print(f"[OK] Session has explorer path but no tabs: {explorer_path}")
+            self.file_explorer.set_root_path(explorer_path)
+            # Show simplified welcome screen (no folder button)
+            self.show_welcome_screen(show_folder_button=False, hide_explorer=False)
+            return
+
+        # Scenario 3: Session exists but no tabs and no explorer path - treat as first run
+        print("[OK] Session exists but empty - showing full welcome screen")
+        self.show_welcome_screen(show_folder_button=True, hide_explorer=True)
 
     def closeEvent(self, event: QCloseEvent):
         """
@@ -794,10 +995,25 @@ class MainWindow(QMainWindow):
         Args:
             event: Close event
         """
-        # Save session
-        self.session_manager.save_session(self.tab_manager)
+        # Get current file explorer path
+        explorer_path = None
+        if self.file_explorer.has_root_path():
+            explorer_path = self.file_explorer.model.rootPath()
+
+        # Check if there are any tabs with file paths
+        tabs_with_files = [
+            tab for tab in self.tab_manager.tabs.values()
+            if tab.file_path is not None
+        ]
+
+        if tabs_with_files or explorer_path:
+            # Save session if there are tabs with files OR explorer has a path
+            self.session_manager.save_session(self.tab_manager, explorer_path)
+            print(f"[OK] Session saved on exit: {len(tabs_with_files)} tabs, explorer: {explorer_path}")
+        else:
+            # No tabs with files and no explorer path - clear session
+            self.session_manager.clear_session()
+            print("[OK] Session cleared on exit (no files open)")
 
         # Accept the close event
         event.accept()
-
-        print("[OK] Session saved on exit")

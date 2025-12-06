@@ -1,0 +1,88 @@
+:root {
+    --bg-color: #2E3440;
+    --card-bg: transparent;
+    --text-color: #ECEFF4;
+    --btn-primary-bg: #88C0D0;
+    --btn-primary-text: #2E3440;
+    --btn-secondary-bg: #434C5E;
+    --btn-secondary-text: #ECEFF4;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    user-select: none;
+    overflow: hidden;
+}
+
+.welcome-screen {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.welcome-card {
+    background-color: var(--card-bg);
+    width: 300px;
+    padding: 40px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.btn {
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn:hover {
+    filter: brightness(1.1);
+}
+
+.btn:active {
+    filter: brightness(0.9);
+}
+
+.btn-primary {
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+}
+
+.btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--btn-primary-bg);
+    /* Use primary color for border */
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    opacity: 1;
+}
+
+.icon {
+    font-size: 16px;
+}

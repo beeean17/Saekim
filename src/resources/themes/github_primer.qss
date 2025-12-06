@@ -224,3 +224,31 @@ QPushButton#TitleBarButton:hover {
 QPushButton#TitleBarCloseButton:hover {
     background-color: #30363D;
 }
+
+/* Welcome Screen */
+QWidget#WelcomeScreen {
+    background-color: #0D1117;
+}
+
+QWidget#WelcomeCard {
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton#WelcomeButtonPrimary {
+    background-color: #0366d6;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+QPushButton#WelcomeButtonPrimary:hover {
+    background-color: #0256b4;
+}
+
+QPushButton#WelcomeButtonPrimary:pressed {
+    background-color: #024494;
+}

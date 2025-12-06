@@ -397,7 +397,7 @@ const FileModule = {
 
                     console.log('✅ PDF 생성 성공:', result.filepath);
 
-                    // Show completion message for 2.5 seconds, then hide
+                    // Show completion message for 2 seconds, then hide
                     setTimeout(() => {
                         this.hidePDFProgress();
                         // Remove success classes
@@ -407,7 +407,7 @@ const FileModule = {
                         if (typeof Utils !== 'undefined') {
                             Utils.showToast(`PDF를 생성했습니다\n${result.filepath}`, 'success');
                         }
-                    }, 2500);
+                    }, 2000);
                 } else if (result.error !== 'Cancelled') {
                     clearInterval(progressInterval); // Stop fake progress on error
                     this.hidePDFProgress();
