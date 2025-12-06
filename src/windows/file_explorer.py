@@ -6,9 +6,10 @@ Provides a file system tree view for navigating and opening markdown files
 from pathlib import Path
 from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
                               QHBoxLayout, QPushButton, QToolButton, QLabel,
-                              QSizePolicy)
+                              QSizePolicy, QMenu)
 from PyQt6.QtCore import pyqtSignal, Qt, QDir
 from PyQt6.QtGui import QFileSystemModel
+from utils.design_manager import DesignManager
 
 
 class FileExplorer(QDockWidget):
@@ -16,9 +17,17 @@ class FileExplorer(QDockWidget):
 
     # Signal emitted when a file is double-clicked
     file_double_clicked = pyqtSignal(str)  # file_path
+    
+    # New signals for UI actions
+    new_file_requested = pyqtSignal()
+    open_folder_requested = pyqtSignal()
+    import_md_requested = pyqtSignal()
+    import_pdf_requested = pyqtSignal()
+    export_pdf_requested = pyqtSignal()
+    settings_requested = pyqtSignal()
 
     def __init__(self, parent=None):
-        super().__init__("파일 탐색기", parent)
+        super().__init__("File Explorer", parent)
 
         # Set dock properties
         self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea |
@@ -39,14 +48,68 @@ class FileExplorer(QDockWidget):
         layout = QVBoxLayout(main_widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create path label to show current directory
+        # --- Header Section ---
+        header_widget = QWidget()
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(2)
+        
+        # 1. File Actions Row
+        actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(5, 5, 5, 0)
+        
+        # New File Button
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.NEW_FILE)
+        self.btn_new_file = QPushButton(text)
+        if icon:
+            self.btn_new_file.setIcon(icon)
+        self.btn_new_file.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_new_file.setToolTip("New File")
+        self.btn_new_file.clicked.connect(self.new_file_requested.emit)
+        actions_layout.addWidget(self.btn_new_file)
+        
+        # Open Folder Button
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.OPEN_FOLDER)
+        self.btn_open_folder = QPushButton(text)
+        if icon:
+            self.btn_open_folder.setIcon(icon)
+        self.btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_folder.setToolTip("Open Folder")
+        self.btn_open_folder.setFixedSize(30, 24)
+        self.btn_open_folder.clicked.connect(self.open_folder_requested.emit)
+        actions_layout.addWidget(self.btn_open_folder)
+        
+        # Import/Export Menu Button
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.IMPORT_EXPORT)
+        self.btn_import_export = QPushButton(text)
+        if icon:
+            self.btn_import_export.setIcon(icon)
+        self.btn_import_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_import_export.setToolTip("Import/Export")
+        self.btn_import_export.setFixedSize(30, 24)
+        
+        # Create menu
+        self.menu_import_export = QMenu(self)
+        self.menu_import_export.addAction("Open Markdown...", self.import_md_requested.emit)
+        self.menu_import_export.addAction("Import PDF...", self.import_pdf_requested.emit)
+        self.menu_import_export.addSeparator()
+        self.menu_import_export.addAction("Export to PDF", self.export_pdf_requested.emit)
+        self.btn_import_export.setMenu(self.menu_import_export)
+        
+        actions_layout.addWidget(self.btn_import_export)
+        
+        header_layout.addLayout(actions_layout)
+
+        # 2. Path Label
         self.path_label = QLabel()
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.path_label.setMinimumHeight(0)  # Allow label to shrink
-        # Set size policy to Ignored so label doesn't affect minimum width
+        self.path_label.setMinimumHeight(0)
         self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        layout.addWidget(self.path_label)
+        self.path_label.setContentsMargins(5, 5, 5, 0)
+        header_layout.addWidget(self.path_label)
+        
+        layout.addWidget(header_widget)
 
         # Create navigation toolbar
         nav_layout = QHBoxLayout()
@@ -54,7 +117,10 @@ class FileExplorer(QDockWidget):
 
         # Back button
         self.back_button = QToolButton()
-        self.back_button.setText("←")
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.BACK)
+        self.back_button.setText(text)
+        if icon:
+            self.back_button.setIcon(icon)
         self.back_button.setToolTip("이전 경로")
         self.back_button.setEnabled(False)
         self.back_button.clicked.connect(self.go_back)
@@ -62,7 +128,10 @@ class FileExplorer(QDockWidget):
 
         # Forward button
         self.forward_button = QToolButton()
-        self.forward_button.setText("→")
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.FORWARD)
+        self.forward_button.setText(text)
+        if icon:
+            self.forward_button.setIcon(icon)
         self.forward_button.setToolTip("다음 경로")
         self.forward_button.setEnabled(False)
         self.forward_button.clicked.connect(self.go_forward)
@@ -70,7 +139,10 @@ class FileExplorer(QDockWidget):
 
         # Up button
         self.up_button = QToolButton()
-        self.up_button.setText("↑")
+        icon, text = DesignManager.get_icon_data(DesignManager.Icons.UP)
+        self.up_button.setText(text)
+        if icon:
+            self.up_button.setIcon(icon)
         self.up_button.setToolTip("상위 디렉토리")
         self.up_button.clicked.connect(self.go_up)
         nav_layout.addWidget(self.up_button)
@@ -177,8 +249,8 @@ class FileExplorer(QDockWidget):
         # Update path label styling to match tree view
         # self.update_path_label_style()  # Removed in favor of global QSS
 
-        # Expand the root
-        self.tree.expand(root_index)
+        # Expand the root - Disabled to improve startup performance
+        # self.tree.expand(root_index)
 
     def focus_on_file(self, file_path: str):
         """
@@ -253,10 +325,25 @@ class FileExplorer(QDockWidget):
         self.back_button.setEnabled(self.history_index > 0)
         self.forward_button.setEnabled(self.history_index < len(self.path_history) - 1)
 
-    # def update_path_label_style(self):
-    #     """
-    #     Update path label styling to match tree view colors
-    #     """
-    #     # Removed in favor of global QSS
-    #     pass
+    def update_icons(self, color):
+        """Update icons with new color"""
+        # Header buttons
+        icon, _ = DesignManager.get_icon_data(DesignManager.Icons.NEW_FILE, color)
+        if icon: self.btn_new_file.setIcon(icon)
+        
+        icon, _ = DesignManager.get_icon_data(DesignManager.Icons.OPEN_FOLDER, color)
+        if icon: self.btn_open_folder.setIcon(icon)
+        
+        icon, _ = DesignManager.get_icon_data(DesignManager.Icons.IMPORT_EXPORT, color)
+        if icon: self.btn_import_export.setIcon(icon)
+        
+        # Navigation buttons
+        icon, _ = DesignManager.get_icon_data(DesignManager.Icons.BACK, color)
+        if icon: self.back_button.setIcon(icon)
+        
+        icon, _ = DesignManager.get_icon_data(DesignManager.Icons.FORWARD, color)
+        if icon: self.forward_button.setIcon(icon)
+        
+        icon, _ = DesignManager.get_icon_data(DesignManager.Icons.UP, color)
+        if icon: self.up_button.setIcon(icon)
 

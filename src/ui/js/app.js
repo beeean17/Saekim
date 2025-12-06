@@ -422,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global function for setting editor content from Python backend
-window.setEditorContent = function(content) {
+window.setEditorContent = function (content) {
     if (typeof EditorModule !== 'undefined' && EditorModule.setContent) {
         EditorModule.setContent(content);
         App.state.editorContent = content;
@@ -436,7 +436,19 @@ window.setEditorContent = function(content) {
 };
 
 // Global function for setting current file path from Python backend
-window.setCurrentFile = function(filePath) {
+window.setCurrentFile = function (filePath) {
     App.state.currentFile = filePath;
     console.log('✅ 현재 파일 설정:', filePath);
+};
+
+// Global function for updating icons from Python backend
+window.updateIcons = function (icons) {
+    console.log('🎨 아이콘 업데이트 중...');
+    for (const [id, content] of Object.entries(icons)) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.innerHTML = content;
+        }
+    }
+    console.log('✅ 아이콘 업데이트 완료');
 };

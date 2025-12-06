@@ -150,6 +150,19 @@ const ToolbarModule = {
 
 // Initialize toolbar button events
 document.addEventListener('DOMContentLoaded', () => {
+    // History
+    const btnUndo = document.getElementById('btn-undo');
+    if (btnUndo) btnUndo.addEventListener('click', () => {
+        if (typeof EditorModule !== 'undefined') EditorModule.editor.focus();
+        document.execCommand('undo');
+    });
+
+    const btnRedo = document.getElementById('btn-redo');
+    if (btnRedo) btnRedo.addEventListener('click', () => {
+        if (typeof EditorModule !== 'undefined') EditorModule.editor.focus();
+        document.execCommand('redo');
+    });
+
     // Image button
     const btnInsertImage = document.getElementById('btn-insert-image');
     if (btnInsertImage) {

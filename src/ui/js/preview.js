@@ -38,7 +38,7 @@ const PreviewModule = {
         const syncButton = document.getElementById('btn-sync-scroll');
         if (syncButton) {
             syncButton.setAttribute('data-active', this.scrollSyncEnabled);
-            syncButton.textContent = this.scrollSyncEnabled ? '🔗' : '🔓';
+            // syncButton.textContent = this.scrollSyncEnabled ? '🔗' : '🔓'; // Removed to keep SVG
             syncButton.title = this.scrollSyncEnabled ? '스크롤 동기화 켜짐' : '스크롤 동기화 꺼짐';
         }
         console.log('스크롤 동기화:', this.scrollSyncEnabled ? '켜짐' : '꺼짐');
@@ -95,364 +95,364 @@ const PreviewModule = {
         `;
     },
 
-/**
- * Render markdown using Marked.js
- */
-renderMarkdown(markdown) {
-    console.log('🔍 renderMarkdown called with content length:', markdown.length);
-    console.log('📝 Markdown content:', markdown.substring(0, 200));
+    /**
+     * Render markdown using Marked.js
+     */
+    renderMarkdown(markdown) {
+        console.log('🔍 renderMarkdown called with content length:', markdown.length);
+        console.log('📝 Markdown content:', markdown.substring(0, 200));
 
-    try {
-        // Check if marked is available
-        if (typeof marked === 'undefined') {
-            console.error('❌ Marked.js is not loaded!');
-            this.previewElement.innerHTML = `<div class="error">Marked.js is not loaded. Using fallback renderer.</div>`;
-            this.basicMarkdownToHtml(markdown);
-            return;
-        }
+        try {
+            // Check if marked is available
+            if (typeof marked === 'undefined') {
+                console.error('❌ Marked.js is not loaded!');
+                this.previewElement.innerHTML = `<div class="error">Marked.js is not loaded. Using fallback renderer.</div>`;
+                this.basicMarkdownToHtml(markdown);
+                return;
+            }
 
-        console.log('✅ Marked.js is available');
+            console.log('✅ Marked.js is available');
 
-        // Protect math expressions from Marked.js parsing
-        const mathExpressions = [];
-        let processedMarkdown = markdown;
+            // Protect math expressions from Marked.js parsing
+            const mathExpressions = [];
+            let processedMarkdown = markdown;
 
-        // Protect display math ($$...$$)
-        processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
-            const placeholder = `MATHDISPLAYPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
-            // content에 순수 LaTeX만 저장 ($$는 제거)
-            mathExpressions.push({ type: 'display', content: math.trim(), placeholder });
-            console.log(`📊 Display math protected: "${math.substring(0, 50)}..." → ${placeholder}`);
-            return placeholder;
-        });
+            // Protect display math ($$...$$)
+            processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
+                const placeholder = `MATHDISPLAYPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
+                // content에 순수 LaTeX만 저장 ($$는 제거)
+                mathExpressions.push({ type: 'display', content: math.trim(), placeholder });
+                console.log(`📊 Display math protected: "${math.substring(0, 50)}..." → ${placeholder}`);
+                return placeholder;
+            });
 
-        // Protect inline math ($...$)
-        processedMarkdown = processedMarkdown.replace(/\$([^\$\n]+?)\$/g, (match, math) => {
-            const placeholder = `MATHINLINEPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
-            // content에 순수 LaTeX만 저장 ($는 제거)
-            mathExpressions.push({ type: 'inline', content: math.trim(), placeholder });
-            console.log(`📝 Inline math protected: "${math}" → ${placeholder}`);
-            return placeholder;
-        });
+            // Protect inline math ($...$)
+            processedMarkdown = processedMarkdown.replace(/\$([^\$\n]+?)\$/g, (match, math) => {
+                const placeholder = `MATHINLINEPLACEHOLDER${mathExpressions.length}ENDPLACEHOLDER`;
+                // content에 순수 LaTeX만 저장 ($는 제거)
+                mathExpressions.push({ type: 'inline', content: math.trim(), placeholder });
+                console.log(`📝 Inline math protected: "${math}" → ${placeholder}`);
+                return placeholder;
+            });
 
-        // Configure Marked.js
-        if (typeof marked !== 'undefined') {
-            marked.setOptions({
-                breaks: true,
-                gfm: true,
-                headerIds: true,
-                mangle: false,
-                sanitize: false,
-                highlight: function(code, lang) {
-                    if (lang === 'mermaid') {
+            // Configure Marked.js
+            if (typeof marked !== 'undefined') {
+                marked.setOptions({
+                    breaks: true,
+                    gfm: true,
+                    headerIds: true,
+                    mangle: false,
+                    sanitize: false,
+                    highlight: function (code, lang) {
+                        if (lang === 'mermaid') {
+                            return code;
+                        }
+                        if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                            try {
+                                return hljs.highlight(code, { language: lang }).value;
+                            } catch (err) {
+                                console.error('Highlight error:', err);
+                            }
+                        }
+                        if (typeof hljs !== 'undefined' && lang !== 'mermaid') {
+                            try {
+                                return hljs.highlightAuto(code).value;
+                            } catch (err) {
+                                console.error('Highlight auto error:', err);
+                            }
+                        }
                         return code;
                     }
-                    if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
-                        try {
-                            return hljs.highlight(code, { language: lang }).value;
-                        } catch (err) {
-                            console.error('Highlight error:', err);
-                        }
+                });
+
+                // Convert markdown to HTML
+                console.log('📄 Calling marked.parse()...');
+                let html = marked.parse(processedMarkdown);
+                console.log('✅ marked.parse() returned HTML length:', html ? html.length : 0);
+                console.log('📄 HTML preview:', html ? html.substring(0, 200) : 'NULL');
+
+                // Restore math expressions - content에 이미 순수 LaTeX만 있음
+                console.log(`🔄 Restoring ${mathExpressions.length} math expressions...`);
+                mathExpressions.forEach(({ type, content, placeholder }) => {
+                    if (type === 'display') {
+                        // div 태그 사용 + data attribute로 LaTeX 저장
+                        html = html.replaceAll(placeholder,
+                            `<div class="math-display" data-math="${this.escapeHtml(content)}"></div>`);
+                        console.log(`📊 Display restore: ${placeholder}, content="${content.substring(0, 30)}..."`);
+                    } else {
+                        html = html.replaceAll(placeholder,
+                            `<span class="math-inline" data-math="${this.escapeHtml(content)}"></span>`);
+                        console.log(`📝 Inline restore: ${placeholder}, content="${content}"`);
                     }
-                    if (typeof hljs !== 'undefined' && lang !== 'mermaid') {
-                        try {
-                            return hljs.highlightAuto(code).value;
-                        } catch (err) {
-                            console.error('Highlight auto error:', err);
-                        }
-                    }
-                    return code;
+                });
+
+                // Sanitize HTML
+                if (typeof DOMPurify !== 'undefined') {
+                    html = DOMPurify.sanitize(html, {
+                        ADD_ATTR: ['class', 'style', 'id', 'data-math'],
+                        ADD_TAGS: ['pre', 'code', 'span', 'div'],
+                        ALLOW_DATA_ATTR: true,
+                        KEEP_CONTENT: true
+                    });
                 }
-            });
 
-            // Convert markdown to HTML
-            console.log('📄 Calling marked.parse()...');
-            let html = marked.parse(processedMarkdown);
-            console.log('✅ marked.parse() returned HTML length:', html ? html.length : 0);
-            console.log('📄 HTML preview:', html ? html.substring(0, 200) : 'NULL');
+                console.log('📝 Setting innerHTML...');
+                this.previewElement.innerHTML = html;
+                console.log('✅ innerHTML set');
 
-            // Restore math expressions - content에 이미 순수 LaTeX만 있음
-            console.log(`🔄 Restoring ${mathExpressions.length} math expressions...`);
-            mathExpressions.forEach(({ type, content, placeholder }) => {
-                if (type === 'display') {
-                    // div 태그 사용 + data attribute로 LaTeX 저장
-                    html = html.replaceAll(placeholder,
-                        `<div class="math-display" data-math="${this.escapeHtml(content)}"></div>`);
-                    console.log(`📊 Display restore: ${placeholder}, content="${content.substring(0, 30)}..."`);
+                // p 태그로 감싸진 math-display를 unwrap
+                this.unwrapMathDisplays();
+
+                // Fix image paths - convert relative paths to absolute file:// URLs
+                console.log('🖼️ Calling fixImagePaths()...');
+                this.fixImagePaths();
+                console.log('✅ fixImagePaths() completed');
+
+                if (typeof hljs !== 'undefined') {
+                    this.previewElement.querySelectorAll('pre code').forEach((block) => {
+                        if (!block.classList.contains('hljs')) {
+                            hljs.highlightElement(block);
+                        }
+                    });
+                }
+
+                this.addCodeLanguageLabels();
+                this.addCopyButtons();
+                this.renderMermaidDiagrams();
+                this.renderMathEquations();
+            } else {
+                let html = this.basicMarkdownToHtml(markdown);
+                this.previewElement.innerHTML = html;
+            }
+        } catch (error) {
+            console.error('❌ Preview rendering error:', error);
+            this.previewElement.innerHTML = `<div class="error">Preview rendering error: ${error.message}</div>`;
+        }
+    },
+
+    /**
+     * Escape HTML for attributes
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    /**
+     * Fix image paths - convert relative paths to absolute file:// URLs
+     */
+    fixImagePaths() {
+        if (!this.previewElement) return;
+
+        const images = this.previewElement.querySelectorAll('img');
+        console.log(`🖼️ Found ${images.length} images to process`);
+
+        // Get project root from App state (set during initialization)
+        let projectRoot = '';
+        if (typeof App !== 'undefined' && App.state && App.state.projectRoot) {
+            projectRoot = App.state.projectRoot;
+            console.log(`🏠 Project root from App state: ${projectRoot}`);
+        }
+
+        // Fallback: calculate from window.location
+        if (!projectRoot) {
+            const currentLocation = window.location.href;
+            const currentDir = currentLocation.substring(0, currentLocation.lastIndexOf('/'));
+            const parts = currentDir.split('/');
+            const projectRootParts = parts.slice(0, -2); // Remove 'ui' and 'src'
+            projectRoot = projectRootParts.join('/');
+            // Remove file:/// prefix if present for consistency
+            projectRoot = projectRoot.replace(/^file:\/\/\/?/, '');
+            console.log(`🏠 Project root from location: ${projectRoot}`);
+        }
+
+        images.forEach((img, index) => {
+            const src = img.getAttribute('src');
+            if (!src) {
+                console.log(`⚠️ Image ${index} has no src`);
+                return;
+            }
+
+            console.log(`📸 Image ${index} original src: ${src}`);
+
+            // Skip if already a full URL (http://, https://, file://, data:)
+            if (src.match(/^(https?|file|data):/i)) {
+                console.log(`✓ Image ${index} already has full URL, skipping`);
+                return;
+            }
+
+            try {
+                let absoluteUrl;
+
+                // Check if this is a relative path starting with './' or '../'
+                if (src.startsWith('./') || src.startsWith('../')) {
+                    // Relative path from markdown file location
+                    if (typeof App !== 'undefined' && App.state && App.state.currentFile) {
+                        // Get current markdown file's directory
+                        const mdFilePath = App.state.currentFile.replace(/\\/g, '/');
+                        console.log(`📄 Current MD file: ${mdFilePath}`);
+
+                        const mdFileDir = mdFilePath.substring(0, mdFilePath.lastIndexOf('/'));
+                        console.log(`📂 MD file dir: ${mdFileDir}`);
+
+                        // Resolve relative path
+                        const cleanSrc = src.replace(/^\.\//, ''); // Remove leading './'
+                        absoluteUrl = `file:///${mdFileDir}/${cleanSrc}`;
+                        console.log(`✅ Resolved relative to MD file: ${absoluteUrl}`);
+                    } else {
+                        // No current file, fall back to project root
+                        console.log(`⚠️ No current file, using project root`);
+                        const cleanSrc = src.replace(/^\.\//, '');
+                        absoluteUrl = `file:///${projectRoot}/${cleanSrc}`;
+                    }
+                } else if (src.startsWith('/')) {
+                    // Absolute path from root
+                    absoluteUrl = `file://${src}`;
                 } else {
-                    html = html.replaceAll(placeholder,
-                        `<span class="math-inline" data-math="${this.escapeHtml(content)}"></span>`);
-                    console.log(`📝 Inline restore: ${placeholder}, content="${content}"`);
+                    // Relative path without ./ - resolve relative to project root
+                    // This handles paths like "data/temp/images/..."
+                    absoluteUrl = `file:///${projectRoot}/${src}`;
                 }
-            });
 
-            // Sanitize HTML
-            if (typeof DOMPurify !== 'undefined') {
-                html = DOMPurify.sanitize(html, {
-                    ADD_ATTR: ['class', 'style', 'id', 'data-math'],
-                    ADD_TAGS: ['pre', 'code', 'span', 'div'],
-                    ALLOW_DATA_ATTR: true,
-                    KEEP_CONTENT: true
-                });
+                // Ensure proper URL encoding for spaces and special characters
+                // But don't double-encode already encoded characters
+                absoluteUrl = absoluteUrl.replace(/ /g, '%20');
+
+                console.log(`✅ Image ${index} fixed path: ${absoluteUrl}`);
+                img.setAttribute('src', absoluteUrl);
+
+                // Add error handler for debugging
+                img.onerror = () => {
+                    console.error(`❌ Failed to load image: ${absoluteUrl}`);
+                };
+                img.onload = () => {
+                    console.log(`✅ Image loaded successfully: ${absoluteUrl}`);
+                };
+            } catch (error) {
+                console.error(`❌ Error fixing image ${index} path:`, error);
             }
+        });
+    },
 
-            console.log('📝 Setting innerHTML...');
-            this.previewElement.innerHTML = html;
-            console.log('✅ innerHTML set');
+    /**
+     * Unwrap math-display elements from p tags
+     */
+    unwrapMathDisplays() {
+        if (!this.previewElement) return;
 
-            // p 태그로 감싸진 math-display를 unwrap
-            this.unwrapMathDisplays();
-
-            // Fix image paths - convert relative paths to absolute file:// URLs
-            console.log('🖼️ Calling fixImagePaths()...');
-            this.fixImagePaths();
-            console.log('✅ fixImagePaths() completed');
-
-            if (typeof hljs !== 'undefined') {
-                this.previewElement.querySelectorAll('pre code').forEach((block) => {
-                    if (!block.classList.contains('hljs')) {
-                        hljs.highlightElement(block);
-                    }
-                });
+        // p 태그 내부에 math-display만 있는 경우를 찾아서 p 태그 제거
+        const paragraphs = this.previewElement.querySelectorAll('p');
+        paragraphs.forEach(p => {
+            // p 태그의 자식이 하나뿐이고, 그것이 math-display인 경우
+            if (p.children.length === 1 && p.children[0].classList.contains('math-display')) {
+                // p 태그를 math-display로 교체
+                const mathDisplay = p.children[0];
+                p.replaceWith(mathDisplay);
+                console.log('✅ Unwrapped math-display from p tag');
             }
+            // p 태그의 텍스트 내용이 비어있고 math-display만 있는 경우
+            else if (p.textContent.trim() === '' && p.querySelector('.math-display')) {
+                const mathDisplay = p.querySelector('.math-display');
+                if (mathDisplay) {
+                    p.replaceWith(mathDisplay);
+                    console.log('✅ Unwrapped math-display from empty p tag');
+                }
+            }
+        });
+    },
 
-            this.addCodeLanguageLabels();
-            this.addCopyButtons();
-            this.renderMermaidDiagrams();
-            this.renderMathEquations();
-        } else {
-            let html = this.basicMarkdownToHtml(markdown);
-            this.previewElement.innerHTML = html;
-        }
-    } catch (error) {
-        console.error('❌ Preview rendering error:', error);
-        this.previewElement.innerHTML = `<div class="error">Preview rendering error: ${error.message}</div>`;
-    }
-},
-
-/**
- * Escape HTML for attributes
- */
-escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-},
-
-/**
- * Fix image paths - convert relative paths to absolute file:// URLs
- */
-fixImagePaths() {
-    if (!this.previewElement) return;
-
-    const images = this.previewElement.querySelectorAll('img');
-    console.log(`🖼️ Found ${images.length} images to process`);
-
-    // Get project root from App state (set during initialization)
-    let projectRoot = '';
-    if (typeof App !== 'undefined' && App.state && App.state.projectRoot) {
-        projectRoot = App.state.projectRoot;
-        console.log(`🏠 Project root from App state: ${projectRoot}`);
-    }
-
-    // Fallback: calculate from window.location
-    if (!projectRoot) {
-        const currentLocation = window.location.href;
-        const currentDir = currentLocation.substring(0, currentLocation.lastIndexOf('/'));
-        const parts = currentDir.split('/');
-        const projectRootParts = parts.slice(0, -2); // Remove 'ui' and 'src'
-        projectRoot = projectRootParts.join('/');
-        // Remove file:/// prefix if present for consistency
-        projectRoot = projectRoot.replace(/^file:\/\/\/?/, '');
-        console.log(`🏠 Project root from location: ${projectRoot}`);
-    }
-
-    images.forEach((img, index) => {
-        const src = img.getAttribute('src');
-        if (!src) {
-            console.log(`⚠️ Image ${index} has no src`);
-            return;
-        }
-
-        console.log(`📸 Image ${index} original src: ${src}`);
-
-        // Skip if already a full URL (http://, https://, file://, data:)
-        if (src.match(/^(https?|file|data):/i)) {
-            console.log(`✓ Image ${index} already has full URL, skipping`);
+    /**
+     * Render math equations using KaTeX
+     */
+    renderMathEquations() {
+        if (typeof katex === 'undefined') {
+            console.warn('⚠️ KaTeX not loaded');
             return;
         }
 
         try {
-            let absoluteUrl;
+            console.log('🔢 Starting KaTeX rendering...');
 
-            // Check if this is a relative path starting with './' or '../'
-            if (src.startsWith('./') || src.startsWith('../')) {
-                // Relative path from markdown file location
-                if (typeof App !== 'undefined' && App.state && App.state.currentFile) {
-                    // Get current markdown file's directory
-                    const mdFilePath = App.state.currentFile.replace(/\\/g, '/');
-                    console.log(`📄 Current MD file: ${mdFilePath}`);
+            // Render display math
+            const displayMath = this.previewElement.querySelectorAll('.math-display');
+            console.log(`📊 Found ${displayMath.length} display math elements`);
+            displayMath.forEach((element, index) => {
+                // data-math 속성에서 LaTeX 가져오기
+                let math = element.getAttribute('data-math') || element.textContent.trim();
 
-                    const mdFileDir = mdFilePath.substring(0, mdFilePath.lastIndexOf('/'));
-                    console.log(`📂 MD file dir: ${mdFileDir}`);
+                // 줄바꿈 처리: \n을 LaTeX 줄바꿈 \\로 변환
+                // 단, 이미 \\가 있는 경우는 제외
+                // 먼저 \\를 임시 플레이스홀더로 대체
+                const placeholder = '___LATEX_NEWLINE___';
+                math = math.replace(/\\\\/g, placeholder);
+                // 일반 줄바꿈을 \\로 변환
+                math = math.replace(/\n/g, ' \\\\ ');
+                // 플레이스홀더를 다시 \\로 복원
+                math = math.replace(new RegExp(placeholder, 'g'), '\\\\');
 
-                    // Resolve relative path
-                    const cleanSrc = src.replace(/^\.\//, ''); // Remove leading './'
-                    absoluteUrl = `file:///${mdFileDir}/${cleanSrc}`;
-                    console.log(`✅ Resolved relative to MD file: ${absoluteUrl}`);
-                } else {
-                    // No current file, fall back to project root
-                    console.log(`⚠️ No current file, using project root`);
-                    const cleanSrc = src.replace(/^\.\//, '');
-                    absoluteUrl = `file:///${projectRoot}/${cleanSrc}`;
+                console.log(`📊 Display[${index}] math (after newline conversion): "${math}"`);
+
+                try {
+                    katex.render(math, element, {
+                        displayMode: true,
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        strict: false,
+                        trust: false,
+                        macros: {
+                            "\\RR": "\\mathbb{R}",
+                            "\\NN": "\\mathbb{N}",
+                            "\\ZZ": "\\mathbb{Z}",
+                            "\\QQ": "\\mathbb{Q}",
+                            "\\CC": "\\mathbb{C}"
+                        }
+                    });
+                    console.log(`✅ Display[${index}] rendered successfully`);
+                } catch (error) {
+                    console.error('❌ KaTeX display error:', error, 'Math:', math);
+                    element.textContent = `[Math Error: ${error.message}]`;
+                    element.style.color = '#cc0000';
                 }
-            } else if (src.startsWith('/')) {
-                // Absolute path from root
-                absoluteUrl = `file://${src}`;
-            } else {
-                // Relative path without ./ - resolve relative to project root
-                // This handles paths like "data/temp/images/..."
-                absoluteUrl = `file:///${projectRoot}/${src}`;
-            }
+            });
 
-            // Ensure proper URL encoding for spaces and special characters
-            // But don't double-encode already encoded characters
-            absoluteUrl = absoluteUrl.replace(/ /g, '%20');
+            // Render inline math
+            const inlineMath = this.previewElement.querySelectorAll('.math-inline');
+            console.log(`📝 Found ${inlineMath.length} inline math elements`);
+            inlineMath.forEach((element, index) => {
+                // data-math 속성에서 LaTeX 가져오기
+                const math = element.getAttribute('data-math') || element.textContent.trim();
+                console.log(`📝 Inline[${index}] math: "${math}"`);
 
-            console.log(`✅ Image ${index} fixed path: ${absoluteUrl}`);
-            img.setAttribute('src', absoluteUrl);
+                try {
+                    katex.render(math, element, {
+                        displayMode: false,
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        strict: false,
+                        trust: false,
+                        macros: {
+                            "\\RR": "\\mathbb{R}",
+                            "\\NN": "\\mathbb{N}",
+                            "\\ZZ": "\\mathbb{Z}",
+                            "\\QQ": "\\mathbb{Q}",
+                            "\\CC": "\\mathbb{C}"
+                        }
+                    });
+                    console.log(`✅ Inline[${index}] rendered successfully`);
+                } catch (error) {
+                    console.error('❌ KaTeX inline error:', error, 'Math:', math);
+                    element.textContent = `[Math Error: ${error.message}]`;
+                    element.style.color = '#cc0000';
+                }
+            });
 
-            // Add error handler for debugging
-            img.onerror = () => {
-                console.error(`❌ Failed to load image: ${absoluteUrl}`);
-            };
-            img.onload = () => {
-                console.log(`✅ Image loaded successfully: ${absoluteUrl}`);
-            };
+            const equations = this.previewElement.querySelectorAll('.katex');
+            console.log(`✅ Rendered ${equations.length} math equations (${displayMath.length} display + ${inlineMath.length} inline)`);
         } catch (error) {
-            console.error(`❌ Error fixing image ${index} path:`, error);
+            console.error('❌ KaTeX rendering error:', error);
         }
-    });
-},
-
-/**
- * Unwrap math-display elements from p tags
- */
-unwrapMathDisplays() {
-    if (!this.previewElement) return;
-
-    // p 태그 내부에 math-display만 있는 경우를 찾아서 p 태그 제거
-    const paragraphs = this.previewElement.querySelectorAll('p');
-    paragraphs.forEach(p => {
-        // p 태그의 자식이 하나뿐이고, 그것이 math-display인 경우
-        if (p.children.length === 1 && p.children[0].classList.contains('math-display')) {
-            // p 태그를 math-display로 교체
-            const mathDisplay = p.children[0];
-            p.replaceWith(mathDisplay);
-            console.log('✅ Unwrapped math-display from p tag');
-        }
-        // p 태그의 텍스트 내용이 비어있고 math-display만 있는 경우
-        else if (p.textContent.trim() === '' && p.querySelector('.math-display')) {
-            const mathDisplay = p.querySelector('.math-display');
-            if (mathDisplay) {
-                p.replaceWith(mathDisplay);
-                console.log('✅ Unwrapped math-display from empty p tag');
-            }
-        }
-    });
-},
-
-/**
- * Render math equations using KaTeX
- */
-renderMathEquations() {
-    if (typeof katex === 'undefined') {
-        console.warn('⚠️ KaTeX not loaded');
-        return;
-    }
-
-    try {
-        console.log('🔢 Starting KaTeX rendering...');
-
-        // Render display math
-        const displayMath = this.previewElement.querySelectorAll('.math-display');
-        console.log(`📊 Found ${displayMath.length} display math elements`);
-        displayMath.forEach((element, index) => {
-            // data-math 속성에서 LaTeX 가져오기
-            let math = element.getAttribute('data-math') || element.textContent.trim();
-
-            // 줄바꿈 처리: \n을 LaTeX 줄바꿈 \\로 변환
-            // 단, 이미 \\가 있는 경우는 제외
-            // 먼저 \\를 임시 플레이스홀더로 대체
-            const placeholder = '___LATEX_NEWLINE___';
-            math = math.replace(/\\\\/g, placeholder);
-            // 일반 줄바꿈을 \\로 변환
-            math = math.replace(/\n/g, ' \\\\ ');
-            // 플레이스홀더를 다시 \\로 복원
-            math = math.replace(new RegExp(placeholder, 'g'), '\\\\');
-
-            console.log(`📊 Display[${index}] math (after newline conversion): "${math}"`);
-
-            try {
-                katex.render(math, element, {
-                    displayMode: true,
-                    throwOnError: false,
-                    errorColor: '#cc0000',
-                    strict: false,
-                    trust: false,
-                    macros: {
-                        "\\RR": "\\mathbb{R}",
-                        "\\NN": "\\mathbb{N}",
-                        "\\ZZ": "\\mathbb{Z}",
-                        "\\QQ": "\\mathbb{Q}",
-                        "\\CC": "\\mathbb{C}"
-                    }
-                });
-                console.log(`✅ Display[${index}] rendered successfully`);
-            } catch (error) {
-                console.error('❌ KaTeX display error:', error, 'Math:', math);
-                element.textContent = `[Math Error: ${error.message}]`;
-                element.style.color = '#cc0000';
-            }
-        });
-
-        // Render inline math
-        const inlineMath = this.previewElement.querySelectorAll('.math-inline');
-        console.log(`📝 Found ${inlineMath.length} inline math elements`);
-        inlineMath.forEach((element, index) => {
-            // data-math 속성에서 LaTeX 가져오기
-            const math = element.getAttribute('data-math') || element.textContent.trim();
-            console.log(`📝 Inline[${index}] math: "${math}"`);
-
-            try {
-                katex.render(math, element, {
-                    displayMode: false,
-                    throwOnError: false,
-                    errorColor: '#cc0000',
-                    strict: false,
-                    trust: false,
-                    macros: {
-                        "\\RR": "\\mathbb{R}",
-                        "\\NN": "\\mathbb{N}",
-                        "\\ZZ": "\\mathbb{Z}",
-                        "\\QQ": "\\mathbb{Q}",
-                        "\\CC": "\\mathbb{C}"
-                    }
-                });
-                console.log(`✅ Inline[${index}] rendered successfully`);
-            } catch (error) {
-                console.error('❌ KaTeX inline error:', error, 'Math:', math);
-                element.textContent = `[Math Error: ${error.message}]`;
-                element.style.color = '#cc0000';
-            }
-        });
-
-        const equations = this.previewElement.querySelectorAll('.katex');
-        console.log(`✅ Rendered ${equations.length} math equations (${displayMath.length} display + ${inlineMath.length} inline)`);
-    } catch (error) {
-        console.error('❌ KaTeX rendering error:', error);
-    }
-},
+    },
 
     /**
      * Render Mermaid diagrams

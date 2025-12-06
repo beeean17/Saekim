@@ -140,3 +140,4 @@ secrets.json
 # private/ is managed as a Git submodule
 # ========================================
 nul
+log.txt

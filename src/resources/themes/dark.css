@@ -1,0 +1,112 @@
+/* Dark theme colors for web editor */
+
+:root {
+    /* Background colors - matching file explorer */
+    --bg-primary: #1E1E1E;
+    --bg-secondary: #252526;
+    --bg-tertiary: #2D2D30;
+
+    /* Text colors */
+    --text-primary: #D4D4D4;
+    --text-secondary: #CCCCCC;
+    --text-tertiary: #858585;
+
+    /* Border colors */
+    --border-color: #3E3E42;
+    --border-light: #2D2D30;
+
+    /* Accent colors */
+    --accent-color: #007ACC;
+    --accent-hover: #005A9E;
+    --accent-light: #4FC3F7;
+
+    /* Status colors */
+    --success-color: #4EC9B0;
+    --warning-color: #CE9178;
+    --error-color: #F48771;
+    --info-color: #007ACC;
+
+    /* Code colors */
+    --code-bg: #252526;
+    --code-text: #CE9178;
+
+    /* Shadow */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Override specific elements for dark theme */
+body[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+body[data-theme="dark"] #preview .mermaid,
+body[data-theme="dark"] #preview .mermaid-container {
+    background: var(--bg-secondary);
+}
+
+/* Math equations styling for dark theme */
+body[data-theme="dark"] #preview .math-display {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body[data-theme="dark"] #preview .katex-display {
+    border: none;
+}
+
+/* KaTeX text color override for dark theme */
+body[data-theme="dark"] #preview .katex {
+    color: var(--text-primary);
+}
+
+body[data-theme="dark"] #preview .katex .mord,
+body[data-theme="dark"] #preview .katex .mop,
+body[data-theme="dark"] #preview .katex .mbin,
+body[data-theme="dark"] #preview .katex .mrel,
+body[data-theme="dark"] #preview .katex .mopen,
+body[data-theme="dark"] #preview .katex .mclose,
+body[data-theme="dark"] #preview .katex .mpunct,
+body[data-theme="dark"] #preview .katex .minner {
+    color: var(--text-primary);
+}
+
+/* KaTeX fraction lines and other borders */
+body[data-theme="dark"] #preview .katex .frac-line,
+body[data-theme="dark"] #preview .katex .rule {
+    border-bottom-color: var(--text-primary);
+    background-color: var(--text-primary);
+}
+
+/* KaTeX root symbols */
+body[data-theme="dark"] #preview .katex .sqrt>.root {
+    color: var(--text-primary);
+}
+
+/* KaTeX accent marks */
+body[data-theme="dark"] #preview .katex .accent .accent-body {
+    color: var(--text-primary);
+}
+
+/* Force all KaTeX elements to use theme colors */
+body[data-theme="dark"] #preview .katex * {
+    color: var(--text-primary) !important;
+}
+
+body[data-theme="dark"] #preview .katex .vlist-t {
+    color: var(--text-primary);
+}
+
+body[data-theme="dark"] #preview .katex .strut {
+    border-color: var(--text-primary);
+}
+
+/* Scrollbar styling for dark theme */
+body[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #424242;
+}
+
+body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #4E4E4E;
+}

@@ -16,12 +16,14 @@ QDockWidget {
     titlebar-close-icon: url(:/icons/close.png);
     titlebar-normal-icon: url(:/icons/float.png);
     border: none;
+    border-right: 1px solid #4C566A; /* File Explorer Separator */
     background-color: #2E3440;
 }
 
 QDockWidget::title {
+    font-family: "Pretendard";
     background-color: #3B4252;
-    padding: 8px;
+    padding: 5px;
     border-radius: 4px;
     color: #88C0D0;
 }
@@ -65,7 +67,7 @@ QTabBar::tab {
     border-bottom: none;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
-    padding: 8px 16px;
+    padding: 4px 16px;
     margin-right: 4px;
     min-width: 100px;
 }
@@ -82,25 +84,27 @@ QTabBar::tab:hover {
 }
 
 QTabBar::close-button {
-    image: url(data:image/svg+xml;utf8,<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 4,4 L 12,12 M 4,12 L 12,4" stroke="%23D8DEE9" stroke-width="2" stroke-linecap="round"/></svg>);
+    image: @TAB_CLOSE_ICON@;
     subcontrol-position: right;
     margin: 2px;
     border-radius: 4px;
+    width: 16px;
+    height: 16px;
 }
 
 QTabBar::close-button:hover {
     background-color: #4C566A;
-    image: url(data:image/svg+xml;utf8,<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 4,4 L 12,12 M 4,12 L 12,4" stroke="%23BF616A" stroke-width="2" stroke-linecap="round"/></svg>);
+    image: @TAB_CLOSE_HOVER_ICON@;
 }
 
 QTabBar::close-button:pressed {
-    background-color: #BF616A;
+    background-color: #434C5E;
 }
 
 /* Toolbar */
 QToolBar {
     background-color: #3B4252;
-    border-bottom: 1px solid #4C566A;
+    border-bottom: none; /* Removed bottom border */
     padding: 4px;
     spacing: 6px;
 }
@@ -171,7 +175,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
 QMenuBar {
     background-color: #3B4252;
     color: #D8DEE9;
-    border-bottom: 1px solid #4C566A;
+    border-bottom: none; /* Removed bottom border */
 }
 
 QMenuBar::item {
@@ -207,4 +211,19 @@ QStatusBar {
     background-color: #3B4252;
     color: #D8DEE9;
     border-top: 1px solid #4C566A;
+}
+
+/* Title Bar Buttons */
+QPushButton#TitleBarButton, QPushButton#TitleBarCloseButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QPushButton#TitleBarButton:hover {
+    background-color: #434C5E;
+}
+
+QPushButton#TitleBarCloseButton:hover {
+    background-color: #4C566A;
 }
