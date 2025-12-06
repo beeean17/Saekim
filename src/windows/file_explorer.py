@@ -6,7 +6,7 @@ Provides a file system tree view for navigating and opening markdown files
 from pathlib import Path
 from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
                               QHBoxLayout, QPushButton, QToolButton, QLabel,
-                              QSizePolicy, QMenu)
+                              QSizePolicy, QMenu, QHeaderView)
 from PyQt6.QtCore import pyqtSignal, Qt, QDir
 from PyQt6.QtGui import QFileSystemModel
 from utils.design_manager import DesignManager
@@ -128,7 +128,8 @@ class FileExplorer(QDockWidget):
         self.tree.setColumnHidden(3, True)  # Date Modified
 
         # Set column width
-        self.tree.setColumnWidth(0, 250)
+        self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        # self.tree.setColumnWidth(0, 250) # Removed fixed width
 
         # Connect double-click signal
         self.tree.doubleClicked.connect(self._on_double_click)
@@ -197,7 +198,9 @@ class FileExplorer(QDockWidget):
         self.tree.setRootIndex(root_index)
 
         # Update path label
-        self.path_label.setText(f"📁 {path_str}")
+        # Inject zero-width space after backslashes to allow wrapping
+        display_path = path_str.replace('\\', '\\\u200b')
+        self.path_label.setText(f"📁 {display_path}")
 
         # Update path label styling to match tree view
         # self.update_path_label_style()  # Removed in favor of global QSS

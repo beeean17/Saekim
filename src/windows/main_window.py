@@ -96,6 +96,15 @@ class MainWindow(QMainWindow):
                 
         super().changeEvent(event)
 
+    def resizeEvent(self, event):
+        """Handle window resize events"""
+        # Limit file explorer width to 1/3 of window width
+        if hasattr(self, 'file_explorer'):
+            max_width = self.width() // 3
+            self.file_explorer.setMaximumWidth(max_width)
+            
+        super().resizeEvent(event)
+
     def _apply_native_window_styles(self):
         """Apply Windows styles to enable Aero Snap while keeping frameless look"""
         import ctypes
