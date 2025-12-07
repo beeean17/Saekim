@@ -84,6 +84,7 @@ data/temp/*
 !data/images/
 data/images/*
 !data/images/.gitkeep
+tests/*
 
 # Exports (user-generated files)
 exports/

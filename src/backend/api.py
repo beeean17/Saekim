@@ -130,6 +130,9 @@ class BackendAPI(QObject):
 
         except Exception as e:
             logger.error(f"Error in open_folder_dialog: {e}")
+
+    @pyqtSlot(str, result=str)
+    def save_file(self, content: str) -> str:
         """
         Save content to the active tab's file
 
