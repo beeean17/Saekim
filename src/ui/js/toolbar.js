@@ -174,4 +174,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnInsertTable) {
         btnInsertTable.addEventListener('click', () => ToolbarModule.insertTable());
     }
+
+    // Find button
+    const btnFind = document.getElementById('btn-find');
+    if (btnFind) {
+        btnFind.addEventListener('click', () => {
+            if (typeof FindReplaceModule !== 'undefined') {
+                FindReplaceModule.showFind();
+            }
+        });
+    }
 });

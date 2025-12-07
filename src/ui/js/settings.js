@@ -40,13 +40,13 @@ const SettingsModule = {
         try {
             const saved = localStorage.getItem(this.SETTINGS_KEY);
             if (saved) {
-                this.settings = {...this.defaults, ...JSON.parse(saved)};
+                this.settings = { ...this.defaults, ...JSON.parse(saved) };
             } else {
-                this.settings = {...this.defaults};
+                this.settings = { ...this.defaults };
             }
         } catch (error) {
             console.error('❌ 설정 로드 실패:', error);
-            this.settings = {...this.defaults};
+            this.settings = { ...this.defaults };
         }
     },
 
@@ -65,20 +65,9 @@ const SettingsModule = {
      * Setup font size controls
      */
     setupFontSizeControls() {
-        const increaseFontBtn = document.getElementById('btn-font-increase');
-        const decreaseFontBtn = document.getElementById('btn-font-decrease');
-
-        if (increaseFontBtn) {
-            increaseFontBtn.addEventListener('click', () => {
-                this.increaseFontSize();
-            });
-        }
-
-        if (decreaseFontBtn) {
-            decreaseFontBtn.addEventListener('click', () => {
-                this.decreaseFontSize();
-            });
-        }
+        // Font size buttons removed in favor of keyboard shortcuts
+        // const increaseFontBtn = document.getElementById('btn-font-increase');
+        // const decreaseFontBtn = document.getElementById('btn-font-decrease');
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -254,6 +243,6 @@ const SettingsModule = {
      * @returns {object}
      */
     getAllSettings() {
-        return {...this.settings};
+        return { ...this.settings };
     }
 };

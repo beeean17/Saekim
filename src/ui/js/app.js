@@ -187,6 +187,14 @@ const App = {
                 e.preventDefault();
                 this.newFile();
             }
+
+            // Ctrl/Cmd + F: Find
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                if (typeof FindReplaceModule !== 'undefined') {
+                    FindReplaceModule.showFind();
+                }
+            }
         });
 
         // Warn before closing if there are unsaved changes

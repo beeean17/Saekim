@@ -13,6 +13,7 @@
     outline: none;
     resize: none;
     tab-size: 4;
+    box-sizing: border-box;
 }
 
 #editor::placeholder {
@@ -76,4 +77,264 @@
 #btn-mermaid-helper .helper-icon {
     font-size: 16px;
     line-height: 1;
+}
+
+/* ==========================================
+   Find & Replace Widget (VS Code-style)
+   ========================================== */
+
+.find-widget {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    z-index: 1000;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 420px;
+    font-family: var(--font-primary);
+    font-size: 13px;
+}
+
+.find-widget-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Toggle Button (Chevron) */
+.find-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, color 0.15s ease;
+}
+
+.find-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.find-toggle-btn.expanded svg {
+    transform: rotate(90deg);
+}
+
+/* Input Fields */
+.find-input-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.find-input {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 5px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.find-input:focus {
+    border-color: var(--accent-color);
+}
+
+.find-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Option Toggle Buttons */
+.find-option-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.find-option-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.find-option-btn.active {
+    background: var(--accent-color);
+    color: #fff;
+    border-color: var(--accent-color);
+}
+
+/* Result Count */
+.find-result-count {
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 0 8px;
+    min-width: 70px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Navigation and Action Buttons */
+.find-nav-btn,
+.find-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.find-nav-btn:hover,
+.find-action-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.find-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.find-close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+/* Replace Row (Collapsible) */
+.find-replace-row {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding-left: 24px;
+}
+
+.find-replace-row.visible {
+    display: flex;
+}
+
+.find-replace-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    transition: all 0.15s ease;
+}
+
+.find-replace-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
+}
+
+/* Separator */
+.find-separator {
+    width: 1px;
+    height: 16px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+/* ==========================================
+   Highlight Backdrop Overlay
+   ========================================== */
+
+.highlight-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: var(--spacing-lg);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.6;
+    color: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    overflow: auto;
+    pointer-events: none;
+    tab-size: 4;
+    -moz-tab-size: 4;
+    box-sizing: border-box;
+    border: none;
+    margin: 0;
+    /* Match textarea behavior exactly */
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-transform: none;
+    text-indent: 0;
+    text-shadow: none;
+    text-align: left;
+}
+
+/* Hide scrollbar for backdrop since editor handles scrolling */
+.highlight-backdrop::-webkit-scrollbar {
+    display: none;
+}
+
+.highlight-backdrop {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.highlight-mark {
+    background-color: rgba(255, 213, 0, 0.4);
+    border-radius: 2px;
+}
+
+.highlight-mark.current {
+    background-color: rgba(255, 165, 0, 0.6);
+    outline: 1px solid rgba(255, 165, 0, 0.8);
+}
+
+/* Editor pane content positioning */
+.editor-pane .pane-content {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Make editor background transparent to show highlights */
+#editor.with-highlights {
+    background: transparent;
+    position: relative;
+    z-index: 1;
 }
