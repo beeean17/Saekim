@@ -113,7 +113,8 @@ class DesignManager:
                         is_file = True
                     else:
                         # Try look in resources/icons
-                        res_path = Path(__file__).parent.parent / 'resources' / 'icons' / icon_value
+                        from backend.file_manager import FileManager
+                        res_path = Path(FileManager.resource_path(f'resources/icons/{icon_value}'))
                         if res_path.exists():
                             icon_value = str(res_path)
                             is_file = True

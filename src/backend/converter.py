@@ -58,6 +58,80 @@ class DocumentConverter:
             return self._generate_pdf_with_playwright(html_content, output_path)
 
         except Exception as e:
+            logger.error(f"Error initializing converter: {e}")
+
+    def check_playwright_browser(self) -> bool:
+        """Check if Playwright browsers are installed"""
+        try:
+            import sys
+            # If frozen, check if the bundled browser exists
+            if getattr(sys, 'frozen', False):
+                bundled_browser_path = Path(sys._MEIPASS) / 'ms-playwright' / 'chromium-1194' / 'chrome-win' / 'chrome.exe'
+                if bundled_browser_path.exists():
+                    return True
+
+            # Standard check
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                try:
+                    p.chromium.launch(executable_path=None)
+                except Exception:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def install_playwright_browser(self) -> Tuple[bool, str]:
+        """Install Playwright browsers programmatically"""
+        import subprocess
+        import sys
+        
+        try:
+            # Install command: playwright install chromium
+            cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
+            
+            # Run command
+            process = subprocess.run(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True
+            )
+            logger.info("Playwright browser installed successfully")
+            return True, ""
+            
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Installation failed: {e.stderr}"
+            logger.error(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = f"Installation error: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def markdown_to_pdf(self, markdown_content: str, output_path: str,
+                        title: str = "Document") -> Tuple[bool, str]:
+        """
+        Convert Markdown to PDF using Playwright
+
+        Args:
+            markdown_content: Markdown text
+            output_path: Path to save PDF
+            title: Document title
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        try:
+            # Convert markdown to HTML first
+            html_content = self._markdown_to_html(markdown_content, title)
+
+            # Use Playwright to generate PDF
+            return self._generate_pdf_with_playwright(html_content, output_path)
+
+        except Exception as e:
+
             error_msg = f"PDF conversion failed: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
@@ -132,9 +206,22 @@ class DocumentConverter:
             with open(temp_html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
 
+            import sys
             async with async_playwright() as p:
-                # Launch browser in headless mode
-                browser = await p.chromium.launch(headless=True)
+                launch_options = {'headless': True}
+                
+                # If frozen (exe), use bundled browser
+                if getattr(sys, 'frozen', False):
+                    # Path: _MEIPASS/ms-playwright/chromium-1194/chrome-win/chrome.exe
+                    bundled_browser_path = Path(sys._MEIPASS) / 'ms-playwright' / 'chromium-1194' / 'chrome-win' / 'chrome.exe'
+                    if bundled_browser_path.exists():
+                        launch_options['executable_path'] = str(bundled_browser_path)
+                        logger.info(f"Using bundled browser at: {bundled_browser_path}")
+                    else:
+                        logger.warning(f"Bundled browser not found at {bundled_browser_path}, trying default lookup")
+
+                # Launch browser
+                browser = await p.chromium.launch(**launch_options)
                 page = await browser.new_page()
 
                 # Load the HTML file

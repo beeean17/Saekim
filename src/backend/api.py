@@ -6,8 +6,8 @@ Provides QWebChannel API for JavaScript ↔ Python communication
 import json
 import shutil
 from pathlib import Path
-from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QSettings
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QSettings, Qt
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QApplication
 
 from backend.file_manager import FileManager
 from backend.converter import DocumentConverter
@@ -413,6 +413,52 @@ class BackendAPI(QObject):
             self.main_window.status_bar.update_position(line, column)
             self.main_window.status_bar.update_word_count(word_count, char_count)
 
+    def _ensure_playwright_browser(self) -> bool:
+        """Check and install Playwright browser if needed"""
+        if self.converter.check_playwright_browser():
+            return True
+
+        # Ask user
+        reply = QMessageBox.question(
+            self.main_window,
+            "추가 구성요소 설치 필요",
+            "PDF 변환 기능을 처음 사용하기 위해 추가 구성요소(Chromium 브라우저) 다운로드가 필요합니다.\n\n"
+            "지금 설치하시겠습니까? (약 100MB, 몇 분 소요될 수 있습니다)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply == QMessageBox.StandardButton.No:
+            return False
+
+        # Show waiting message
+        progress = QMessageBox(self.main_window)
+        progress.setWindowTitle("설치 중")
+        progress.setText("PDF 변환 엔진을 설치하고 있습니다...\n잠시만 기다려주세요.")
+        progress.setStandardButtons(QMessageBox.StandardButton.NoButton)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.show()
+        
+        # Process events to show dialog
+        QApplication.processEvents()
+
+        # Install
+        success, error = self.converter.install_playwright_browser()
+        
+        progress.close()
+
+        if not success:
+            QMessageBox.critical(
+                self.main_window, 
+                "설치 실패", 
+                f"설치 중 오류가 발생했습니다:\n{error}\n\n"
+                "인터넷 연결을 확인하거나 터미널에서 'playwright install chromium'을 직접 실행해주세요."
+            )
+            return False
+            
+        QMessageBox.information(self.main_window, "설치 완료", "구성요소 설치가 완료되었습니다. PDF 변환을 진행합니다.")
+        return True
+
     @pyqtSlot(str, result=str)
     def export_to_pdf(self, markdown_content: str) -> str:
         """
@@ -434,6 +480,10 @@ class BackendAPI(QObject):
 
             if not file_path:
                 return json.dumps({"success": False, "filepath": "", "error": "Cancelled"})
+
+            # Ensure Playwright browser is installed
+            if not self._ensure_playwright_browser():
+                return json.dumps({"success": False, "filepath": "", "error": "Browser installation cancelled or failed"})
 
             # Get document title from first line or use filename
             title = "Document"
@@ -508,6 +558,10 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
+            # Ensure Playwright browser is installed
+            if not self._ensure_playwright_browser():
+                return json.dumps({"success": False, "filepath": "", "error": "Browser installation cancelled or failed"})
+
             success, error = self.converter.html_to_pdf(rendered_html, file_path, title)
 
             if success:
@@ -546,6 +600,10 @@ class BackendAPI(QObject):
 
             if not file_path:
                 return json.dumps({"success": False, "filepath": "", "error": "Cancelled"})
+
+            # Ensure Playwright browser is installed
+            if not self._ensure_playwright_browser():
+                return json.dumps({"success": False, "filepath": "", "error": "Browser installation cancelled or failed"})
 
             success, error = self.converter.html_to_pdf(rendered_html, file_path, title)
 
