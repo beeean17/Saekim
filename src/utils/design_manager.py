@@ -9,6 +9,9 @@ class DesignManager:
     # Font Families
     FONT_FAMILY = "Pretendard, 'Segoe UI', 'Roboto', sans-serif"
     CODE_FONT_FAMILY = "'Consolas', 'Monaco', monospace"
+    
+    # App Icon
+    APP_ICON = "app_icon.png"
 
     class Icons:
         # Window Controls (Minimalist Line Style)

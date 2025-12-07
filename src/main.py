@@ -43,11 +43,28 @@ def main():
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
 
+    # Set AppUserModelID for Windows Taskbar grouping
+    # This must be done app-wide to separate it from the Python launcher
+    if sys.platform == 'win32':
+        try:
+            from ctypes import windll
+            myappid = 'beeean17.saekim.editor.1.0' # Arbitrary string
+            windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception as e:
+            logger.warning(f"AppUserModelID 설정 실패: {e}")
+
+
     # Create application
     app = QApplication(sys.argv)
-    app.setApplicationName("새김")
+    app.setApplicationName("Saekim")
     app.setOrganizationName("Saekim")
-    app.setApplicationDisplayName("새김 - 마크다운 에디터")
+    app.setApplicationDisplayName("Saekim")
+
+    # Set application icon
+    from utils.design_manager import DesignManager
+    app_icon = DesignManager.get_icon_data(DesignManager.APP_ICON)[0]
+    if app_icon:
+        app.setWindowIcon(app_icon)
 
     # Create and show main window with empty content
     window = MainWindow(initial_file=None, initial_content="")

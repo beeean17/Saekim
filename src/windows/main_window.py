@@ -41,7 +41,7 @@ class MainWindow(QMainWindow):
     def __init__(self, initial_file=None, initial_content=None):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.Window)
-        self.setWindowTitle("새김 - 마크다운 에디터")
+        self.setWindowTitle("Saekim - Markdown Editor")
         self.setGeometry(100, 100, 1200, 800)
 
         # Windows native event handling setup
@@ -772,9 +772,9 @@ class MainWindow(QMainWindow):
                 title = f"*{title}"
             if tab.is_modified:
                 title = f"*{title}"
-            self.setWindowTitle(f"{title} - 새김")
+            self.setWindowTitle(f"{title} - Saekim")
             if hasattr(self, 'title_bar'):
-                self.title_bar.set_title(f"{title} - 새김")
+                self.title_bar.set_title(f"{title} - Saekim")
 
         # Update file explorer to show current tab's file directory
         if tab and tab.file_path:
