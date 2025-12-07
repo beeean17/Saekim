@@ -9,9 +9,9 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 ## Project License
 
 **Saekim (새김) - Markdown Editor**
-- **License**: GNU General Public License v3.0 (GPL-3.0)
-- **Reason**: This project uses PyQt6, which is licensed under GPL-3.0. Therefore, the entire project must also be GPL-3.0 licensed.
-- **Copyright**: © 2024 Saekim Contributors
+- **License**: GNU Affero General Public License v3.0 (AGPL-3.0)
+- **Reason**: This project uses PyMuPDF (fitz), which is licensed under AGPL-3.0. Therefore, the entire project must also be AGPL-3.0 licensed. PyQt6 (GPL-3.0) is compatible with AGPL-3.0.
+- **Copyright**: © 2025 윤성빈 (Yoon Seongbin)
 
 ---
 
@@ -47,15 +47,24 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 - **Copyright**: © Microsoft Corporation
 - **Usage**: Headless browser automation for PDF generation (Markdown → PDF export)
 
-#### 4. pdfplumber
+#### 4. PyMuPDF (fitz)
+- **Version**: ≥1.24.0
+- **License**: GNU Affero General Public License v3.0 (AGPL-3.0)
+- **Homepage**: https://pymupdf.readthedocs.io/
+- **Repository**: https://github.com/pymupdf/PyMuPDF
+- **Copyright**: © Artifex Software, Inc.
+- **Usage**: High-quality PDF → Markdown conversion, text extraction, table recognition
+- **Note**: This is the primary reason the project uses AGPL-3.0 license
+
+#### 5. pdfplumber
 - **Version**: ≥0.11.0
 - **License**: MIT License
 - **Homepage**: https://github.com/jsvine/pdfplumber
 - **Repository**: https://github.com/jsvine/pdfplumber
 - **Copyright**: © Jeremy Singer-Vine
-- **Usage**: Extracting text and data from PDF files (PDF → Markdown conversion)
+- **Usage**: Extracting tables and structured data from PDF files (complementary to PyMuPDF)
 
-#### 5. PyPDF2
+#### 6. PyPDF2
 - **Version**: ≥3.0.0
 - **License**: BSD 3-Clause License
 - **Homepage**: https://pypdf2.readthedocs.io/
@@ -67,7 +76,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 
 ### DOCX Processing
 
-#### 6. python-docx
+#### 7. python-docx
 - **Version**: ≥1.1.0
 - **License**: MIT License
 - **Homepage**: https://python-docx.readthedocs.io/
@@ -79,7 +88,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 
 ### Image Processing
 
-#### 7. Pillow
+#### 8. Pillow
 - **Version**: ≥10.2.0
 - **License**: HPND License (Historical Permission Notice and Disclaimer)
 - **Homepage**: https://python-pillow.org/
@@ -91,7 +100,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 
 ### HTML Parsing
 
-#### 8. beautifulsoup4
+#### 9. beautifulsoup4
 - **Version**: ≥4.12.0
 - **License**: MIT License
 - **Homepage**: https://www.crummy.com/software/BeautifulSoup/
@@ -99,7 +108,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 - **Copyright**: © 2004-2024 Leonard Richardson
 - **Usage**: HTML/XML parsing and sanitization
 
-#### 9. lxml
+#### 10. lxml
 - **Version**: ≥4.9.0
 - **License**: BSD 3-Clause License
 - **Homepage**: https://lxml.de/
@@ -111,7 +120,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 
 ### Utilities
 
-#### 10. python-dateutil
+#### 11. python-dateutil
 - **Version**: ≥2.8.0
 - **License**: Apache License 2.0 / BSD 3-Clause License (Dual License)
 - **Homepage**: https://dateutil.readthedocs.io/
@@ -257,10 +266,11 @@ These JavaScript libraries are used in the web-based editor interface:
 
 ## License Compatibility
 
-### GPL-3.0 Compatibility
-This project is licensed under GPL-3.0 due to PyQt6's license requirements. All dependencies listed above are compatible with GPL-3.0:
+### AGPL-3.0 Compatibility
+This project is licensed under AGPL-3.0 due to PyMuPDF's license requirements. All dependencies listed above are compatible with AGPL-3.0:
 
-- **GPL-3.0/GPL-2.0**: Compatible (PyQt6, PyQt6-WebEngine, pylint)
+- **AGPL-3.0**: Primary license (PyMuPDF)
+- **GPL-3.0**: Compatible (PyQt6, PyQt6-WebEngine, pylint)
 - **MIT License**: Compatible (most dependencies)
 - **BSD Licenses**: Compatible (PyPDF2, lxml, sphinx, Highlight.js)
 - **Apache 2.0**: Compatible (Playwright, python-dateutil, DOMPurify)
@@ -268,19 +278,30 @@ This project is licensed under GPL-3.0 due to PyQt6's license requirements. All 
 - **MPL 2.0**: Compatible (DOMPurify)
 
 ### Commercial Use Note
-While this project is GPL-3.0 licensed (due to PyQt6), for commercial/proprietary use, consider:
-1. Using **PySide6** (Qt for Python) instead of PyQt6 - it's LGPL-3.0 licensed
-2. Obtaining a commercial Qt license from The Qt Company
+While this project is AGPL-3.0 licensed (due to PyMuPDF and PyQt6), for commercial/proprietary use, consider:
+1. Using **PySide6** (LGPL-3.0) instead of PyQt6 **AND** replacing PyMuPDF with MIT/BSD alternatives
+2. Obtaining commercial licenses from:
+   - The Qt Company (for Qt/PyQt6)
+   - Artifex Software (for PyMuPDF)
+
+### Network Use Implications (AGPL-3.0)
+AGPL-3.0 requires that if you run a modified version of this software on a server and let users interact with it over a network, you must also make the source code available to those users. This is the key difference from GPL-3.0.
 
 ---
 
 ## How to Comply with Licenses
 
-### For GPL-3.0 (PyQt6, PyQt6-WebEngine)
-1. This entire project is GPL-3.0 licensed
+### For AGPL-3.0 (PyMuPDF)
+1. This entire project is AGPL-3.0 licensed
 2. Source code is publicly available at the repository URL
-3. LICENSE file includes full GPL-3.0 text
-4. This LICENSES.md file provides proper attribution
+3. LICENSE file includes full AGPL-3.0 text
+4. If deployed as a network service, source code must be made available to users
+5. This LICENSES.md file provides proper attribution
+
+### For GPL-3.0 (PyQt6, PyQt6-WebEngine)
+1. Compatible with AGPL-3.0
+2. Source code is publicly available
+3. Proper attribution provided in this document
 
 ### For MIT/BSD/Apache Libraries
 1. Original copyright notices are preserved (see above)
@@ -297,10 +318,14 @@ All JavaScript libraries will be included via CDN or bundled with proper:
 
 ## Full License Texts
 
+### GNU Affero General Public License v3.0
+The full text of AGPL-3.0 is available at:
+- https://www.gnu.org/licenses/agpl-3.0.html
+- In the project's LICENSE file
+
 ### GNU General Public License v3.0
 The full text of GPL-3.0 is available at:
 - https://www.gnu.org/licenses/gpl-3.0.html
-- In the project's LICENSE file
 
 ### MIT License
 Copyright (c) [year] [copyright holder]
@@ -373,7 +398,8 @@ limitations under the License.
 | Date | Version | Changes |
 |------|---------|---------|
 | 2024-11-08 | 1.0.0 | Initial license documentation with all current dependencies |
-| 2025-11-23 | 1.1.0 | WeasyPrint → Playwright 변경, DOMPurify 추가 |
+| 2024-11-23 | 1.1.0 | WeasyPrint → Playwright 변경, DOMPurify 추가 |
+| 2024-12-07 | 1.2.0 | License changed to AGPL-3.0 due to PyMuPDF usage, added PyMuPDF to dependencies |
 
 ---
 
@@ -382,6 +408,11 @@ limitations under the License.
 For questions about licensing or attribution:
 - Project Repository: https://github.com/beeean17/Saekim
 - Issues: https://github.com/beeean17/Saekim/issues
+- Email: yoonsb1374@seoultech.ac.kr
+
+---
+
+**Last Updated**: December 7, 2025
 
 ---
 
