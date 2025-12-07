@@ -343,7 +343,9 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """Initialize UI components with tab interface"""
         # Get UI path first
-        self.ui_path = Path(__file__).parent.parent / 'ui' / 'index.html'
+        from backend.file_manager import FileManager
+        # ui/index.html is relative to src directory
+        self.ui_path = Path(FileManager.resource_path('ui/index.html'))
         if not self.ui_path.exists():
             print(f"Warning: UI file not found at {self.ui_path}")
 
@@ -950,10 +952,9 @@ class MainWindow(QMainWindow):
 
         # Get explorer path from session
         explorer_path = session_data.get('explorer_path')
-        tabs_data = session_data.get('tabs', [])
-
         # Try to restore tabs
         restored_tabs = 0
+        tabs_data = session_data.get('tabs')
         if tabs_data:
             for tab_data in tabs_data:
                 file_path = tab_data.get('file_path')

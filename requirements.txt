@@ -5,18 +5,10 @@ PyQt6-WebEngine>=6.6.0
 # PDF Processing
 playwright>=1.40.0
 pdfplumber>=0.11.0
-PyPDF2>=3.0.0
 PyMuPDF>=1.24.0  # For enhanced PDF to Markdown conversion
 
 # DOCX Processing
 python-docx>=1.1.0
 
-# Image Processing
-Pillow>=10.2.0
-
-# HTML Parsingㅅ
-beautifulsoup4>=4.12.0
-lxml>=4.9.0
-
-# Utilities
-python-dateutil>=2.8.0
+# Markdown Processing
+Markdown>=3.5.0

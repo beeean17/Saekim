@@ -6,6 +6,8 @@ Stateless utility class for file I/O operations on markdown files
 import json
 import re
 import shutil
+import sys
+import os
 from pathlib import Path
 from typing import Optional, Tuple, List
 from datetime import datetime
@@ -16,6 +18,22 @@ class FileManager:
 
     ENCODING = 'utf-8'
     ALLOWED_EXTENSIONS = ['.md', '.txt', '.markdown']
+
+    @staticmethod
+    def resource_path(relative_path: str) -> str:
+        """
+        Get absolute path to resource, works for dev and for PyInstaller
+        """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            # dev mode: simplified to be relative to src directory
+            # Assuming this file is in src/backend/file_manager.py
+            # We want to return path relative to src/
+            base_path = str(Path(__file__).parent.parent)
+
+        return str(Path(base_path) / relative_path)
 
     @staticmethod
     def open_file(file_path: str) -> Tuple[bool, str, str]:
