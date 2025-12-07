@@ -22,6 +22,7 @@ from PyQt6.QtGui import QFont, QColor, QDragEnterEvent, QDropEvent, QPalette
 
 from backend.converter import DocumentConverter
 from utils.logger import get_logger
+from utils.design_manager import DesignManager
 
 logger = get_logger()
 
@@ -218,7 +219,7 @@ class StartupDialog(QDialog):
 
         # 타이틀
         title_label = QLabel("새김")
-        title_font = QFont()
+        title_font = DesignManager.get_font("header")
         title_font.setPointSize(28)
         title_font.setBold(True)
         title_label.setFont(title_font)
@@ -228,7 +229,7 @@ class StartupDialog(QDialog):
         # 서브타이틀
         subtitle_label = QLabel("마크다운 에디터")
         subtitle_label.setObjectName("subtitle")
-        subtitle_font = QFont()
+        subtitle_font = DesignManager.get_font("body")
         subtitle_font.setPointSize(12)
         subtitle_label.setFont(subtitle_font)
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -250,7 +251,7 @@ class StartupDialog(QDialog):
 
         self.drop_text_label = QLabel("MD 또는 PDF 파일을 여기에 드래그하세요")
         self.drop_text_label.setObjectName("dropHint")
-        drop_text_font = QFont()
+        drop_text_font = DesignManager.get_font("body")
         drop_text_font.setPointSize(10)
         self.drop_text_label.setFont(drop_text_font)
         self.drop_text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -317,7 +318,7 @@ class StartupDialog(QDialog):
         # 제목
         title_label = QLabel(title)
         title_label.setProperty("class", "btn-title")
-        title_font = QFont()
+        title_font = DesignManager.get_font("body")
         title_font.setPointSize(10)
         title_font.setBold(True)
         title_label.setFont(title_font)
@@ -327,7 +328,7 @@ class StartupDialog(QDialog):
         # 설명
         desc_label = QLabel(description)
         desc_label.setProperty("class", "btn-desc")
-        desc_font = QFont()
+        desc_font = DesignManager.get_font("small")
         desc_font.setPointSize(9)
         desc_label.setFont(desc_font)
         desc_label.setStyleSheet("border: none; background: transparent;")

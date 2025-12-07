@@ -55,6 +55,7 @@ class FileExplorer(QDockWidget):
 
         # 2. Path Label
         self.path_label = QLabel()
+        self.path_label.setFont(DesignManager.get_font("small"))
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.path_label.setMinimumHeight(0)
@@ -115,6 +116,9 @@ class FileExplorer(QDockWidget):
         # Create tree view
         self.tree = QTreeView()
         self.tree.setModel(self.model)
+
+        # Set Pretendard font for Korean file names
+        self.tree.setFont(DesignManager.get_font("body"))
 
         # Configure tree view appearance
         self.tree.setAnimated(True)

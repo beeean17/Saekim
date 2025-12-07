@@ -43,7 +43,7 @@
 
     /* Typography */
     --font-family: "Pretendard", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
-    --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-mono: 'Consolas', 'Monaco', 'D2Coding', 'Noto Sans Mono CJK KR', '나눔고딕코딩', 'Courier New', monospace;
     --font-size-base: 14px;
     --font-size-sm: 12px;
     --font-size-lg: 16px;

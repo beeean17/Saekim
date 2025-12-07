@@ -4,6 +4,7 @@ Menu bar component for the main window
 
 from PyQt6.QtWidgets import QMenuBar
 from PyQt6.QtGui import QAction, QKeySequence
+from utils.design_manager import DesignManager
 
 
 class MenuBar(QMenuBar):
@@ -12,6 +13,10 @@ class MenuBar(QMenuBar):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
+
+        # Set Pretendard font for Korean text
+        self.setFont(DesignManager.get_font("body"))
+
         self.create_menus()
 
     def create_menus(self):
