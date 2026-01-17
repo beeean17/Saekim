@@ -59,9 +59,15 @@ workflow_status:
         agent: "analyst"
         command: "/bmad:bmm:workflows:brainstorming"
       - id: "research"
-        status: "optional"
+        status: "docs/macos-support-research.md"
         agent: "analyst"
         command: "/bmad:bmm:workflows:research"
+        note: "Completed 2026-01-17 - macOS support technical research"
+      - id: "product-brief"
+        status: "_bmad-output/planning-artifacts/product-brief-macos-support.md"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:create-product-brief"
+        note: "Completed 2026-01-17 - macOS support product brief"
 
   # Phase 2: Planning (Required)
   - phase: 2
@@ -69,16 +75,17 @@ workflow_status:
     required: true
     workflows:
       - id: "prd"
-        status: "required"
+        status: "_bmad-output/planning-artifacts/prd-macos-support.md"
         agent: "pm"
         command: "/bmad:bmm:workflows:prd"
         output: "Product Requirements Document"
+        note: "Completed 2026-01-17 - macOS support PRD"
       - id: "create-ux-design"
         status: "conditional"
         conditional: "if_has_ui"
         agent: "ux-designer"
         command: "/bmad:bmm:workflows:create-ux-design"
-        note: "Recommended - this is a UI-heavy desktop application"
+        note: "Optional - Using existing UI design, only window chrome changes"
 
   # Phase 3: Solutioning (Required)
   - phase: 3
