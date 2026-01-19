@@ -1,6 +1,7 @@
 # Desktop Framework
 PyQt6>=6.6.0
 PyQt6-WebEngine>=6.6.0
+PyQt6-Frameless-Window>=0.3.0
 
 # PDF Processing
 playwright>=1.40.0

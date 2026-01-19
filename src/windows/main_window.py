@@ -9,6 +9,7 @@ Defines the main application window with:
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QStackedWidget, QWidget,
@@ -66,8 +67,9 @@ class MainWindow(QMainWindow):
         self._border_width = 5
         self._title_bar_height = 32
         
-        # Apply Windows styles for Aero Snap
-        self._apply_native_window_styles()
+        # Apply Windows styles for Aero Snap (Windows only)
+        if sys.platform == 'win32':
+            self._apply_native_window_styles()
 
         # Enable drag visual feedback on entire window
         self.setAcceptDrops(True)
@@ -202,7 +204,13 @@ class MainWindow(QMainWindow):
         webview.repaint()
 
     def _apply_native_window_styles(self):
-        """Apply Windows styles to enable Aero Snap while keeping frameless look"""
+        """Apply Windows styles to enable Aero Snap while keeping frameless look.
+        
+        Note: This is Windows-only. On macOS/Linux, standard Qt window behavior is used.
+        """
+        if sys.platform != 'win32':
+            return
+            
         import ctypes
         from ctypes import wintypes
         
@@ -235,7 +243,13 @@ class MainWindow(QMainWindow):
         )
 
     def nativeEvent(self, event_type, message):
-        """Handle Windows native events for resizing and snapping"""
+        """Handle Windows native events for resizing and snapping.
+        
+        Note: This is Windows-only. On macOS/Linux, standard Qt event handling is used.
+        """
+        if sys.platform != 'win32':
+            return False, 0
+            
         try:
             # Ensure attributes exist (in case called before __init__ completes)
             if not hasattr(self, '_border_width') or not hasattr(self, '_title_bar_height'):
