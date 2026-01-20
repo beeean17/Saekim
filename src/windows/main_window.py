@@ -12,13 +12,16 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict, Optional
-from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QStackedWidget, QWidget,
+from PyQt6.QtWidgets import (QTabWidget, QStackedWidget, QWidget,
                               QVBoxLayout, QHBoxLayout, QLabel, QPushButton)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtCore import QUrl, Qt, QFile, QTextStream, QEvent, QFileSystemWatcher
 from PyQt6.QtGui import QCloseEvent, QShortcut, QKeySequence, QFont
+
+# Frameless window for cross-platform chrome (Windows/macOS)
+from qframelesswindow import FramelessMainWindow
 
 from .menu_bar import MenuBar
 from .toolbar import ToolBar
@@ -52,7 +55,7 @@ class UpdateCheckThread(QThread):
             self.update_available.emit(None)
 
 
-class MainWindow(QMainWindow):
+class MainWindow(FramelessMainWindow):
     """Main application window with tab interface"""
 
     MAX_WEBVIEW_CACHE = 3  # Maximum number of cached webviews
@@ -63,13 +66,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Saekim - Markdown Editor")
         self.setGeometry(100, 100, 1200, 800)
 
-        # Windows native event handling setup
-        self._border_width = 5
+        # Layout constants (used for overlays/spacing)
         self._title_bar_height = 32
-        
-        # Apply Windows styles for Aero Snap (Windows only)
-        if sys.platform == 'win32':
-            self._apply_native_window_styles()
 
         # Enable drag visual feedback on entire window
         self.setAcceptDrops(True)
@@ -203,175 +201,6 @@ class MainWindow(QMainWindow):
         webview.update()
         webview.repaint()
 
-    def _apply_native_window_styles(self):
-        """Apply Windows styles to enable Aero Snap while keeping frameless look.
-        
-        Note: This is Windows-only. On macOS/Linux, standard Qt window behavior is used.
-        """
-        if sys.platform != 'win32':
-            return
-            
-        import ctypes
-        from ctypes import wintypes
-        
-        hwnd = self.winId().__int__()
-        
-        # Constants
-        GWL_STYLE = -16
-        WS_CAPTION = 0x00C00000
-        WS_THICKFRAME = 0x00040000
-        SWP_FRAMECHANGED = 0x0020
-        SWP_NOMOVE = 0x0002
-        SWP_NOSIZE = 0x0001
-        SWP_NOZORDER = 0x0004
-        SWP_NOACTIVATE = 0x0010
-        
-        # Get current style
-        style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
-        
-        # Add Caption and ThickFrame styles
-        # These are required for Aero Snap and native resizing
-        style |= WS_CAPTION | WS_THICKFRAME
-        
-        # Set new style
-        ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, style)
-        
-        # Trigger frame recalculation (WM_NCCALCSIZE)
-        ctypes.windll.user32.SetWindowPos(
-            hwnd, 0, 0, 0, 0, 0,
-            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
-        )
-
-    def nativeEvent(self, event_type, message):
-        """Handle Windows native events for resizing and snapping.
-        
-        Note: This is Windows-only. On macOS/Linux, standard Qt event handling is used.
-        """
-        if sys.platform != 'win32':
-            return False, 0
-            
-        try:
-            # Ensure attributes exist (in case called before __init__ completes)
-            if not hasattr(self, '_border_width') or not hasattr(self, '_title_bar_height'):
-                return False, 0
-
-            if event_type == "windows_generic_MSG":
-                import ctypes
-                from ctypes import wintypes
-                from PyQt6.QtGui import QCursor
-                from PyQt6.QtWidgets import QPushButton
-                
-                msg = ctypes.wintypes.MSG.from_address(int(message))
-                
-                # WM_NCCALCSIZE = 0x0083
-                if msg.message == 0x0083:
-                    # If wParam is TRUE, it specifies that the application should indicate 
-                    # which part of the client area contains valid information.
-                    if msg.wParam:
-                        # We return 0 to indicate that the entire window is the client area,
-                        # effectively hiding the native frame and caption.
-                        
-                        # However, when maximized, the window extends beyond the screen boundaries
-                        # to hide the borders. We need to adjust for this.
-                        if self.isMaximized():
-                            # Get monitor info to adjust coordinates
-                            monitor = ctypes.windll.user32.MonitorFromWindow(msg.hWnd, 2) # MONITOR_DEFAULTTONEAREST
-                            
-                            class MONITORINFO(ctypes.Structure):
-                                _fields_ = [
-                                    ("cbSize", ctypes.c_ulong),
-                                    ("rcMonitor", ctypes.wintypes.RECT),
-                                    ("rcWork", ctypes.wintypes.RECT),
-                                    ("dwFlags", ctypes.c_ulong),
-                                ]
-                            
-                            monitor_info = MONITORINFO()
-                            monitor_info.cbSize = ctypes.sizeof(MONITORINFO)
-                            ctypes.windll.user32.GetMonitorInfoW(monitor, ctypes.byref(monitor_info))
-                            
-                            # For now, returning 0 (WVR_REDRAW might be better) works for "fullscreen" client area.
-                            pass
-
-                        return True, 0
-                
-                # WM_NCHITTEST = 0x0084
-                if msg.message == 0x0084:
-                    # Use QCursor.pos() for DPI-aware coordinates
-                    # msg.lParam provides physical pixels, but Qt works with logical pixels
-                    global_pos = QCursor.pos()
-                    x = global_pos.x()
-                    y = global_pos.y()
-
-                    # Get window geometry in global coordinates (logical pixels)
-                    frame = self.frameGeometry()
-                    
-                    # Determine borders based on global coordinates
-                    # Note: When maximized, we shouldn't allow resizing
-                    if self.isMaximized():
-                        isOnLeft = False
-                        isOnRight = False
-                        isOnTop = False
-                        isOnBottom = False
-                    else:
-                        isOnLeft = x < frame.x() + self._border_width
-                        isOnRight = x >= frame.x() + frame.width() - self._border_width
-                        isOnTop = y < frame.y() + self._border_width
-                        isOnBottom = y >= frame.y() + frame.height() - self._border_width
-                    
-                    # Hit test codes
-                    HTCLIENT = 1
-                    HTCAPTION = 2
-                    HTLEFT = 10
-                    HTRIGHT = 11
-                    HTTOP = 12
-                    HTTOPLEFT = 13
-                    HTTOPRIGHT = 14
-                    HTBOTTOM = 15
-                    HTBOTTOMLEFT = 16
-                    HTBOTTOMRIGHT = 17
-                    
-                    # 1. Corners
-                    if isOnLeft and isOnTop: return True, HTTOPLEFT
-                    if isOnRight and isOnTop: return True, HTTOPRIGHT
-                    if isOnLeft and isOnBottom: return True, HTBOTTOMLEFT
-                    if isOnRight and isOnBottom: return True, HTBOTTOMRIGHT
-                        
-                    # 2. Edges
-                    if isOnLeft: return True, HTLEFT
-                    if isOnRight: return True, HTRIGHT
-                    if isOnTop: return True, HTTOP
-                    if isOnBottom: return True, HTBOTTOM
-                        
-                    # 3. Title bar (Caption)
-                    # Check if y is within title bar height from top of frame
-                    if y < frame.y() + self._title_bar_height and not isOnTop:
-                        # Check for child widgets (buttons)
-                        # We need local coordinates for childAt
-                        # Use QCursor.pos() for reliable global position
-                        global_pos = QCursor.pos()
-                        local_pos = self.mapFromGlobal(global_pos)
-                        
-                        child = self.childAt(local_pos)
-                        if child:
-                            # If hovering over a button, let it handle the event
-                            curr = child
-                            while curr and curr != self:
-                                if isinstance(curr, QPushButton):
-                                    return True, HTCLIENT
-                                curr = curr.parent()
-                        
-                        return True, HTCAPTION
-                        
-                    return True, HTCLIENT
-                    
-        except Exception as e:
-            # Print error but don't crash
-            import traceback
-            traceback.print_exc()
-            print(f"Native event error: {e}")
-            pass
-            
-        return False, 0
 
     def apply_theme(self, theme_name: str):
         """Apply theme using ThemeManager"""
@@ -669,6 +498,10 @@ class MainWindow(QMainWindow):
         """Setup custom title bar"""
         self.title_bar = TitleBar(self)
         self.setMenuWidget(self.title_bar)
+
+        # Enable frameless window integration for drag/controls when available
+        if hasattr(self, "setTitleBar"):
+            self.setTitleBar(self.title_bar)
 
         # Connect title bar signals
         self.title_bar.toggle_sidebar.connect(self.toggle_file_explorer)
