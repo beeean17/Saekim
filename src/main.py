@@ -15,6 +15,10 @@ from PyQt6.QtCore import Qt
 if sys.platform == 'win32':
     os.environ['G_MESSAGES_DEBUG'] = ''
 
+# macOS-specific environment tuning (keeps layer-backed views stable for WebEngine)
+if sys.platform == 'darwin':
+    os.environ.setdefault('QT_MAC_WANTS_LAYER', '1')
+
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -28,7 +32,7 @@ def main():
     logger = setup_logger()
     logger.info("새김 마크다운 에디터 시작")
 
-    # Configure DPI awareness for Windows
+    # Configure platform-specific init
     if sys.platform == 'win32':
         try:
             from ctypes import windll
@@ -36,6 +40,11 @@ def main():
             windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
         except Exception as e:
             logger.warning(f"DPI awareness 설정 실패: {e}")
+
+    if sys.platform == 'darwin':
+        logger.info("macOS 초기화 경로 진입")
+        # PyQt6는 기본적으로 High DPI를 처리하지만, macOS 분기를 명시적으로 남긴다
+        # 추가 macOS 전용 설정이 필요하면 이 블록에 배치한다
 
     # Enable high DPI scaling BEFORE creating QApplication
     # PyQt6 has high DPI support enabled by default
