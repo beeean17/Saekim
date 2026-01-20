@@ -322,13 +322,11 @@ class MainWindow(FramelessMainWindow):
         # Apply tab styling after file explorer is created
         # self.apply_tab_styling()  # Removed in favor of global QSS
 
-        # Setup shortcuts
-        # Ctrl+N: New file
-        self.shortcut_new_file = QShortcut(QKeySequence("Ctrl+N"), self)
+        # Setup shortcuts (use StandardKey for Cmd/Ctrl auto-mapping)
+        self.shortcut_new_file = QShortcut(QKeySequence(QKeySequence.StandardKey.New), self)
         self.shortcut_new_file.activated.connect(self.backend.new_file)
 
-        # Ctrl+W: Close tab
-        self.shortcut_close_tab = QShortcut(QKeySequence("Ctrl+W"), self)
+        self.shortcut_close_tab = QShortcut(QKeySequence(QKeySequence.StandardKey.Close), self)
         self.shortcut_close_tab.activated.connect(self.close_current_tab)
 
         # F5: Refresh current file
