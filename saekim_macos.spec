@@ -17,6 +17,7 @@ a = Analysis(
     datas=[
         ('src/ui', 'ui'),
         ('src/resources', 'resources'),
+        ('vendor/ms-playwright', 'ms-playwright'),  # bundle Chromium cache
     ],
     hiddenimports=[
         'PyQt6.QtWebEngine', 
@@ -35,6 +36,10 @@ a = Analysis(
     cipher=block_cipher,
 )
 
+# Drop Playwright Chromium binaries from the binaries list to avoid macOS codesign on them.
+# We still copy the browser cache via datas above.
+a.binaries = [b for b in a.binaries if 'ms-playwright' not in str(b[0]) and 'chrome-mac' not in str(b[0])]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -50,9 +55,9 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch='universal2',  # Support Intel and Apple Silicon
-    codesign_identity=None,  # Set to your Developer ID for signing
-    entitlements_file='entitlements.plist',
+    target_arch='arm64',  # Match current Python env; switch back to universal2 only if all deps are fat binaries
+    codesign_identity=False,  # Force-disable signing to avoid Chromium bundle errors
+    entitlements_file=None,
 )
 
 coll = COLLECT(
@@ -63,6 +68,8 @@ coll = COLLECT(
     strip=False,
     upx=False,
     name='Saekim',
+    codesign_identity=False,
+    entitlements_file=None,
 )
 
 app = BUNDLE(
@@ -70,6 +77,8 @@ app = BUNDLE(
     name='Saekim.app',
     icon='src/resources/icons/app_icon.icns',
     bundle_identifier='com.beeean17.saekim',
+    codesign_identity=False,
+    entitlements_file=None,
     info_plist={
         'CFBundleDisplayName': 'Saekim',
         'CFBundleName': 'Saekim',

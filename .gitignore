@@ -30,6 +30,9 @@ dist/
 *.egg
 *.whl
 
+# Chromium Build Files
+/vendor
+
 # Build Artifacts
 *.exe
 *.msi
@@ -45,6 +48,13 @@ releases/
 
 # Beta Build Files
 BETA_README.md
+
+# install packages
+node_modules/
+jspm_packages/
+pkgroot/
+*.pkg
+
 
 # ============ IDE & Editors ============
 
@@ -164,4 +174,7 @@ secrets.json
 # ========================================
 nul
 log.txt
+
+
+# End of .gitignore
 

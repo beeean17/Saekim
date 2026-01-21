@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+# Postinstall script to fetch Playwright Chromium into the user cache.
+# Runs under Installer.app; shows progress in the Installer log (Window -> Installer Log).
+
+CHROMIUM_VERSION="1200"  # Match playwright browser revision
+CACHE_DIR="${HOME}/.cache/ms-playwright"
+DEST_DIR="${CACHE_DIR}/chromium-${CHROMIUM_VERSION}"
+ARCH="$(uname -m)"
+
+if [[ "${ARCH}" == "arm64" ]]; then
+  PKG_URL="https://playwright.azureedge.net/builds/chromium/${CHROMIUM_VERSION}/chromium-mac-arm64.zip"
+  SUBDIR_PREFIX="chrome-mac-arm64"
+else
+  PKG_URL="https://playwright.azureedge.net/builds/chromium/${CHROMIUM_VERSION}/chromium-mac.zip"
+  SUBDIR_PREFIX="chrome-mac"
+fi
+
+BINARY_PATH="${DEST_DIR}/${SUBDIR_PREFIX}/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+
+if [[ -x "${BINARY_PATH}" ]]; then
+  echo "Playwright Chromium already present at ${BINARY_PATH}. Skipping download."
+  exit 0
+fi
+
+echo "Downloading Playwright Chromium (${ARCH}) from ${PKG_URL}" 
+mkdir -p "${CACHE_DIR}"
+
+TMP_DIR="$(mktemp -d)"
+cleanup() { rm -rf "${TMP_DIR}"; }
+trap cleanup EXIT
+
+curl -fL --progress-bar "${PKG_URL}" -o "${TMP_DIR}/chromium.zip"
+
+# Extract
+mkdir -p "${DEST_DIR}"
+/usr/bin/ditto -x -k "${TMP_DIR}/chromium.zip" "${TMP_DIR}/out"
+# Move extracted folder (chrome-mac* -> DEST_DIR)
+rm -rf "${DEST_DIR}/${SUBDIR_PREFIX}" || true
+mv "${TMP_DIR}/out"/${SUBDIR_PREFIX} "${DEST_DIR}/"
+
+# Tighten permissions a bit
+chmod -R go-w "${DEST_DIR}/${SUBDIR_PREFIX}" || true
+
+echo "Playwright Chromium installed to ${DEST_DIR}/${SUBDIR_PREFIX}" 
+exit 0
