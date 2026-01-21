@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.2.0] - 2025-12-23
+
 
 ## [1.3.0] - 2026-01-21
 
@@ -22,10 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🐛 Fixed
 - **Playwright 서명 오류 회피**: PyInstaller 빌드 시 Playwright Chromium 바이너리를 codesign 대상에서 제외하여 macOS COLLECT 단계 실패를 방지
 
-### 🛠️ Build
-- **배포 흐름**: Saekim.pkg는 Git 저장소에 커밋하지 않고 GitHub Releases 자산으로 업로드 권장; 서명/노타 생략 빌드와 호환
-
 ---
+
+## [1.2.0] - 2025-12-23
 
 ### ✨ Added
 
