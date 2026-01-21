@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2025-12-23
 
+## [1.3.0] - 2026-01-21
+
+### ✨ Added
+
+#### macOS Support
+- **macOS 앱 번들**: PyInstaller macOS spec(arm64)로 Saekim.app 빌드, 리소스/아이콘 포함
+- **PDF 내보내기 브라우저 처리**: Playwright 런타임 훅이 사용자 캐시(`~/.cache/ms-playwright`)를 우선 사용하고, 필요 시 첫 실행에 자동 다운로드
+- **PKG 설치기**: postinstall 스크립트가 설치 중 Chromium을 자동 내려받아 사용자 캐시에 배치(수동 설치 불필요)
+- **macOS UX 정비**: Frameless 창 유지, Cmd 기반 StandardKey 단축키 적용, macOS 렌더링 안정화(QT_MAC_WANTS_LAYER 등 환경 설정)
+
+### 🐛 Fixed
+- **Playwright 서명 오류 회피**: PyInstaller 빌드 시 Playwright Chromium 바이너리를 codesign 대상에서 제외하여 macOS COLLECT 단계 실패를 방지
+
+### 🛠️ Build
+- **배포 흐름**: Saekim.pkg는 Git 저장소에 커밋하지 않고 GitHub Releases 자산으로 업로드 권장; 서명/노타 생략 빌드와 호환
+
+---
+
 ### ✨ Added
 
 #### UI/UX Enhancements
