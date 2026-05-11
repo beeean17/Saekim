@@ -7,6 +7,8 @@
 
 # Claude Code (AI assistant configuration)
 .claude/
+.agent/
+_bmad/
 claude.md
 CLAUDE.md
 
@@ -177,4 +179,3 @@ log.txt
 
 
 # End of .gitignore
-
