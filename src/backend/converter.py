@@ -3,9 +3,6 @@ Document Converter Module
 Handles conversion between different document formats (MD, PDF, DOCX, HTML)
 """
 
-import os
-import asyncio
-import tempfile
 from pathlib import Path
 from typing import Tuple, Optional
 
@@ -14,132 +11,10 @@ from utils.logger import get_logger
 logger = get_logger()
 
 
-def _run_async(coro):
-    """Run async coroutine in sync context"""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # If loop is already running (e.g., in Qt), create a new one
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, coro)
-                return future.result()
-        else:
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        return asyncio.run(coro)
-
-
 class DocumentConverter:
     """Converts documents between various formats"""
 
-    def __init__(self):
-        self.temp_dir = Path(tempfile.gettempdir()) / 'saekim_temp'
-        self.temp_dir.mkdir(exist_ok=True)
-
-    def check_playwright_browser(self) -> bool:
-        """Check if Playwright browsers are installed"""
-        try:
-            import sys
-            # If frozen, check if the bundled browser exists
-            if getattr(sys, 'frozen', False):
-                bundled_browser_path = Path(sys._MEIPASS) / 'ms-playwright' / 'chromium-1194' / 'chrome-win' / 'chrome.exe'
-                if bundled_browser_path.exists():
-                    return True
-
-            # Standard check
-            from playwright.sync_api import sync_playwright
-            with sync_playwright() as p:
-                try:
-                    p.chromium.launch(executable_path=None)
-                except Exception:
-                    return False
-            return True
-        except Exception:
-            return False
-
-    def install_playwright_browser(self) -> Tuple[bool, str]:
-        """Install Playwright browsers programmatically"""
-        import subprocess
-        import sys
-        
-        try:
-            # Install command: playwright install chromium
-            cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
-            
-            # Run command
-            process = subprocess.run(
-                cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True
-            )
-            logger.info("Playwright browser installed successfully")
-            return True, ""
-            
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Installation failed: {e.stderr}"
-            logger.error(error_msg)
-            return False, error_msg
-        except Exception as e:
-            error_msg = f"Installation error: {str(e)}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def markdown_to_pdf(self, markdown_content: str, output_path: str,
-                        title: str = "Document") -> Tuple[bool, str]:
-        """
-        Convert Markdown to PDF using Playwright
-
-        Args:
-            markdown_content: Markdown text
-            output_path: Path to save PDF
-            title: Document title
-
-        Returns:
-            Tuple of (success, error_message)
-        """
-        try:
-            # Convert markdown to HTML first
-            html_content = self._markdown_to_html(markdown_content, title)
-
-            # Use Playwright to generate PDF
-            return self._generate_pdf_with_playwright(html_content, output_path)
-
-        except Exception as e:
-
-            error_msg = f"PDF conversion failed: {str(e)}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def html_to_pdf(self, rendered_html: str, output_path: str,
-                    title: str = "Document") -> Tuple[bool, str]:
-        """
-        Convert rendered HTML to PDF using Playwright
-        This method preserves all formatting including Mermaid diagrams and KaTeX equations
-
-        Args:
-            rendered_html: Fully rendered HTML from frontend
-            output_path: Path to save PDF
-            title: Document title
-
-        Returns:
-            Tuple of (success, error_message)
-        """
-        try:
-            # Wrap the rendered HTML in a complete HTML document with all dependencies
-            full_html = self._create_full_html_for_pdf(rendered_html, title)
-
-            # Use Playwright to generate PDF
-            return self._generate_pdf_with_playwright(full_html, output_path)
-
-        except Exception as e:
-            error_msg = f"PDF conversion from HTML failed: {str(e)}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _create_full_html_for_pdf(self, rendered_html: str, title: str) -> str:
+    def create_full_html_for_pdf(self, rendered_html: str, title: str) -> str:
         """Create a complete HTML document for PDF generation with all necessary styles"""
         return f"""<!DOCTYPE html>
 <html>
@@ -157,93 +32,6 @@ class DocumentConverter:
     </div>
 </body>
 </html>"""
-
-    def _generate_pdf_with_playwright(self, html_content: str, output_path: str) -> Tuple[bool, str]:
-        """Generate PDF from HTML using Playwright"""
-        return _run_async(self._async_generate_pdf(html_content, output_path))
-
-    async def _async_generate_pdf(self, html_content: str, output_path: str) -> Tuple[bool, str]:
-        """Async implementation of PDF generation using Playwright"""
-        try:
-            from playwright.async_api import async_playwright
-        except ImportError:
-            error_msg = (
-                "Playwright가 설치되지 않았습니다.\n\n"
-                "다음 명령어로 설치해주세요:\n"
-                "pip install playwright\n"
-                "playwright install chromium"
-            )
-            logger.error("Playwright not installed")
-            return False, error_msg
-
-        temp_html_path = None
-        try:
-            # Save HTML to temp file (Playwright needs a file or URL)
-            temp_html_path = self.temp_dir / f"temp_pdf_{os.getpid()}.html"
-            with open(temp_html_path, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-
-            import sys
-            async with async_playwright() as p:
-                launch_options = {'headless': True}
-                
-                # If frozen (exe), use bundled browser
-                if getattr(sys, 'frozen', False):
-                    # Path: _MEIPASS/ms-playwright/chromium-1194/chrome-win/chrome.exe
-                    bundled_browser_path = Path(sys._MEIPASS) / 'ms-playwright' / 'chromium-1194' / 'chrome-win' / 'chrome.exe'
-                    if bundled_browser_path.exists():
-                        launch_options['executable_path'] = str(bundled_browser_path)
-                        logger.info(f"Using bundled browser at: {bundled_browser_path}")
-                    else:
-                        logger.warning(f"Bundled browser not found at {bundled_browser_path}, trying default lookup")
-
-                # Launch browser
-                browser = await p.chromium.launch(**launch_options)
-                page = await browser.new_page()
-
-                # Load the HTML file
-                await page.goto(f'file:///{temp_html_path.as_posix()}', wait_until='networkidle')
-
-                # Wait for any dynamic content (KaTeX, Mermaid) to render
-                await page.wait_for_timeout(500)
-
-                # Generate PDF with A4 format
-                await page.pdf(
-                    path=output_path,
-                    format='A4',
-                    margin={
-                        'top': '2.5cm',
-                        'bottom': '2.5cm',
-                        'left': '2.5cm',
-                        'right': '2.5cm'
-                    },
-                    print_background=True,
-                    display_header_footer=True,
-                    header_template='<div></div>',
-                    footer_template='''
-                        <div style="font-size: 10px; text-align: center; width: 100%; color: #666;">
-                            <span class="pageNumber"></span> / <span class="totalPages"></span>
-                        </div>
-                    '''
-                )
-
-                await browser.close()
-
-            logger.info(f"PDF created successfully with Playwright: {output_path}")
-            return True, ""
-
-        except Exception as e:
-            error_msg = f"Playwright PDF generation failed: {str(e)}"
-            logger.error(error_msg)
-            return False, error_msg
-
-        finally:
-            # Clean up temp file
-            if temp_html_path and temp_html_path.exists():
-                try:
-                    temp_html_path.unlink()
-                except:
-                    pass
 
     def _markdown_to_html(self, markdown: str, title: str) -> str:
         """

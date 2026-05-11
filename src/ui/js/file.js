@@ -124,7 +124,7 @@ const FileModule = {
     },
 
     /**
-     * Export to PDF (Advanced - requires GTK3)
+     * Export to PDF using the application's embedded Qt WebEngine renderer.
      */
     async exportToPDF() {
         if (!App.backend) {
@@ -361,7 +361,7 @@ const FileModule = {
             console.log('  - HTML 크기:', renderedHTML.length, 'bytes');
             console.log('  - 문서 제목:', title);
 
-            this.showPDFProgress(80, 'PDF 생성 중...', 'Playwright를 사용하여 PDF를 생성하고 있습니다...');
+            this.showPDFProgress(80, 'PDF 생성 중...', '내장 렌더러로 PDF를 생성하고 있습니다...');
 
             // Simulate progress from 80% to 95% while waiting for PDF generation
             let currentProgress = 80;
@@ -380,11 +380,18 @@ const FileModule = {
                 }
             }, 200); // Update every 200ms
 
-            // Step 3: Generate PDF to the selected path
-            App.backend.generate_pdf_from_html(renderedHTML, title, savePath, (resultJson) => {
-                clearInterval(progressInterval); // Stop fake progress
+            const requestId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+            const handlePdfResult = (resultJson) => {
                 const result = JSON.parse(resultJson);
+                if (result.request_id !== requestId) {
+                    return;
+                }
+
+                clearInterval(progressInterval); // Stop fake progress
+                if (App.backend.pdf_export_finished && App.backend.pdf_export_finished.disconnect) {
+                    App.backend.pdf_export_finished.disconnect(handlePdfResult);
+                }
 
                 if (result.success) {
                     this.showPDFProgress(100, '✅ 완료!', `PDF 생성이 완료되었습니다!`);
@@ -415,8 +422,8 @@ const FileModule = {
 
                     // Provide helpful error messages
                     let errorMessage = 'PDF 생성 실패';
-                    if (result.error.includes('Playwright')) {
-                        errorMessage = 'Playwright가 필요합니다. pip install playwright && playwright install chromium';
+                    if (result.error.includes('QWebEngine')) {
+                        errorMessage = '내장 PDF 렌더러에서 오류가 발생했습니다';
                     } else {
                         errorMessage = `PDF 생성 실패: ${result.error}`;
                     }
@@ -428,6 +435,27 @@ const FileModule = {
                     clearInterval(progressInterval); // Stop fake progress on cancel
                     this.hidePDFProgress();
                     console.log('PDF 내보내기 취소됨');
+                }
+            };
+
+            if (App.backend.pdf_export_finished && App.backend.pdf_export_finished.connect) {
+                App.backend.pdf_export_finished.connect(handlePdfResult);
+            }
+
+            // Step 3: Generate PDF to the selected path
+            App.backend.generate_pdf_from_html(requestId, renderedHTML, title, savePath, (resultJson) => {
+                const accepted = JSON.parse(resultJson);
+                if (!accepted.success) {
+                    clearInterval(progressInterval);
+                    if (App.backend.pdf_export_finished && App.backend.pdf_export_finished.disconnect) {
+                        App.backend.pdf_export_finished.disconnect(handlePdfResult);
+                    }
+                    this.hidePDFProgress();
+                    const errorMessage = accepted.error || 'PDF 생성 요청 실패';
+                    console.error('❌ PDF 생성 요청 실패:', errorMessage);
+                    if (typeof Utils !== 'undefined') {
+                        Utils.showToast(errorMessage, 'error');
+                    }
                 }
             });
         } catch (error) {

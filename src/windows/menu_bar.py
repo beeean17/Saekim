@@ -74,7 +74,7 @@ class MenuBar(QMenuBar):
         # Export submenu
         export_menu = file_menu.addMenu("내보내기(&E)")
 
-        # PDF export (Playwright)
+        # PDF export
         export_pdf_action = QAction("PDF로 내보내기...", self)
         export_pdf_action.setShortcut("Ctrl+P")
         export_pdf_action.setStatusTip("PDF로 내보내기")

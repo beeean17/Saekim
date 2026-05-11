@@ -48,7 +48,7 @@
 - **파일 새로고침**: 외부 파일 변경 자동 감지 (F5로 수동 새로고침 가능)
 
 ### 🔄 문서 변환
-- **Markdown → PDF** (Playwright): 다이어그램, 수식 포함 고품질 변환
+- **Markdown → PDF** (QWebEngine): 다이어그램, 수식 포함 고품질 변환
 - **PDF → Markdown** (PyMuPDF): 텍스트 추출, 표 인식, 제목 계층 구조 보존
 
 ### 🎨 테마 시스템
@@ -131,7 +131,7 @@
 #### ⚠️ macOS 설치 시 보안/서명 안내
 
 - 제공 파일: `Saekim-v1.3.0-macos.pkg` (미서명, 미노타라이즈)
-- 설치 중 postinstall이 Playwright Chromium을 자동 다운로드해 사용자 캐시(`~/.cache/ms-playwright`)에 배치합니다. 추가 조작은 없지만 첫 설치 시 네트워크가 필요합니다.
+- PDF 내보내기는 앱에 포함된 Qt WebEngine 렌더러를 사용하므로 별도 Chromium 다운로드가 필요하지 않습니다.
 - Gatekeeper 우회(미서명 PKG 실행):
    1) PKG 실행 시 차단되면 **시스템 설정 > 개인정보 보호 및 보안**에서 경고 알림의 **열기** 또는 **Open Anyway** 선택
    2) 다시 실행 후 **열기**를 눌러 설치 진행
@@ -168,17 +168,13 @@ venv\Scripts\activate  # Windows
 # 3. 의존성 설치
 pip install -r requirements.txt
 
-# 4. Playwright 브라우저 설치 (PDF 변환용)
-playwright install chromium
-
-# 5. 실행
+# 4. 실행
 python src/main.py
 ```
 
 **주요 의존성**:
 - PyQt6 >= 6.6.0 (GUI 프레임워크)
 - PyQt6-WebEngine >= 6.6.0 (내장 브라우저)
-- playwright >= 1.40.0 (PDF 생성)
 - PyMuPDF >= 1.24.0 (PDF 처리)
 - pdfplumber >= 0.11.0 (PDF 텍스트 추출)
 
@@ -235,8 +231,8 @@ Saekim/
 
 **주요 의존성 라이센스**:
 - PyQt6: GPL-3.0
+- PyQt6-WebEngine: GPL-3.0
 - PyMuPDF: AGPL-3.0
-- Playwright: Apache-2.0
 - Marked.js, Highlight.js, Mermaid.js, KaTeX: MIT
 - Pretendard 폰트: SIL OFL-1.1
 
@@ -286,11 +282,9 @@ Saekim/
 - [Highlight.js](https://highlightjs.org/) - 코드 하이라이팅
 - [Mermaid.js](https://mermaid.js.org/) - 다이어그램 렌더링
 - [KaTeX](https://katex.org/) - 수식 렌더링
-- [Playwright](https://playwright.dev/) - PDF 변환
 - [PyMuPDF](https://pymupdf.readthedocs.io/) - PDF 처리
 - [Pretendard](https://github.com/orioncactus/pretendard) - 한글 폰트
 
 ---
 
 **Made by [beeean17](https://github.com/beeean17)**
-

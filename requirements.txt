@@ -4,7 +4,6 @@ PyQt6-WebEngine>=6.6.0
 PyQt6-Frameless-Window>=0.3.0
 
 # PDF Processing
-playwright>=1.40.0
 PyMuPDF>=1.24.0
 pdfplumber>=0.11.0
 

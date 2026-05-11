@@ -7,9 +7,6 @@ from pathlib import Path
 
 block_cipher = None
 
-# Playwright browser path (auto-downloaded on first run, not bundled)
-# Users will need to run the app once with internet to download Chromium
-
 a = Analysis(
     ['src/main.py'],
     pathex=['src'],
@@ -17,7 +14,6 @@ a = Analysis(
     datas=[
         ('src/ui', 'ui'),
         ('src/resources', 'resources'),
-        ('vendor/ms-playwright', 'ms-playwright'),  # bundle Chromium cache
     ],
     hiddenimports=[
         'PyQt6.QtWebEngine', 
@@ -27,18 +23,14 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=['runtime_hook.py'],
+    runtime_hooks=[],
     excludes=[
-        'torch', 'torchvision', 'torchaudio', 'nvidia', 
+        'playwright', 'torch', 'torchvision', 'torchaudio', 'nvidia',
         'numpy', 'pandas', 'matplotlib', 'scipy'
     ],
     noarchive=False,
     cipher=block_cipher,
 )
-
-# Drop Playwright Chromium binaries from the binaries list to avoid macOS codesign on them.
-# We still copy the browser cache via datas above.
-a.binaries = [b for b in a.binaries if 'ms-playwright' not in str(b[0]) and 'chrome-mac' not in str(b[0])]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
@@ -56,7 +48,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch='arm64',  # Match current Python env; switch back to universal2 only if all deps are fat binaries
-    codesign_identity=False,  # Force-disable signing to avoid Chromium bundle errors
+    codesign_identity=False,
     entitlements_file=None,
 )
 

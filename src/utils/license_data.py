@@ -77,14 +77,6 @@ DEPENDENCIES = [
         "license_text": LICENSE_GPL_3
     },
     {
-        "name": "Playwright",
-        "license": "Apache-2.0",
-        "description": "Browser automation library (PDF generation)",
-        "copyright": "Copyright (c) Microsoft Corporation",
-        "url": "https://playwright.dev/",
-        "license_text": LICENSE_APACHE_2
-    },
-    {
         "name": "PyMuPDF (fitz)",
         "license": "AGPL-3.0",
         "description": "PDF processing library",

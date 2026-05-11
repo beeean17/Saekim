@@ -5,9 +5,13 @@ Provides QWebChannel API for JavaScript ↔ Python communication
 
 import json
 import shutil
+import tempfile
+import uuid
 from pathlib import Path
-from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QSettings, Qt
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QApplication
+from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QSettings, QMarginsF, QTimer, QUrl
+from PyQt6.QtGui import QPageLayout, QPageSize
+from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from backend.file_manager import FileManager
 # DocumentConverter is lazy loaded on first use to improve startup time
@@ -27,11 +31,13 @@ class BackendAPI(QObject):
     file_opened = pyqtSignal(str, str)  # (filename, content)
     file_saved = pyqtSignal(str)  # (filepath)
     error_occurred = pyqtSignal(str)  # (error_message)
+    pdf_export_finished = pyqtSignal(str)  # JSON: {request_id, success, filepath, error}
 
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
         self._converter = None  # Lazy loaded for faster startup
+        self._pdf_export_jobs = {}
         logger.info("Backend API initialized")
 
     @property
@@ -422,51 +428,122 @@ class BackendAPI(QObject):
             self.main_window.status_bar.update_position(line, column)
             self.main_window.status_bar.update_word_count(word_count, char_count)
 
-    def _ensure_playwright_browser(self) -> bool:
-        """Check and install Playwright browser if needed"""
-        if self.converter.check_playwright_browser():
-            return True
+    def _start_pdf_export_with_qwebengine(self, request_id: str, html_content: str, file_path: str):
+        """Render standalone HTML to PDF using Qt WebEngine's built-in PDF printer."""
+        timeout = QTimer(self)
+        timeout.setSingleShot(True)
+        job = {
+            "done": False,
+            "page": None,
+            "timeout": timeout,
+            "temp_html_path": None,
+            "file_path": file_path,
+        }
+        self._pdf_export_jobs[request_id] = job
 
-        # Ask user
-        reply = QMessageBox.question(
-            self.main_window,
-            "추가 구성요소 설치 필요",
-            "PDF 변환 기능을 처음 사용하기 위해 추가 구성요소(Chromium 브라우저) 다운로드가 필요합니다.\n\n"
-            "지금 설치하시겠습니까? (약 100MB, 몇 분 소요될 수 있습니다)",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
-        )
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                suffix=".html",
+                prefix="saekim_pdf_",
+                delete=False,
+            ) as temp_html:
+                temp_html.write(html_content)
+                temp_html_path = Path(temp_html.name)
+                job["temp_html_path"] = temp_html_path
 
-        if reply == QMessageBox.StandardButton.No:
-            return False
+            page = QWebEnginePage(self.main_window)
+            job["page"] = page
+            settings = page.settings()
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
 
-        # Show waiting message
-        progress = QMessageBox(self.main_window)
-        progress.setWindowTitle("설치 중")
-        progress.setText("PDF 변환 엔진을 설치하고 있습니다...\n잠시만 기다려주세요.")
-        progress.setStandardButtons(QMessageBox.StandardButton.NoButton)
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.show()
-        
-        # Process events to show dialog
-        QApplication.processEvents()
+            def finish(success: bool, error: str = ""):
+                if job["done"]:
+                    return
+                job["done"] = True
+                if timeout.isActive():
+                    timeout.stop()
 
-        # Install
-        success, error = self.converter.install_playwright_browser()
-        
-        progress.close()
+                if success:
+                    logger.info(f"PDF exported with QWebEngine: {file_path}")
+                else:
+                    logger.error(f"QWebEngine PDF export failed: {error}")
 
-        if not success:
-            QMessageBox.critical(
-                self.main_window, 
-                "설치 실패", 
-                f"설치 중 오류가 발생했습니다:\n{error}\n\n"
-                "인터넷 연결을 확인하거나 터미널에서 'playwright install chromium'을 직접 실행해주세요."
-            )
-            return False
-            
-        QMessageBox.information(self.main_window, "설치 완료", "구성요소 설치가 완료되었습니다. PDF 변환을 진행합니다.")
-        return True
+                self.pdf_export_finished.emit(json.dumps({
+                    "request_id": request_id,
+                    "success": success,
+                    "filepath": file_path if success else "",
+                    "error": error,
+                }))
+                self._cleanup_pdf_export_job(request_id)
+
+            def on_timeout():
+                finish(False, "QWebEngine PDF generation timed out")
+
+            def on_pdf_finished(output_path: str, success: bool):
+                if not success:
+                    finish(False, "QWebEngine failed to write the PDF")
+                    return
+
+                output_file = Path(output_path or file_path)
+                if not output_file.exists() or output_file.stat().st_size == 0:
+                    finish(False, "QWebEngine reported success, but the PDF file is empty")
+                    return
+
+                finish(True, "")
+
+            def print_pdf():
+                layout = QPageLayout(
+                    QPageSize(QPageSize.PageSizeId.A4),
+                    QPageLayout.Orientation.Portrait,
+                    QMarginsF(25, 25, 25, 25),
+                    QPageLayout.Unit.Millimeter,
+                )
+                page.printToPdf(file_path, layout)
+
+            def on_load_finished(ok: bool):
+                if not ok:
+                    finish(False, "Failed to load the PDF export document")
+                    return
+
+                QTimer.singleShot(300, print_pdf)
+
+            timeout.timeout.connect(on_timeout)
+            page.loadFinished.connect(on_load_finished)
+            page.pdfPrintingFinished.connect(on_pdf_finished)
+
+            timeout.start(60000)
+            page.load(QUrl.fromLocalFile(str(temp_html_path)))
+
+        except Exception as e:
+            error_msg = f"QWebEngine PDF generation failed: {str(e)}"
+            logger.error(error_msg)
+            self.pdf_export_finished.emit(json.dumps({
+                "request_id": request_id,
+                "success": False,
+                "filepath": "",
+                "error": error_msg,
+            }))
+            self._cleanup_pdf_export_job(request_id)
+
+    def _cleanup_pdf_export_job(self, request_id: str):
+        job = self._pdf_export_jobs.pop(request_id, None)
+        if not job:
+            return
+
+        page = job.get("page")
+        if page is not None:
+            page.deleteLater()
+
+        temp_html_path = job.get("temp_html_path")
+        if temp_html_path and temp_html_path.exists():
+            try:
+                temp_html_path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to remove temporary PDF HTML file: {e}")
 
     @pyqtSlot(str, result=str)
     def export_to_pdf(self, markdown_content: str) -> str:
@@ -490,25 +567,21 @@ class BackendAPI(QObject):
             if not file_path:
                 return json.dumps({"success": False, "filepath": "", "error": "Cancelled"})
 
-            # Ensure Playwright browser is installed
-            if not self._ensure_playwright_browser():
-                return json.dumps({"success": False, "filepath": "", "error": "Browser installation cancelled or failed"})
-
             # Get document title from first line or use filename
             title = "Document"
             lines = markdown_content.strip().split('\n')
             if lines and lines[0].startswith('#'):
                 title = lines[0].lstrip('#').strip()
 
-            success, error = self.converter.markdown_to_pdf(markdown_content, file_path, title)
-
-            if success:
-                logger.info(f"PDF exported: {file_path}")
+            request_id = str(uuid.uuid4())
+            html_content = self.converter._markdown_to_html(markdown_content, title)
+            self._start_pdf_export_with_qwebengine(request_id, html_content, file_path)
 
             return json.dumps({
-                "success": success,
-                "filepath": file_path if success else "",
-                "error": error
+                "success": True,
+                "request_id": request_id,
+                "filepath": file_path,
+                "error": ""
             })
 
         except Exception as e:
@@ -552,8 +625,8 @@ class BackendAPI(QObject):
             logger.error(f"Error in get_pdf_save_path: {e}")
             return json.dumps({"success": False, "filepath": "", "error": str(e)})
 
-    @pyqtSlot(str, str, str, result=str)
-    def generate_pdf_from_html(self, rendered_html: str, title: str, file_path: str) -> str:
+    @pyqtSlot(str, str, str, str, result=str)
+    def generate_pdf_from_html(self, request_id: str, rendered_html: str, title: str, file_path: str) -> str:
         """
         Generate PDF from rendered HTML to the specified path
         This is called after the user selects the save location
@@ -567,19 +640,14 @@ class BackendAPI(QObject):
             JSON string with {success, filepath, error}
         """
         try:
-            # Ensure Playwright browser is installed
-            if not self._ensure_playwright_browser():
-                return json.dumps({"success": False, "filepath": "", "error": "Browser installation cancelled or failed"})
-
-            success, error = self.converter.html_to_pdf(rendered_html, file_path, title)
-
-            if success:
-                logger.info(f"PDF exported from HTML: {file_path}")
+            html_content = self.converter.create_full_html_for_pdf(rendered_html, title)
+            QTimer.singleShot(0, lambda: self._start_pdf_export_with_qwebengine(request_id, html_content, file_path))
 
             return json.dumps({
-                "success": success,
-                "filepath": file_path if success else "",
-                "error": error
+                "success": True,
+                "request_id": request_id,
+                "filepath": file_path,
+                "error": ""
             })
 
         except Exception as e:
@@ -610,19 +678,15 @@ class BackendAPI(QObject):
             if not file_path:
                 return json.dumps({"success": False, "filepath": "", "error": "Cancelled"})
 
-            # Ensure Playwright browser is installed
-            if not self._ensure_playwright_browser():
-                return json.dumps({"success": False, "filepath": "", "error": "Browser installation cancelled or failed"})
-
-            success, error = self.converter.html_to_pdf(rendered_html, file_path, title)
-
-            if success:
-                logger.info(f"PDF exported from HTML: {file_path}")
+            request_id = str(uuid.uuid4())
+            html_content = self.converter.create_full_html_for_pdf(rendered_html, title)
+            self._start_pdf_export_with_qwebengine(request_id, html_content, file_path)
 
             return json.dumps({
-                "success": success,
-                "filepath": file_path if success else "",
-                "error": error
+                "success": True,
+                "request_id": request_id,
+                "filepath": file_path,
+                "error": ""
             })
 
         except Exception as e:

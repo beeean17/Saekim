@@ -29,21 +29,13 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 - **License**: GNU General Public License v3.0 (GPL-3.0)
 - **Homepage**: https://www.riverbankcomputing.com/software/pyqt/
 - **Copyright**: © Riverbank Computing Limited
-- **Usage**: Chromium-based web engine for rendering markdown preview
+- **Usage**: Chromium-based web engine for rendering markdown preview and PDF export
 
 ---
 
 ### PDF Processing
 
-#### 3. Playwright
-- **Version**: ≥1.40.0
-- **License**: Apache License 2.0
-- **Homepage**: https://playwright.dev/python/
-- **Repository**: https://github.com/microsoft/playwright-python
-- **Copyright**: © Microsoft Corporation
-- **Usage**: Headless browser for PDF generation (Markdown → PDF export)
-
-#### 4. PyMuPDF (fitz)
+#### 3. PyMuPDF (fitz)
 - **Version**: ≥1.24.0
 - **License**: GNU Affero General Public License v3.0 (AGPL-3.0)
 - **Homepage**: https://pymupdf.readthedocs.io/
@@ -52,7 +44,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 - **Usage**: PDF → Markdown conversion, text extraction
 - **Note**: This is the primary reason the project uses AGPL-3.0 license
 
-#### 5. pdfplumber
+#### 4. pdfplumber
 - **Version**: ≥0.11.0
 - **License**: MIT License
 - **Homepage**: https://github.com/jsvine/pdfplumber
@@ -63,7 +55,7 @@ This document lists all open-source software (OSS) used in the Saekim project, a
 
 ### Markdown Processing
 
-#### 6. Markdown
+#### 5. Markdown
 - **Version**: ≥3.5.0
 - **License**: BSD 3-Clause License
 - **Homepage**: https://python-markdown.github.io/
@@ -79,7 +71,7 @@ These JavaScript libraries are loaded via CDN in the web-based editor interface:
 
 ### Markdown & Rendering
 
-#### 7. Marked.js
+#### 6. Marked.js
 - **Version**: 11.1.0
 - **License**: MIT License
 - **Homepage**: https://marked.js.org/
@@ -87,7 +79,7 @@ These JavaScript libraries are loaded via CDN in the web-based editor interface:
 - **Copyright**: © 2011-2024 Christopher Jeffrey and contributors
 - **Usage**: Client-side Markdown parser and compiler
 
-#### 8. Highlight.js
+#### 7. Highlight.js
 - **Version**: 11.9.0
 - **License**: BSD 3-Clause License
 - **Homepage**: https://highlightjs.org/
@@ -95,7 +87,7 @@ These JavaScript libraries are loaded via CDN in the web-based editor interface:
 - **Copyright**: © 2006 Ivan Sagalaev and contributors
 - **Usage**: Syntax highlighting for code blocks
 
-#### 9. Mermaid.js
+#### 8. Mermaid.js
 - **Version**: 10.6.1
 - **License**: MIT License
 - **Homepage**: https://mermaid.js.org/
@@ -103,7 +95,7 @@ These JavaScript libraries are loaded via CDN in the web-based editor interface:
 - **Copyright**: © 2014-2024 Knut Sveidqvist and contributors
 - **Usage**: Diagram and flowchart generation
 
-#### 10. KaTeX
+#### 9. KaTeX
 - **Version**: 0.16.9
 - **License**: MIT License
 - **Homepage**: https://katex.org/
@@ -111,7 +103,7 @@ These JavaScript libraries are loaded via CDN in the web-based editor interface:
 - **Copyright**: © 2013-2020 Khan Academy and other contributors
 - **Usage**: Fast math typesetting for LaTeX equations
 
-#### 11. DOMPurify
+#### 10. DOMPurify
 - **Version**: 3.0.6
 - **License**: Apache License 2.0 / Mozilla Public License 2.0 (Dual License)
 - **Homepage**: https://github.com/cure53/DOMPurify
@@ -122,7 +114,7 @@ These JavaScript libraries are loaded via CDN in the web-based editor interface:
 
 ## Fonts
 
-### 12. Pretendard
+### 11. Pretendard
 - **Version**: 1.3.9
 - **License**: SIL Open Font License 1.1 (OFL-1.1)
 - **Homepage**: https://cactus.tistory.com/306
