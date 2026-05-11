@@ -48,6 +48,10 @@ const FindReplaceModule = {
         const widget = document.createElement('div');
         widget.id = 'find-widget';
         widget.className = 'find-widget';
+        const shortcutLabel = window.PlatformUX
+            ? window.PlatformUX.shortcutLabel.bind(window.PlatformUX)
+            : (sequence) => sequence.replace(/\bPrimary\b/g, 'Ctrl');
+
         widget.innerHTML = `
             <!-- Top Row: Toggle, Find Input, Options, Count, Nav, Close -->
             <div class="find-widget-row">
@@ -59,9 +63,9 @@ const FindReplaceModule = {
                 <div class="find-input-wrapper">
                     <input type="text" class="find-input" id="find-input" placeholder="찾기" spellcheck="false" />
                 </div>
-                <button class="find-option-btn" id="opt-case" title="대소문자 구분 (Alt+C)">Aa</button>
-                <button class="find-option-btn" id="opt-word" title="전체 단어 일치 (Alt+W)">W</button>
-                <button class="find-option-btn" id="opt-regex" title="정규식 사용 (Alt+R)">.*</button>
+                <button class="find-option-btn" id="opt-case" title="대소문자 구분 (${shortcutLabel('Alt+C')})">Aa</button>
+                <button class="find-option-btn" id="opt-word" title="전체 단어 일치 (${shortcutLabel('Alt+W')})">W</button>
+                <button class="find-option-btn" id="opt-regex" title="정규식 사용 (${shortcutLabel('Alt+R')})">.*</button>
                 <span class="find-result-count" id="find-result-count">결과 없음</span>
                 <div class="find-separator"></div>
                 <button class="find-nav-btn" id="find-prev-btn" title="이전 찾기 (Shift+Enter)">
@@ -82,7 +86,7 @@ const FindReplaceModule = {
                     <input type="text" class="find-input" id="replace-input" placeholder="바꾸기" spellcheck="false" />
                 </div>
                 <button class="find-replace-btn" id="replace-btn" title="바꾸기 (Enter)">바꾸기</button>
-                <button class="find-replace-btn" id="replace-all-btn" title="모두 바꾸기 (Ctrl+Alt+Enter)">모두 바꾸기</button>
+                <button class="find-replace-btn" id="replace-all-btn" title="모두 바꾸기 (${shortcutLabel('Primary+Alt+Enter')})">모두 바꾸기</button>
             </div>
         `;
 
@@ -270,7 +274,7 @@ const FindReplaceModule = {
     onReplaceKeyDown(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            if (e.ctrlKey && e.altKey) {
+            if ((e.ctrlKey || e.metaKey) && e.altKey) {
                 this.replaceAll();
             } else {
                 this.replace();

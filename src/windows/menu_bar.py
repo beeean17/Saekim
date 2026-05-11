@@ -232,7 +232,7 @@ class MenuBar(QMenuBar):
         view_menu.addAction(sidebar_action)
 
         refresh_action = QAction("새로고침", self)
-        refresh_action.setShortcut(QKeySequence("F5"))
+        refresh_action.setShortcut(self.platform_shortcut("R") if sys.platform == "darwin" else QKeySequence("F5"))
         refresh_action.setStatusTip("현재 파일 새로고침")
         refresh_action.triggered.connect(self.refresh_current_file)
         view_menu.addAction(refresh_action)

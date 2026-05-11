@@ -2,6 +2,30 @@
  * Main application controller for Saekim editor
  */
 
+const PlatformUX = {
+    isMac: /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent),
+
+    primaryModifierLabel() {
+        return this.isMac ? 'Cmd' : 'Ctrl';
+    },
+
+    alternateModifierLabel() {
+        return this.isMac ? 'Option' : 'Alt';
+    },
+
+    shortcutLabel(sequence) {
+        return sequence
+            .replace(/\bPrimary\b/g, this.primaryModifierLabel())
+            .replace(/\bAlt\b/g, this.alternateModifierLabel());
+    },
+
+    titleWithShortcut(title, sequence) {
+        return `${title} (${this.shortcutLabel(sequence)})`;
+    }
+};
+
+window.PlatformUX = PlatformUX;
+
 const App = {
     // Backend reference (Python via QWebChannel)
     backend: null,
@@ -25,6 +49,9 @@ const App = {
         try {
             // Connect to Python backend
             await this.connectBackend();
+
+            // Apply OS-specific labels before modules create additional controls
+            this.applyPlatformUX();
 
             // Initialize modules
             this.setupResizer();
@@ -162,6 +189,31 @@ const App = {
         });
 
         console.log('✅ Resizer 설정 완료');
+    },
+
+    /**
+     * Apply platform-specific UI affordances inside the web editor.
+     */
+    applyPlatformUX() {
+        document.documentElement.dataset.platform = PlatformUX.isMac ? 'macos' : 'default';
+
+        const shortcutTitles = [
+            ['btn-undo', '실행 취소', 'Primary+Z'],
+            ['btn-redo', '다시 실행', PlatformUX.isMac ? 'Primary+Shift+Z' : 'Primary+Y'],
+            ['btn-markdown-helper', '마크다운 문법 도우미', 'Primary+Shift+D'],
+            ['btn-katex-helper', 'KaTeX 수식 도우미', 'Primary+Shift+K'],
+            ['btn-mermaid-helper', 'Mermaid 다이어그램 도우미', 'Primary+Shift+M'],
+            ['btn-find', '찾기', 'Primary+F'],
+        ];
+
+        shortcutTitles.forEach(([id, title, shortcut]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.title = PlatformUX.titleWithShortcut(title, shortcut);
+            }
+        });
+
+        console.log(`✅ Platform UX 적용: ${PlatformUX.isMac ? 'macOS' : 'default'}`);
     },
 
     /**

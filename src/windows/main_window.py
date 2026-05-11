@@ -341,6 +341,13 @@ class MainWindow(BaseMainWindow):
         self.shortcut_refresh = QShortcut(QKeySequence("F5"), self)
         self.shortcut_refresh.activated.connect(self.reload_current_file)
 
+        if sys.platform == "darwin":
+            self.shortcut_refresh_mac = QShortcut(QKeySequence("Meta+R"), self)
+            self.shortcut_refresh_mac.activated.connect(self.reload_current_file)
+
+            self.shortcut_preferences = QShortcut(QKeySequence(QKeySequence.StandardKey.Preferences), self)
+            self.shortcut_preferences.activated.connect(self.show_settings)
+
         # F9: Toggle file explorer
         self.shortcut_toggle_explorer = QShortcut(QKeySequence("F9"), self)
         self.shortcut_toggle_explorer.activated.connect(self.toggle_file_explorer)
