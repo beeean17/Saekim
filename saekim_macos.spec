@@ -19,7 +19,6 @@ a = Analysis(
         'PyQt6.QtWebEngine', 
         'PyQt6.QtWebEngineCore', 
         'PyQt6.QtWebEngineWidgets',
-        'qframelesswindow',
     ],
     hookspath=[],
     hooksconfig={},

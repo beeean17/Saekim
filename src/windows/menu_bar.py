@@ -2,8 +2,10 @@
 Menu bar component for the main window
 """
 
+import sys
+
 from PyQt6.QtWidgets import QMenuBar
-from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
 from utils.design_manager import DesignManager
 
 
@@ -14,6 +16,9 @@ class MenuBar(QMenuBar):
         super().__init__(parent)
         self.parent = parent
 
+        if sys.platform == "darwin":
+            self.setNativeMenuBar(True)
+
         # Set Pretendard font for Korean text
         self.setFont(DesignManager.get_font("body"))
 
@@ -21,10 +26,26 @@ class MenuBar(QMenuBar):
 
     def create_menus(self):
         """Create all menus"""
+        if sys.platform == "darwin":
+            self.create_app_menu()
         self.create_file_menu()
         self.create_edit_menu()
         self.create_view_menu()
         self.create_help_menu()
+
+    def create_app_menu(self):
+        """Create macOS application menu entries."""
+        app_menu = self.addMenu("Saekim")
+
+        preferences_action = QAction("설정...", self)
+        if hasattr(QKeySequence.StandardKey, "Preferences"):
+            preferences_action.setShortcut(QKeySequence.StandardKey.Preferences)
+        else:
+            preferences_action.setShortcut(QKeySequence("Meta+,"))
+        preferences_action.setMenuRole(QAction.MenuRole.PreferencesRole)
+        preferences_action.setStatusTip("설정 열기")
+        preferences_action.triggered.connect(self.show_settings)
+        app_menu.addAction(preferences_action)
 
     def create_file_menu(self):
         """Create File menu"""
@@ -43,6 +64,12 @@ class MenuBar(QMenuBar):
         open_action.setStatusTip("마크다운 파일 열기")
         open_action.triggered.connect(self.open_file)
         file_menu.addAction(open_action)
+
+        # Open folder
+        open_folder_action = QAction("폴더 열기...", self)
+        open_folder_action.setStatusTip("파일 탐색기 루트 폴더 열기")
+        open_folder_action.triggered.connect(self.open_folder)
+        file_menu.addAction(open_folder_action)
 
         file_menu.addSeparator()
 
@@ -76,7 +103,7 @@ class MenuBar(QMenuBar):
 
         # PDF export
         export_pdf_action = QAction("PDF로 내보내기...", self)
-        export_pdf_action.setShortcut("Ctrl+P")
+        export_pdf_action.setShortcut(QKeySequence.StandardKey.Print)
         export_pdf_action.setStatusTip("PDF로 내보내기")
         export_pdf_action.triggered.connect(self.export_pdf)
         export_menu.addAction(export_pdf_action)
@@ -98,14 +125,14 @@ class MenuBar(QMenuBar):
 
         # Close tab
         close_tab_action = QAction("탭 닫기(&W)", self)
-        close_tab_action.setShortcut("Ctrl+W")
+        close_tab_action.setShortcut(QKeySequence.StandardKey.Close)
         close_tab_action.setStatusTip("현재 탭 닫기")
         close_tab_action.triggered.connect(self.close_current_tab)
         file_menu.addAction(close_tab_action)
 
         # Close all tabs
         close_all_action = QAction("모든 탭 닫기", self)
-        close_all_action.setShortcut("Ctrl+Shift+W")
+        close_all_action.setShortcut(self.platform_shortcut("Shift+W"))
         close_all_action.setStatusTip("모든 탭 닫기")
         close_all_action.triggered.connect(self.close_all_tabs)
         file_menu.addAction(close_all_action)
@@ -115,6 +142,7 @@ class MenuBar(QMenuBar):
         # Exit
         exit_action = QAction("종료(&X)", self)
         exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        exit_action.setMenuRole(QAction.MenuRole.QuitRole)
         exit_action.setStatusTip("애플리케이션 종료")
         exit_action.triggered.connect(self.exit_app)
         file_menu.addAction(exit_action)
@@ -173,6 +201,44 @@ class MenuBar(QMenuBar):
         """Create View menu"""
         view_menu = self.addMenu("보기(&V)")
 
+        mode_group = QActionGroup(self)
+        mode_group.setExclusive(True)
+
+        edit_mode_action = QAction("편집 모드", self)
+        edit_mode_action.setCheckable(True)
+        edit_mode_action.triggered.connect(lambda: self.set_view_mode("edit"))
+        mode_group.addAction(edit_mode_action)
+        view_menu.addAction(edit_mode_action)
+
+        split_mode_action = QAction("분할 모드", self)
+        split_mode_action.setCheckable(True)
+        split_mode_action.setChecked(True)
+        split_mode_action.triggered.connect(lambda: self.set_view_mode("split"))
+        mode_group.addAction(split_mode_action)
+        view_menu.addAction(split_mode_action)
+
+        preview_mode_action = QAction("미리보기 모드", self)
+        preview_mode_action.setCheckable(True)
+        preview_mode_action.triggered.connect(lambda: self.set_view_mode("preview"))
+        mode_group.addAction(preview_mode_action)
+        view_menu.addAction(preview_mode_action)
+
+        view_menu.addSeparator()
+
+        sidebar_action = QAction("파일 탐색기 보기", self)
+        sidebar_action.setShortcut(QKeySequence("F9"))
+        sidebar_action.setStatusTip("파일 탐색기 보이기/숨기기")
+        sidebar_action.triggered.connect(self.toggle_file_explorer)
+        view_menu.addAction(sidebar_action)
+
+        refresh_action = QAction("새로고침", self)
+        refresh_action.setShortcut(QKeySequence("F5"))
+        refresh_action.setStatusTip("현재 파일 새로고침")
+        refresh_action.triggered.connect(self.refresh_current_file)
+        view_menu.addAction(refresh_action)
+
+        view_menu.addSeparator()
+
         # Theme submenu
         theme_menu = view_menu.addMenu("테마(&T)")
 
@@ -201,6 +267,7 @@ class MenuBar(QMenuBar):
 
         # About
         about_action = QAction("새김 정보(&A)", self)
+        about_action.setMenuRole(QAction.MenuRole.AboutRole)
         about_action.setStatusTip("새김 정보 보기")
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
@@ -213,6 +280,11 @@ class MenuBar(QMenuBar):
             return None
         return self.parent.webview_cache.get(active_tab.tab_id)
 
+    def platform_shortcut(self, key_sequence: str) -> QKeySequence:
+        """Return a platform-appropriate app shortcut."""
+        modifier = "Meta" if sys.platform == "darwin" else "Ctrl"
+        return QKeySequence(f"{modifier}+{key_sequence}")
+
     # Action handlers
     def new_file(self):
         """Create new file in new tab"""
@@ -222,6 +294,10 @@ class MenuBar(QMenuBar):
         """Open file in new tab"""
         # Call backend directly to avoid webview dependency
         self.parent.backend.open_file_dialog()
+
+    def open_folder(self):
+        """Open folder in the file explorer"""
+        self.parent.open_folder_dialog()
 
     def save_file(self):
         """Save active tab's file"""
@@ -318,6 +394,10 @@ class MenuBar(QMenuBar):
         # But we might want to trigger a refresh or specific logic if needed
         pass
 
+    def set_view_mode(self, mode):
+        """Set editor/preview layout mode"""
+        self.parent.set_view_mode(mode)
+
     def toggle_fullscreen(self):
         """Toggle fullscreen"""
         if self.parent.isFullScreen():
@@ -332,10 +412,17 @@ class MenuBar(QMenuBar):
         else:
             self.parent.file_explorer.show()
 
+    def refresh_current_file(self):
+        """Reload the active file from disk"""
+        self.parent.reload_current_file()
+
+    def show_settings(self):
+        """Show settings dialog"""
+        self.parent.show_settings()
+
     def show_about(self):
         """Show about dialog"""
-        # TODO: Implement about dialog
-        print("About dialog")
+        self.parent.show_about()
 
     def insert_image(self):
         """Insert image"""

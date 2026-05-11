@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict, Optional
-from PyQt6.QtWidgets import (QTabWidget, QStackedWidget, QWidget,
+from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QStackedWidget, QWidget,
                               QVBoxLayout, QHBoxLayout, QLabel, QPushButton)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
@@ -20,8 +20,12 @@ from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtCore import QUrl, Qt, QFile, QTextStream, QEvent, QFileSystemWatcher
 from PyQt6.QtGui import QCloseEvent, QShortcut, QKeySequence, QFont
 
-# Frameless window for cross-platform chrome (Windows/macOS)
-from qframelesswindow import FramelessMainWindow
+# Use native chrome on macOS and keep the custom frameless shell elsewhere.
+if sys.platform == "darwin":
+    BaseMainWindow = QMainWindow
+else:
+    from qframelesswindow import FramelessMainWindow
+    BaseMainWindow = FramelessMainWindow
 
 from .menu_bar import MenuBar
 from .toolbar import ToolBar
@@ -55,7 +59,7 @@ class UpdateCheckThread(QThread):
             self.update_available.emit(None)
 
 
-class MainWindow(FramelessMainWindow):
+class MainWindow(BaseMainWindow):
     """Main application window with tab interface"""
 
     MAX_WEBVIEW_CACHE = 3  # Maximum number of cached webviews
@@ -66,8 +70,10 @@ class MainWindow(FramelessMainWindow):
         self.setWindowTitle("Saekim - Markdown Editor")
         self.setGeometry(100, 100, 1200, 800)
 
+        self._uses_native_window_frame = sys.platform == "darwin"
+
         # Layout constants (used for overlays/spacing)
-        self._title_bar_height = 32
+        self._title_bar_height = 0 if self._uses_native_window_frame else 32
 
         # Enable drag visual feedback on entire window
         self.setAcceptDrops(True)
@@ -103,8 +109,10 @@ class MainWindow(FramelessMainWindow):
         # Initialize theme manager before menu bar
         self.theme_manager = ThemeManager(self.session_manager.session_file)
         
-        # self.setup_menu_and_toolbar() # Removed for custom UI
-        self.setup_custom_title_bar()
+        if self._uses_native_window_frame:
+            self.setup_native_menu_bar()
+        else:
+            self.setup_custom_title_bar()
         
         # Apply initial theme
         self.apply_theme(self.theme_manager.current_theme)
@@ -140,7 +148,7 @@ class MainWindow(FramelessMainWindow):
 
     def changeEvent(self, event):
         """Handle window state changes to adjust margins"""
-        if event.type() == QEvent.Type.WindowStateChange:
+        if event.type() == QEvent.Type.WindowStateChange and sys.platform == "win32":
             if self.windowState() & Qt.WindowState.WindowMaximized:
                 # Add margin when maximized to prevent content from being cut off
                 # Windows usually pushes the window 8px off screen when maximized
@@ -448,8 +456,7 @@ class MainWindow(FramelessMainWindow):
             webview.page().runJavaScript(f"if(window.updateIcons) window.updateIcons({icons_json});")
 
             # Set default view mode to split
-            if hasattr(self, 'title_bar'):
-                self.title_bar.set_view_mode('split')
+            self.set_view_mode('split')
 
         # Get tab info
         tab = self.tab_manager.get_tab(tab_id)
@@ -494,6 +501,10 @@ class MainWindow(FramelessMainWindow):
 
     def setup_custom_title_bar(self):
         """Setup custom title bar"""
+        if self._uses_native_window_frame:
+            self.setup_native_menu_bar()
+            return
+
         self.title_bar = TitleBar(self)
         self.setMenuWidget(self.title_bar)
 
@@ -514,6 +525,13 @@ class MainWindow(FramelessMainWindow):
         self.title_bar.export_pdf_requested.connect(self.export_pdf)
 
         print("[OK] Custom title bar and file explorer signals connected")
+
+    def setup_native_menu_bar(self):
+        """Setup native macOS menu bar and system window chrome."""
+        self.menu_bar = MenuBar(self)
+        self.menu_bar.setNativeMenuBar(True)
+        self.setMenuBar(self.menu_bar)
+        print("[OK] Native menu bar connected")
 
     def open_folder_dialog(self):
         """Open folder dialog and set file explorer root"""
@@ -539,6 +557,46 @@ class MainWindow(FramelessMainWindow):
         """Show settings"""
         dialog = SettingsDialog(self, self.theme_manager)
         dialog.exec()
+
+    def show_about(self):
+        """Show app and license information."""
+        from .license_dialog import LicenseDialog
+        dialog = LicenseDialog(self)
+        dialog.exec()
+
+    def set_view_mode(self, mode):
+        """Set editor/preview layout mode in the active tab."""
+        if hasattr(self, 'title_bar'):
+            self.title_bar.set_view_mode(mode)
+            return
+
+        js_code = f"""
+            (function() {{
+                const editorPane = document.getElementById('editor-pane');
+                const previewPane = document.getElementById('preview-pane');
+                const resizer = document.getElementById('resizer');
+
+                if (!editorPane || !previewPane || !resizer) return;
+
+                editorPane.style.display = 'flex';
+                previewPane.style.display = 'flex';
+                resizer.style.display = 'block';
+
+                if ('{mode}' === 'edit') {{
+                    previewPane.style.display = 'none';
+                    resizer.style.display = 'none';
+                    editorPane.style.flex = '1';
+                }} else if ('{mode}' === 'split') {{
+                    editorPane.style.flex = '1';
+                    previewPane.style.flex = '1';
+                }} else if ('{mode}' === 'preview') {{
+                    editorPane.style.display = 'none';
+                    resizer.style.display = 'none';
+                    previewPane.style.flex = '1';
+                }}
+            }})();
+        """
+        self.run_js_in_active_tab(js_code)
         
     def run_js_in_active_tab(self, js_code):
         """Run JavaScript in the active tab's webview"""
