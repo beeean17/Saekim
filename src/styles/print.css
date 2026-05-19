@@ -1,0 +1,27 @@
+@media print {
+  .app {
+    display: block;
+    height: auto;
+    background: white;
+  }
+
+  .header,
+  .sidebar,
+  .editor-pane,
+  .preview-head,
+  .statusbar,
+  .no-print {
+    display: none !important;
+  }
+
+  .body,
+  .preview-pane {
+    display: block;
+    overflow: visible;
+  }
+
+  .preview-content {
+    overflow: visible;
+    padding: 0;
+  }
+}

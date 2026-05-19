@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
+import { exportPreviewToPdf } from '../../lib/pdf/export';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
@@ -49,6 +50,9 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
           <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식" onClick={() => wrapSelection(textareaRef.current, '$', '$')} />
         </div>
         <div className="tool-spacer" />
+        <button className="toolbar-expand" type="button" onClick={() => void exportPreviewToPdf()} title="PDF 내보내기">
+          PDF
+        </button>
         <button className="toolbar-expand" type="button" onClick={() => void saveActive()} title="저장">
           저장
         </button>
