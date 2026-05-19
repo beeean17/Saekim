@@ -106,6 +106,7 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
+  const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
 
   return (
     <>
@@ -133,6 +134,9 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
         </button>
         <button className="toolbar-expand" type="button" onClick={() => void saveActive()} title="저장">
           저장
+        </button>
+        <button className="toolbar-expand" type="button" onClick={() => void saveActiveAs()} title="다른 이름으로 저장">
+          다른 이름 저장
         </button>
         <button className={`toolbar-expand ${toolbarExpanded ? 'open' : ''}`} type="button" onClick={toggleToolbarExpanded} title="모든 마크다운 도구 보기">
           <span>모든 도구</span>

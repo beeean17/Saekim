@@ -185,9 +185,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }),
   closeFile: (id) =>
     set((state) => {
+      const closedIndex = state.openFiles.findIndex((file) => file.id === id);
+      const closedFile = state.openFiles[closedIndex];
       const openFiles = state.openFiles.filter((file) => file.id !== id);
-      const activeFileId = state.activeFileId === id ? openFiles[0]?.id ?? null : state.activeFileId;
-      return { openFiles, activeFileId };
+      const nextActiveFile =
+        state.activeFileId === id ? openFiles[Math.max(0, Math.min(closedIndex, openFiles.length - 1))] ?? null : null;
+      const activeFileId = nextActiveFile?.id ?? (state.activeFileId === id ? null : state.activeFileId);
+      const closedPath = closedFile?.path;
+
+      return {
+        openFiles,
+        activeFileId,
+        history: {
+          back: closedPath ? state.history.back.filter((path) => path !== closedPath) : state.history.back,
+          forward: closedPath ? state.history.forward.filter((path) => path !== closedPath) : state.history.forward,
+          current: nextActiveFile?.path ?? (state.history.current === closedPath ? null : state.history.current),
+        },
+      };
     }),
   updateContent: (id, text) =>
     set((state) => ({
