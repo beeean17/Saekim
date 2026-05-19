@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { setNativeTheme } from '../lib/tauri/theme';
+import { Backend } from '../lib/backend';
 import type { ThemeName } from '../types/workspace';
 
 interface SettingsState {
@@ -18,7 +18,7 @@ export const useSettingsStore = create<SettingsState>()(
       editorFontFamily: 'JetBrains Mono',
       setTheme: (theme) => {
         document.documentElement.setAttribute('data-theme', theme);
-        void setNativeTheme(theme);
+        void Backend.setTheme(theme);
         set({ theme });
       },
     }),

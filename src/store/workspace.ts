@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { openFileDialog, saveFile, saveFileAs } from '../lib/tauri/fs';
+import { Backend } from '../lib/backend';
 import type { FileTreeNode, OpenFile } from '../types/workspace';
 
 const starterContent = `# Saekim 마크다운 에디터
@@ -100,7 +100,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFolder: async () => undefined,
   openFile: async (path) => {
     if (!path) {
-      const opened = await openFileDialog();
+      const opened = await Backend.openFileDialog();
       if (!opened) return;
       const file = toOpenFile(opened.path, opened.name, opened.content);
       set((state) => upsertOpenFile(state, file));
@@ -132,7 +132,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await saveFile(file.path.startsWith('~') ? null : file.path, file.content);
+    const savedPath = await Backend.saveFile(file.path.startsWith('~') ? null : file.path, file.content);
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
         candidate.id === file.id
@@ -149,7 +149,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await saveFileAs(file.content, file.name);
+    const savedPath = await Backend.saveFileAs(file.content, file.name);
     if (!savedPath) return;
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
