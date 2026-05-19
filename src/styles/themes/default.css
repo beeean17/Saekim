@@ -1,0 +1,18 @@
+[data-theme="default"] {
+  --bg-app: #fafaf7;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f5f4ef;
+  --bg-sunken: #efeee8;
+  --bg-code: #f5f4ef;
+  --border: #e6e3da;
+  --border-strong: #cfcabd;
+  --text-primary: #1f1d18;
+  --text-secondary: #57544c;
+  --text-muted: #8a857a;
+  --text-faint: #b3ad9f;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: rgba(79, 70, 229, 0.1);
+  --accent-border: rgba(79, 70, 229, 0.3);
+  --accent-fg: #ffffff;
+}

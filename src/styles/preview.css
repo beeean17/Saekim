@@ -1,0 +1,134 @@
+.preview-content {
+  overflow-y: auto;
+  padding: 28px 36px 60px;
+  color: var(--text-primary);
+}
+
+.preview-content h1 {
+  margin-bottom: 14px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.preview-content h2 {
+  margin-top: 24px;
+  margin-bottom: 10px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.preview-content h3 {
+  margin-top: 18px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.preview-content p {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.preview-content strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.preview-content em {
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.preview-content ul,
+.preview-content ol {
+  margin-bottom: 14px;
+  padding-left: 24px;
+}
+
+.preview-content li {
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.preview-content li::marker {
+  color: var(--accent);
+}
+
+.preview-content code {
+  padding: 1px 6px;
+  color: var(--text-primary);
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.preview-content pre,
+.preview-content .shiki {
+  margin: 14px 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  color: var(--text-primary);
+  background: var(--bg-code) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.preview-content pre code,
+.preview-content .shiki code {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.preview-content blockquote {
+  margin: 14px 0;
+  padding: 4px 14px;
+  color: var(--text-secondary);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.preview-content hr {
+  height: 1px;
+  margin: 22px 0;
+  background: var(--border);
+  border: 0;
+}
+
+.preview-content .katex-display {
+  margin: 14px 0;
+  padding: 14px 18px;
+  overflow-x: auto;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.preview-content .mermaid-block {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  margin: 14px 0;
+  padding: 22px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.preview-content .mermaid-block svg {
+  max-width: 100%;
+}
