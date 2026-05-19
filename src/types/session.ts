@@ -11,6 +11,7 @@ export interface UISession {
   sidebarMode: SidebarMode;
   toolbarExpanded: boolean;
   viewMode: ViewMode;
+  sidebarWidth: number;
   splitRatio: number;
   syncScroll: boolean;
 }

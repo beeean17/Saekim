@@ -18,6 +18,7 @@ type IconName =
   | 'bold'
   | 'italic'
   | 'link'
+  | 'unlink'
   | 'code'
   | 'strike'
   | 'highlight'
@@ -113,6 +114,15 @@ const paths: Record<IconName, JSX.Element> = {
     <>
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </>
+  ),
+  unlink: (
+    <>
+      <path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M5.17 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+      <path d="M8 12h2" />
+      <path d="M14 12h2" />
     </>
   ),
   code: (

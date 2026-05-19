@@ -7,6 +7,7 @@ interface UIState {
   sidebarMode: SidebarMode;
   toolbarExpanded: boolean;
   viewMode: ViewMode;
+  sidebarWidth: number;
   splitRatio: number;
   syncScroll: boolean;
   findOpen: boolean;
@@ -14,6 +15,7 @@ interface UIState {
   toggleSidebar: () => void;
   toggleToolbarExpanded: () => void;
   setViewMode: (mode: ViewMode) => void;
+  setSidebarWidth: (width: number) => void;
   setSplitRatio: (ratio: number) => void;
   toggleSyncScroll: () => void;
   openFind: () => void;
@@ -29,6 +31,7 @@ export const useUIStore = create<UIState>()(
       sidebarMode: 'expanded',
       toolbarExpanded: true,
       viewMode: 'split',
+      sidebarWidth: 248,
       splitRatio: 0.5,
       syncScroll: true,
       findOpen: false,
@@ -42,7 +45,8 @@ export const useUIStore = create<UIState>()(
           toolbarExpanded: !state.toolbarExpanded,
         })),
       setViewMode: (mode) => set({ viewMode: mode }),
-      setSplitRatio: (ratio) => set({ splitRatio: ratio }),
+      setSidebarWidth: (width) => set({ sidebarWidth: Math.min(420, Math.max(180, width)) }),
+      setSplitRatio: (ratio) => set({ splitRatio: Math.min(0.75, Math.max(0.25, ratio)) }),
       toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
       openFind: () => set({ findOpen: true }),
       closeFind: () => set({ findOpen: false }),
@@ -56,6 +60,7 @@ export const useUIStore = create<UIState>()(
         sidebarMode: state.sidebarMode,
         toolbarExpanded: state.toolbarExpanded,
         viewMode: state.viewMode,
+        sidebarWidth: state.sidebarWidth,
         splitRatio: state.splitRatio,
         syncScroll: state.syncScroll,
       }),
