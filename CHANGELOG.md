@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0] - Unreleased
+
+### Added
+
+- Tauri 기반 3.0.0 런타임 마이그레이션 작업을 진행 중입니다.
+- PDF import 재도입을 위한 `import_pdf(path)` 명령 경계를 예약했습니다.
+
+### Changed
+
+- PDF export는 자동 파일 저장 대신 운영체제 인쇄 대화상자를 통해 PDF로 저장합니다.
+
+### Deferred
+
+- PDF-to-Markdown import는 3.0.0 MVP에서 제외합니다. 기존 Python/PyMuPDF/pdfplumber 변환 스택은 앱 크기와 시작 시간 목표를 약화시키므로 후속 릴리스에서 별도 sidecar 또는 native 변환기로 재검토합니다.
+
+---
+
 
 
 ## [1.3.0] - 2026-01-21

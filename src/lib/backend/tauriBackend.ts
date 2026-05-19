@@ -1,4 +1,4 @@
-import { openFileDialog, openFolderDialog, readFile, readFolder, readFolderChildren, saveFile, saveFileAs } from '../tauri/fs';
+import { importPdf, openFileDialog, openFolderDialog, readFile, readFolder, readFolderChildren, saveFile, saveFileAs } from '../tauri/fs';
 import { loadSession, saveSession } from '../tauri/session';
 import { getNativeTheme, setNativeTheme } from '../tauri/theme';
 import type { BackendAdapter } from './types';
@@ -6,6 +6,7 @@ import type { BackendAdapter } from './types';
 export const tauriBackend: BackendAdapter = {
   openFileDialog,
   openFolderDialog,
+  importPdf,
   readFile,
   readFolder,
   readFolderChildren,

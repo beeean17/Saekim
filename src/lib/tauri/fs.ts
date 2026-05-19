@@ -11,6 +11,10 @@ export async function openFolderDialog(): Promise<string | null> {
   return invokeCommand<string | null>('open_folder_dialog');
 }
 
+export async function importPdf(path: string): Promise<OpenFilePayload> {
+  return invokeCommand<OpenFilePayload>('import_pdf', { path });
+}
+
 export async function readFile(path: string): Promise<OpenFilePayload> {
   return invokeCommand<OpenFilePayload>('read_file', { path });
 }

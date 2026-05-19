@@ -13,6 +13,10 @@ export const browserBackend: BackendAdapter = {
     return null;
   },
 
+  async importPdf(_path: string): Promise<OpenFilePayload> {
+    throw new Error('PDF import is deferred in Saekim 3.0.0.');
+  },
+
   async readFile(path: string): Promise<OpenFilePayload> {
     const content = localStorage.getItem(`saekim-file:${path}`) ?? '';
     return {
