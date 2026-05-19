@@ -82,6 +82,7 @@ interface WorkspaceState {
   history: { back: string[]; forward: string[]; current: string | null };
   openFolder: () => Promise<void>;
   openFile: (path?: string) => Promise<void>;
+  createFile: () => Promise<void>;
   toggleFolder: (path: string) => void;
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
@@ -143,6 +144,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       console.error('파일 읽기 실패:', error);
     }
   },
+  createFile: async () => {
+    try {
+      const savedPath = await Backend.saveFileAs('', 'untitled.md');
+      if (!savedPath) return;
+
+      const file = toOpenFile(savedPath, fileNameFromPath(savedPath), '');
+      set((state) => upsertOpenFile(state, file));
+      await get().refresh();
+    } catch (error) {
+      console.error('새 파일 생성 실패:', error);
+    }
+  },
   toggleFolder: (path) =>
     set((state) => ({
       tree: toggleTreeFolder(state.tree, path),
@@ -163,17 +176,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
     const savedPath = await Backend.saveFile(file.path.startsWith('~') ? null : file.path, file.content);
+    if (!savedPath) return;
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
         candidate.id === file.id
           ? {
               ...candidate,
-              path: savedPath || candidate.path,
+              id: savedPath,
+              path: savedPath,
+              name: fileNameFromPath(savedPath),
               savedContent: candidate.content,
             }
           : candidate,
       ),
+      activeFileId: current.activeFileId === file.id ? savedPath : current.activeFileId,
+      history: {
+        ...current.history,
+        current: current.history.current === file.path ? savedPath : current.history.current,
+      },
     }));
+    await get().refresh();
   },
   saveActiveAs: async () => {
     const state = get();
@@ -188,13 +210,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ...candidate,
               id: savedPath,
               path: savedPath,
-              name: savedPath.split('/').pop() || candidate.name,
+              name: fileNameFromPath(savedPath),
               savedContent: candidate.content,
             }
           : candidate,
       ),
       activeFileId: savedPath,
+      history: {
+        ...current.history,
+        current: savedPath,
+      },
     }));
+    await get().refresh();
   },
   refresh: async () => {
     const { rootPath } = get();
@@ -237,6 +264,10 @@ function toOpenFile(path: string, name: string, content: string): OpenFile {
     encoding: 'UTF-8',
     eol,
   };
+}
+
+function fileNameFromPath(path: string): string {
+  return path.split('/').pop() || 'untitled.md';
 }
 
 function isPlaceholderPath(path: string): boolean {

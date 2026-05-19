@@ -11,6 +11,7 @@ export function Sidebar() {
   const activeFile = useWorkspaceStore(selectActiveFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openFile = useWorkspaceStore((state) => state.openFile);
+  const createFile = useWorkspaceStore((state) => state.createFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
@@ -20,6 +21,7 @@ export function Sidebar() {
       <div className="sidebar-head">
         <div className="sidebar-title">탐색기</div>
         <SidebarActions
+          onCreateFile={() => void createFile()}
           onOpenFolder={() => void openFolder()}
           onRefresh={() => void refresh()}
         />
@@ -46,15 +48,17 @@ export function Sidebar() {
 }
 
 function SidebarActions({
+  onCreateFile,
   onOpenFolder,
   onRefresh,
 }: {
+  onCreateFile: () => void;
   onOpenFolder: () => void;
   onRefresh: () => void;
 }) {
   return (
     <div className="sidebar-actions">
-      <IconButton label="새 파일">
+      <IconButton label="새 파일" onClick={onCreateFile}>
         <Icon name="filePlus" />
       </IconButton>
       <IconButton label="폴더 열기" onClick={onOpenFolder}>
