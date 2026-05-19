@@ -240,44 +240,6 @@
   accent-color: var(--accent);
 }
 
-.theme-switcher {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-}
-
-.theme-chip {
-  width: 22px;
-  height: 22px;
-  border: 1.5px solid transparent;
-  border-radius: 50%;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.theme-chip:hover {
-  transform: scale(1.1);
-}
-
-.theme-chip.active {
-  border-color: var(--accent);
-}
-
-.theme-chip[data-set="default"] {
-  background: linear-gradient(135deg, #fafaf7 50%, #4f46e5 50%);
-}
-
-.theme-chip[data-set="dark"] {
-  background: linear-gradient(135deg, #15171b 50%, #818cf8 50%);
-}
-
-.theme-chip[data-set="nord"] {
-  background: linear-gradient(135deg, #3b4252 50%, #88c0d0 50%);
-}
-
 .body {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr 1fr;
@@ -945,10 +907,13 @@
 .view-toggle {
   display: inline-flex;
   gap: 1px;
-  margin-left: auto;
   padding: 2px;
   background: var(--bg-elevated);
   border-radius: var(--radius);
+}
+
+.header-view-toggle {
+  flex-shrink: 0;
 }
 
 .view-toggle button {
