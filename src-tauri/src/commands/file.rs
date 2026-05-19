@@ -194,28 +194,39 @@ fn read_folder_payload(path: PathBuf) -> Result<FolderPayload, String> {
 }
 
 fn read_tree_children(path: &Path, depth: usize) -> Result<Vec<FileTreeNode>, String> {
-    const MAX_DEPTH: usize = 3;
+    const MAX_DEPTH: usize = 2;
+    const MAX_ENTRIES_PER_FOLDER: usize = 80;
 
     let mut entries = fs::read_dir(path)
         .map_err(|error| format!("failed to read folder: {error}"))?
         .filter_map(Result::ok)
-        .filter(|entry| should_include_path(&entry.path()))
+        .filter_map(|entry| {
+            let file_type = entry.file_type().ok()?;
+            if file_type.is_symlink() {
+                return None;
+            }
+
+            let path = entry.path();
+            let is_dir = file_type.is_dir();
+            let is_file = file_type.is_file();
+            if should_include_path(&path, is_dir, is_file) {
+                Some((entry, is_dir))
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>();
 
     entries.sort_by(|a, b| {
-        let a_path = a.path();
-        let b_path = b.path();
-        let a_is_dir = a_path.is_dir();
-        let b_is_dir = b_path.is_dir();
-
-        b_is_dir
-            .cmp(&a_is_dir)
-            .then_with(|| file_name_lower(&a_path).cmp(&file_name_lower(&b_path)))
+        b.1.cmp(&a.1)
+            .then_with(|| entry_name_lower(&a.0).cmp(&entry_name_lower(&b.0)))
     });
+
+    entries.truncate(MAX_ENTRIES_PER_FOLDER);
 
     entries
         .into_iter()
-        .map(|entry| build_tree_node(entry.path(), depth, MAX_DEPTH))
+        .map(|(entry, _)| build_tree_node(entry.path(), depth, MAX_DEPTH))
         .collect()
 }
 
@@ -263,22 +274,44 @@ fn build_tree_node(path: PathBuf, depth: usize, max_depth: usize) -> Result<File
     })
 }
 
-fn should_include_path(path: &Path) -> bool {
+fn should_include_path(path: &Path, is_dir: bool, is_file: bool) -> bool {
     let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
         return false;
     };
 
-    !matches!(
+    if matches!(
         name,
-        ".git" | "node_modules" | "dist" | "build" | "target" | "src-tauri"
-    ) && !name.starts_with('.')
+        ".git"
+            | "node_modules"
+            | "dist"
+            | "build"
+            | "target"
+            | "src-tauri"
+            | "Library"
+            | "Applications"
+            | "Movies"
+            | "Music"
+            | "Pictures"
+    ) || name.starts_with('.')
+    {
+        return false;
+    }
+
+    is_dir || (is_file && is_supported_document(path))
 }
 
-fn file_name_lower(path: &Path) -> String {
-    path.file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("")
-        .to_lowercase()
+fn is_supported_document(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|value| value.to_str())
+            .map(str::to_lowercase)
+            .as_deref(),
+        Some("md" | "markdown" | "txt")
+    )
+}
+
+fn entry_name_lower(entry: &fs::DirEntry) -> String {
+    entry.file_name().to_str().unwrap_or("").to_lowercase()
 }
 
 fn ok<T>(data: T) -> CommandResult<T>
