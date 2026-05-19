@@ -2,7 +2,7 @@ import type { FolderPayload, OpenFilePayload, ThemeName } from '../../types/work
 
 export interface BackendAdapter {
   openFileDialog(): Promise<OpenFilePayload | null>;
-  openFolderDialog(): Promise<FolderPayload | null>;
+  openFolderDialog(): Promise<string | null>;
   readFile(path: string): Promise<OpenFilePayload>;
   readFolder(path: string): Promise<FolderPayload>;
   saveFile(path: string | null, content: string): Promise<string | null>;

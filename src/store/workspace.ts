@@ -103,9 +103,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   history: { back: [], forward: [], current: initialFile.path },
   openFolder: async () => {
     try {
-      const opened = await Backend.openFolderDialog();
-      if (!opened) return;
-      set({ rootPath: opened.rootPath, tree: opened.tree });
+      const rootPath = await Backend.openFolderDialog();
+      if (!rootPath) return;
+      set({ rootPath, tree: [] });
+      const folder = await Backend.readFolder(rootPath);
+      set({ rootPath: folder.rootPath, tree: folder.tree });
     } catch (error) {
       console.error('폴더 열기 실패:', error);
     }

@@ -74,16 +74,20 @@ pub fn open_file_dialog(
 }
 
 #[tauri::command]
-pub fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<FolderPayload>> {
-    let selected = app.dialog().file().blocking_pick_folder();
+pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>> {
+    let selected =
+        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
+            .await;
 
-    let Some(path) = selected else {
-        return ok(None);
-    };
-
-    match read_folder_payload(path.into_path().unwrap_or_default()) {
-        Ok(payload) => ok(Some(payload)),
-        Err(error) => fail(error),
+    match selected {
+        Ok(Some(path)) => ok(Some(
+            path.into_path()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        )),
+        Ok(None) => ok(None),
+        Err(error) => fail(format!("failed to open folder dialog: {error}")),
     }
 }
 

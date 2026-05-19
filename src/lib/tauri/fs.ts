@@ -6,9 +6,9 @@ export async function openFileDialog(): Promise<OpenFilePayload | null> {
   return invokeCommand<OpenFilePayload | null>('open_file_dialog');
 }
 
-export async function openFolderDialog(): Promise<FolderPayload | null> {
+export async function openFolderDialog(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
-  return invokeCommand<FolderPayload | null>('open_folder_dialog');
+  return invokeCommand<string | null>('open_folder_dialog');
 }
 
 export async function readFile(path: string): Promise<OpenFilePayload> {
