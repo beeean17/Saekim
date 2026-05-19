@@ -1,21 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { useSettingsStore } from '../../store/settings';
+import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import { Icon } from '../primitives/Icon';
 
-export function PreviewPane() {
+export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
+  const syncScroll = useUIStore((state) => state.syncScroll);
+  const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
+
   return (
     <section className="preview-pane">
       <div className="preview-head">
         <span className="label">미리보기</span>
+        <button
+          className={`preview-action ${syncScroll ? 'active' : ''}`}
+          title={syncScroll ? '스크롤 동기화 풀기' : '스크롤 동기화'}
+          type="button"
+          onClick={toggleSyncScroll}
+        >
+          <Icon name={syncScroll ? 'link' : 'unlink'} />
+        </button>
       </div>
-      <PreviewContent />
+      <PreviewContent previewRef={previewRef} />
     </section>
   );
 }
 
-function PreviewContent() {
-  const ref = useRef<HTMLDivElement | null>(null);
+function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
+  const localRef = useRef<HTMLDivElement | null>(null);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const theme = useSettingsStore((state) => state.theme);
   const [html, setHtml] = useState('');
@@ -32,7 +45,7 @@ function PreviewContent() {
   }, [activeFile?.content, theme]);
 
   useEffect(() => {
-    const root = ref.current;
+    const root = localRef.current;
     if (!root) return;
 
     const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
@@ -61,5 +74,14 @@ function PreviewContent() {
     };
   }, [html, theme]);
 
-  return <div className="preview-content" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div
+      className="preview-content"
+      ref={(element) => {
+        localRef.current = element;
+        previewRef.current = element;
+      }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }

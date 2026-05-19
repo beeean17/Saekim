@@ -18,6 +18,7 @@ export function useSessionPersistence(): void {
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const viewMode = useUIStore((state) => state.viewMode);
+  const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const restoreUI = useUIStore((state) => state.restoreUI);
@@ -65,6 +66,7 @@ export function useSessionPersistence(): void {
           sidebarMode,
           toolbarExpanded,
           viewMode,
+          sidebarWidth,
           splitRatio,
           syncScroll,
         },
@@ -91,6 +93,7 @@ export function useSessionPersistence(): void {
     openFiles,
     rootPath,
     sidebarMode,
+    sidebarWidth,
     splitRatio,
     syncScroll,
     theme,
