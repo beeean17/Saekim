@@ -11,6 +11,9 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::file::open_file_dialog,
+            commands::file::open_folder_dialog,
+            commands::file::read_file,
+            commands::file::read_folder,
             commands::file::save_file,
             commands::file::save_file_as,
             commands::session::load_session,

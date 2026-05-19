@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::UNIX_EPOCH,
+};
 
 use serde::Serialize;
 use tauri::AppHandle;
@@ -23,6 +27,26 @@ pub struct OpenFilePayload {
     content: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPayload {
+    root_path: String,
+    tree: Vec<FileTreeNode>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTreeNode {
+    id: String,
+    name: String,
+    #[serde(rename = "type")]
+    node_type: String,
+    path: String,
+    modified_at: Option<u64>,
+    children: Option<Vec<FileTreeNode>>,
+    is_open: Option<bool>,
+}
+
 #[tauri::command]
 pub fn open_file_dialog(
     app: AppHandle,
@@ -38,12 +62,47 @@ pub fn open_file_dialog(
         return ok(None);
     };
 
-    match read_file(path.into_path().unwrap_or_default()) {
+    match read_file_payload(path.into_path().unwrap_or_default()) {
         Ok(payload) => {
             if let Ok(mut active_file) = state.active_file.lock() {
                 *active_file = Some(payload.path.clone());
             }
             ok(Some(payload))
+        }
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<FolderPayload>> {
+    let selected = app.dialog().file().blocking_pick_folder();
+
+    let Some(path) = selected else {
+        return ok(None);
+    };
+
+    match read_folder_payload(path.into_path().unwrap_or_default()) {
+        Ok(payload) => ok(Some(payload)),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn read_folder(path: String) -> CommandResult<FolderPayload> {
+    match read_folder_payload(PathBuf::from(path)) {
+        Ok(payload) => ok(payload),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn read_file(path: String, state: tauri::State<AppState>) -> CommandResult<OpenFilePayload> {
+    match read_file_payload(PathBuf::from(path)) {
+        Ok(payload) => {
+            if let Ok(mut active_file) = state.active_file.lock() {
+                *active_file = Some(payload.path.clone());
+            }
+            ok(payload)
         }
         Err(error) => fail(error),
     }
@@ -107,7 +166,7 @@ pub fn save_file_as(
     }
 }
 
-fn read_file(path: PathBuf) -> Result<OpenFilePayload, String> {
+fn read_file_payload(path: PathBuf) -> Result<OpenFilePayload, String> {
     let content =
         fs::read_to_string(&path).map_err(|error| format!("failed to read file: {error}"))?;
     let name = path
@@ -121,6 +180,105 @@ fn read_file(path: PathBuf) -> Result<OpenFilePayload, String> {
         name,
         content,
     })
+}
+
+fn read_folder_payload(path: PathBuf) -> Result<FolderPayload, String> {
+    if !path.is_dir() {
+        return Err("selected path is not a folder".to_string());
+    }
+
+    Ok(FolderPayload {
+        root_path: path.to_string_lossy().to_string(),
+        tree: read_tree_children(&path, 0)?,
+    })
+}
+
+fn read_tree_children(path: &Path, depth: usize) -> Result<Vec<FileTreeNode>, String> {
+    const MAX_DEPTH: usize = 3;
+
+    let mut entries = fs::read_dir(path)
+        .map_err(|error| format!("failed to read folder: {error}"))?
+        .filter_map(Result::ok)
+        .filter(|entry| should_include_path(&entry.path()))
+        .collect::<Vec<_>>();
+
+    entries.sort_by(|a, b| {
+        let a_path = a.path();
+        let b_path = b.path();
+        let a_is_dir = a_path.is_dir();
+        let b_is_dir = b_path.is_dir();
+
+        b_is_dir
+            .cmp(&a_is_dir)
+            .then_with(|| file_name_lower(&a_path).cmp(&file_name_lower(&b_path)))
+    });
+
+    entries
+        .into_iter()
+        .map(|entry| build_tree_node(entry.path(), depth, MAX_DEPTH))
+        .collect()
+}
+
+fn build_tree_node(path: PathBuf, depth: usize, max_depth: usize) -> Result<FileTreeNode, String> {
+    let metadata =
+        fs::metadata(&path).map_err(|error| format!("failed to read metadata: {error}"))?;
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_string();
+    let modified_at = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64);
+
+    if metadata.is_dir() {
+        let is_open = depth == 0;
+        let children = if depth < max_depth {
+            Some(read_tree_children(&path, depth + 1)?)
+        } else {
+            Some(Vec::new())
+        };
+
+        return Ok(FileTreeNode {
+            id: path.to_string_lossy().to_string(),
+            name,
+            node_type: "folder".to_string(),
+            path: path.to_string_lossy().to_string(),
+            modified_at,
+            children,
+            is_open: Some(is_open),
+        });
+    }
+
+    Ok(FileTreeNode {
+        id: path.to_string_lossy().to_string(),
+        name,
+        node_type: "file".to_string(),
+        path: path.to_string_lossy().to_string(),
+        modified_at,
+        children: None,
+        is_open: None,
+    })
+}
+
+fn should_include_path(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+
+    !matches!(
+        name,
+        ".git" | "node_modules" | "dist" | "build" | "target" | "src-tauri"
+    ) && !name.starts_with('.')
+}
+
+fn file_name_lower(path: &Path) -> String {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_lowercase()
 }
 
 fn ok<T>(data: T) -> CommandResult<T>

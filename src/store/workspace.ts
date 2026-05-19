@@ -82,6 +82,7 @@ interface WorkspaceState {
   history: { back: string[]; forward: string[]; current: string | null };
   openFolder: () => Promise<void>;
   openFile: (path?: string) => Promise<void>;
+  toggleFolder: (path: string) => void;
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
   updateContent: (id: string, text: string) => void;
@@ -99,13 +100,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFiles: [initialFile],
   activeFileId: initialFile.id,
   history: { back: [], forward: [], current: initialFile.path },
-  openFolder: async () => undefined,
+  openFolder: async () => {
+    try {
+      const opened = await Backend.openFolderDialog();
+      if (!opened) return;
+      set({ rootPath: opened.rootPath, tree: opened.tree });
+    } catch (error) {
+      console.error('폴더 열기 실패:', error);
+    }
+  },
   openFile: async (path) => {
     if (!path) {
-      const opened = await Backend.openFileDialog();
-      if (!opened) return;
-      const file = toOpenFile(opened.path, opened.name, opened.content);
-      set((state) => upsertOpenFile(state, file));
+      try {
+        const opened = await Backend.openFileDialog();
+        if (!opened) return;
+        const file = toOpenFile(opened.path, opened.name, opened.content);
+        set((state) => upsertOpenFile(state, file));
+      } catch (error) {
+        console.error('파일 열기 실패:', error);
+      }
       return;
     }
 
@@ -115,10 +128,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    const name = path.split('/').pop() || 'untitled.md';
-    const file = toOpenFile(path, name, starterContent);
-    set((state) => upsertOpenFile(state, file));
+    if (isPlaceholderPath(path)) {
+      const name = path.split('/').pop() || 'untitled.md';
+      const file = toOpenFile(path, name, starterContent);
+      set((state) => upsertOpenFile(state, file));
+      return;
+    }
+
+    try {
+      const opened = await Backend.readFile(path);
+      const file = toOpenFile(opened.path, opened.name, opened.content);
+      set((state) => upsertOpenFile(state, file));
+    } catch (error) {
+      console.error('파일 읽기 실패:', error);
+    }
   },
+  toggleFolder: (path) =>
+    set((state) => ({
+      tree: toggleTreeFolder(state.tree, path),
+    })),
   setActiveFile: (id) => set({ activeFileId: id }),
   closeFile: (id) =>
     set((state) => {
@@ -168,12 +196,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeFileId: savedPath,
     }));
   },
-  refresh: async () => undefined,
+  refresh: async () => {
+    const { rootPath } = get();
+    if (!rootPath || isPlaceholderPath(rootPath)) return;
+
+    try {
+      const folder = await Backend.readFolder(rootPath);
+      set({ rootPath: folder.rootPath, tree: folder.tree });
+    } catch (error) {
+      console.error('폴더 새로고침 실패:', error);
+    }
+  },
   historyPrev: () => undefined,
   historyNext: () => undefined,
   restoreWorkspace: (workspace) =>
     set({
       rootPath: workspace.rootPath,
+      tree: workspace.tree.length > 0 ? workspace.tree : initialTree,
       openFiles: workspace.openFiles.length > 0 ? workspace.openFiles : [initialFile],
       activeFileId: workspace.activeFileId ?? workspace.openFiles[0]?.id ?? initialFile.id,
     }),
@@ -198,6 +237,24 @@ function toOpenFile(path: string, name: string, content: string): OpenFile {
     encoding: 'UTF-8',
     eol,
   };
+}
+
+function isPlaceholderPath(path: string): boolean {
+  return path.startsWith('~') || path.startsWith('browser://');
+}
+
+function toggleTreeFolder(nodes: FileTreeNode[], path: string): FileTreeNode[] {
+  return nodes.map((node) => {
+    if (node.path === path && node.type === 'folder') {
+      return { ...node, isOpen: !node.isOpen };
+    }
+
+    if (node.children) {
+      return { ...node, children: toggleTreeFolder(node.children, path) };
+    }
+
+    return node;
+  });
 }
 
 function upsertOpenFile(

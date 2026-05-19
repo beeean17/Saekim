@@ -283,15 +283,19 @@
 
 .folder {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
+  border: 0;
   color: var(--text-muted);
+  background: transparent;
   border-radius: var(--radius-sm);
-  cursor: default;
+  cursor: pointer;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  text-align: left;
   text-transform: uppercase;
 }
 

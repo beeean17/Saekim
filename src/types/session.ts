@@ -1,7 +1,8 @@
-import type { OpenFile, SidebarMode, ThemeName, ViewMode } from './workspace';
+import type { FileTreeNode, OpenFile, SidebarMode, ThemeName, ViewMode } from './workspace';
 
 export interface WorkspaceSession {
   rootPath: string | null;
+  tree: FileTreeNode[];
   openFiles: OpenFile[];
   activeFileId: string | null;
 }
