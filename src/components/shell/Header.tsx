@@ -1,18 +1,12 @@
-import { useSettingsStore } from '../../store/settings';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { useUIStore } from '../../store/ui';
-import type { ThemeName } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
-
-const themes: ThemeName[] = ['default', 'dark', 'nord'];
 
 export function Header() {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const openFind = useUIStore((state) => state.openFind);
   const toggleSettings = useUIStore((state) => state.toggleSettings);
-  const theme = useSettingsStore((state) => state.theme);
-  const setTheme = useSettingsStore((state) => state.setTheme);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
   const parts = (activeFile?.path || '~/Documents/notes/readme.md').split('/');
@@ -37,26 +31,36 @@ export function Header() {
       </div>
 
       <div className="header-right">
+        <ViewToggle />
         <IconButton className="header-btn" label="찾기" onClick={openFind}>
           <Icon name="search" />
         </IconButton>
         <IconButton className="header-btn" label="설정" onClick={toggleSettings}>
           <Icon name="settings" />
         </IconButton>
-        <div className="theme-switcher">
-          {themes.map((candidate) => (
-            <button
-              className={`theme-chip ${theme === candidate ? 'active' : ''}`}
-              data-set={candidate}
-              key={candidate}
-              title={candidate}
-              aria-label={`${candidate} 테마`}
-              type="button"
-              onClick={() => setTheme(candidate)}
-            />
-          ))}
-        </div>
       </div>
     </header>
+  );
+}
+
+function ViewToggle() {
+  const viewMode = useUIStore((state) => state.viewMode);
+  const setViewMode = useUIStore((state) => state.setViewMode);
+
+  return (
+    <div className="view-toggle header-view-toggle" aria-label="보기 모드">
+      <button className={viewMode === 'edit' ? 'active' : ''} title="편집기만" type="button" onClick={() => setViewMode('edit')}>
+        <Icon name="edit" />
+        편집
+      </button>
+      <button className={viewMode === 'split' ? 'active' : ''} title="분할 보기" type="button" onClick={() => setViewMode('split')}>
+        <Icon name="split" />
+        분할
+      </button>
+      <button className={viewMode === 'preview' ? 'active' : ''} title="미리보기만" type="button" onClick={() => setViewMode('preview')}>
+        <Icon name="eye" />
+        보기
+      </button>
+    </div>
   );
 }

@@ -1,41 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { useSettingsStore } from '../../store/settings';
-import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import { Icon } from '../primitives/Icon';
 
 export function PreviewPane() {
   return (
     <section className="preview-pane">
       <div className="preview-head">
         <span className="label">미리보기</span>
-        <ViewToggle />
       </div>
       <PreviewContent />
     </section>
-  );
-}
-
-function ViewToggle() {
-  const viewMode = useUIStore((state) => state.viewMode);
-  const setViewMode = useUIStore((state) => state.setViewMode);
-
-  return (
-    <div className="view-toggle">
-      <button className={viewMode === 'edit' ? 'active' : ''} title="편집기만" type="button" onClick={() => setViewMode('edit')}>
-        <Icon name="edit" />
-        편집
-      </button>
-      <button className={viewMode === 'split' ? 'active' : ''} title="분할 보기" type="button" onClick={() => setViewMode('split')}>
-        <Icon name="split" />
-        분할
-      </button>
-      <button className={viewMode === 'preview' ? 'active' : ''} title="미리보기만" type="button" onClick={() => setViewMode('preview')}>
-        <Icon name="eye" />
-        보기
-      </button>
-    </div>
   );
 }
 
