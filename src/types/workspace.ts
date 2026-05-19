@@ -11,6 +11,7 @@ export interface FileTreeNode {
   modifiedAt?: number;
   children?: FileTreeNode[];
   isOpen?: boolean;
+  isLoaded?: boolean;
 }
 
 export interface OpenFile {

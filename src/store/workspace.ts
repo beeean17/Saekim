@@ -83,7 +83,7 @@ interface WorkspaceState {
   openFolder: () => Promise<void>;
   openFile: (path?: string) => Promise<void>;
   createFile: () => Promise<void>;
-  toggleFolder: (path: string) => void;
+  toggleFolder: (path: string) => Promise<void>;
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
   updateContent: (id: string, text: string) => void;
@@ -158,10 +158,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       console.error('새 파일 생성 실패:', error);
     }
   },
-  toggleFolder: (path) =>
+  toggleFolder: async (path) => {
+    const node = findTreeNode(get().tree, path);
+    if (!node || node.type !== 'folder') return;
+
+    if (!node.isOpen && !node.isLoaded && !isPlaceholderPath(path)) {
+      try {
+        const children = await Backend.readFolderChildren(path);
+        set((state) => ({
+          tree: updateTreeFolder(state.tree, path, { children, isLoaded: true, isOpen: true }),
+        }));
+      } catch (error) {
+        console.error('하위 폴더 읽기 실패:', error);
+      }
+      return;
+    }
+
     set((state) => ({
-      tree: toggleTreeFolder(state.tree, path),
-    })),
+      tree: updateTreeFolder(state.tree, path, { isOpen: !node.isOpen }),
+    }));
+  },
   setActiveFile: (id) => set({ activeFileId: id }),
   closeFile: (id) =>
     set((state) => {
@@ -276,14 +292,26 @@ function isPlaceholderPath(path: string): boolean {
   return path.startsWith('~') || path.startsWith('browser://');
 }
 
-function toggleTreeFolder(nodes: FileTreeNode[], path: string): FileTreeNode[] {
+function findTreeNode(nodes: FileTreeNode[], path: string): FileTreeNode | null {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    if (node.children) {
+      const child = findTreeNode(node.children, path);
+      if (child) return child;
+    }
+  }
+
+  return null;
+}
+
+function updateTreeFolder(nodes: FileTreeNode[], path: string, patch: Partial<FileTreeNode>): FileTreeNode[] {
   return nodes.map((node) => {
     if (node.path === path && node.type === 'folder') {
-      return { ...node, isOpen: !node.isOpen };
+      return { ...node, ...patch };
     }
 
     if (node.children) {
-      return { ...node, children: toggleTreeFolder(node.children, path) };
+      return { ...node, children: updateTreeFolder(node.children, path, patch) };
     }
 
     return node;

@@ -1,10 +1,11 @@
-import type { FolderPayload, OpenFilePayload, ThemeName } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload, ThemeName } from '../../types/workspace';
 
 export interface BackendAdapter {
   openFileDialog(): Promise<OpenFilePayload | null>;
   openFolderDialog(): Promise<string | null>;
   readFile(path: string): Promise<OpenFilePayload>;
   readFolder(path: string): Promise<FolderPayload>;
+  readFolderChildren(path: string): Promise<FileTreeNode[]>;
   saveFile(path: string | null, content: string): Promise<string | null>;
   saveFileAs(content: string, suggestedName: string): Promise<string | null>;
   loadSession<T>(): Promise<T | null>;

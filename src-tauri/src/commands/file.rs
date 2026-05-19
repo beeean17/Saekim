@@ -45,6 +45,7 @@ pub struct FileTreeNode {
     modified_at: Option<u64>,
     children: Option<Vec<FileTreeNode>>,
     is_open: Option<bool>,
+    is_loaded: Option<bool>,
 }
 
 #[tauri::command]
@@ -94,6 +95,14 @@ pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>>
 #[tauri::command]
 pub fn read_folder(path: String) -> CommandResult<FolderPayload> {
     match read_folder_payload(PathBuf::from(path)) {
+        Ok(payload) => ok(payload),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn read_folder_children(path: String) -> CommandResult<Vec<FileTreeNode>> {
+    match read_folder_children_payload(PathBuf::from(path)) {
         Ok(payload) => ok(payload),
         Err(error) => fail(error),
     }
@@ -193,12 +202,24 @@ fn read_folder_payload(path: PathBuf) -> Result<FolderPayload, String> {
 
     Ok(FolderPayload {
         root_path: path.to_string_lossy().to_string(),
-        tree: read_tree_children(&path, 0)?,
+        tree: read_tree_children(&path, 0, 2, true)?,
     })
 }
 
-fn read_tree_children(path: &Path, depth: usize) -> Result<Vec<FileTreeNode>, String> {
-    const MAX_DEPTH: usize = 2;
+fn read_folder_children_payload(path: PathBuf) -> Result<Vec<FileTreeNode>, String> {
+    if !path.is_dir() {
+        return Err("selected path is not a folder".to_string());
+    }
+
+    read_tree_children(&path, 0, 0, false)
+}
+
+fn read_tree_children(
+    path: &Path,
+    depth: usize,
+    max_depth: usize,
+    open_root_folders: bool,
+) -> Result<Vec<FileTreeNode>, String> {
     const MAX_ENTRIES_PER_FOLDER: usize = 80;
 
     let mut entries = fs::read_dir(path)
@@ -230,11 +251,16 @@ fn read_tree_children(path: &Path, depth: usize) -> Result<Vec<FileTreeNode>, St
 
     entries
         .into_iter()
-        .map(|(entry, _)| build_tree_node(entry.path(), depth, MAX_DEPTH))
+        .map(|(entry, _)| build_tree_node(entry.path(), depth, max_depth, open_root_folders))
         .collect()
 }
 
-fn build_tree_node(path: PathBuf, depth: usize, max_depth: usize) -> Result<FileTreeNode, String> {
+fn build_tree_node(
+    path: PathBuf,
+    depth: usize,
+    max_depth: usize,
+    open_root_folders: bool,
+) -> Result<FileTreeNode, String> {
     let metadata =
         fs::metadata(&path).map_err(|error| format!("failed to read metadata: {error}"))?;
     let name = path
@@ -249,9 +275,15 @@ fn build_tree_node(path: PathBuf, depth: usize, max_depth: usize) -> Result<File
         .map(|duration| duration.as_millis() as u64);
 
     if metadata.is_dir() {
-        let is_open = depth == 0;
-        let children = if depth < max_depth {
-            Some(read_tree_children(&path, depth + 1)?)
+        let is_open = open_root_folders && depth == 0;
+        let is_loaded = depth < max_depth;
+        let children = if is_loaded {
+            Some(read_tree_children(
+                &path,
+                depth + 1,
+                max_depth,
+                open_root_folders,
+            )?)
         } else {
             Some(Vec::new())
         };
@@ -264,6 +296,7 @@ fn build_tree_node(path: PathBuf, depth: usize, max_depth: usize) -> Result<File
             modified_at,
             children,
             is_open: Some(is_open),
+            is_loaded: Some(is_loaded),
         });
     }
 
@@ -275,6 +308,7 @@ fn build_tree_node(path: PathBuf, depth: usize, max_depth: usize) -> Result<File
         modified_at,
         children: None,
         is_open: None,
+        is_loaded: None,
     })
 }
 
