@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Backend } from '../lib/backend';
+import type { WorkspaceSession } from '../types/session';
 import type { FileTreeNode, OpenFile } from '../types/workspace';
 
 const starterContent = `# Saekim 마크다운 에디터
@@ -89,6 +90,7 @@ interface WorkspaceState {
   refresh: () => Promise<void>;
   historyPrev: () => void;
   historyNext: () => void;
+  restoreWorkspace: (workspace: WorkspaceSession) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -169,6 +171,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   refresh: async () => undefined,
   historyPrev: () => undefined,
   historyNext: () => undefined,
+  restoreWorkspace: (workspace) =>
+    set({
+      rootPath: workspace.rootPath,
+      openFiles: workspace.openFiles.length > 0 ? workspace.openFiles : [initialFile],
+      activeFileId: workspace.activeFileId ?? workspace.openFiles[0]?.id ?? initialFile.id,
+    }),
 }));
 
 export function selectActiveFile(state: WorkspaceState): OpenFile | null {

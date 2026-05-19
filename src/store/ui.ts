@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { UISession } from '../types/session';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
 interface UIState {
@@ -13,6 +14,7 @@ interface UIState {
   setViewMode: (mode: ViewMode) => void;
   setSplitRatio: (ratio: number) => void;
   toggleSyncScroll: () => void;
+  restoreUI: (ui: UISession) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -34,6 +36,7 @@ export const useUIStore = create<UIState>()(
       setViewMode: (mode) => set({ viewMode: mode }),
       setSplitRatio: (ratio) => set({ splitRatio: ratio }),
       toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
+      restoreUI: (ui) => set(ui),
     }),
     {
       name: 'saekim-ui',
