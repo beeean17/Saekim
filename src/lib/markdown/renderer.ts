@@ -1,6 +1,5 @@
 import MarkdownIt from 'markdown-it';
 import markdownItKatex from 'markdown-it-katex';
-import { codeToHtml } from 'shiki';
 import { escapeHtml } from './escape';
 
 const md = new MarkdownIt({
@@ -42,6 +41,7 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
       const code = pre.textContent ?? '';
       const lang = pre.getAttribute('data-lang') || 'text';
       try {
+        const { codeToHtml } = await import('shiki');
         const highlighted = await codeToHtml(code, {
           lang,
           theme: theme === 'dark' ? 'github-dark' : 'github-light',
