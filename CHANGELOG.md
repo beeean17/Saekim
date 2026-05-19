@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - PDF export는 자동 파일 저장 대신 운영체제 인쇄 대화상자를 통해 PDF로 저장합니다.
+- macOS bundle identifier를 `com.beeean17.saekim`으로 정리했습니다.
+
+### Build
+
+- Tauri macOS 앱 번들 빌드 명령과 DMG 빌드 명령을 분리했습니다.
 
 ### Deferred
 
