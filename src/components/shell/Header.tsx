@@ -10,6 +10,7 @@ const themes: ThemeName[] = ['default', 'dark', 'nord'];
 export function Header() {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const openFind = useUIStore((state) => state.openFind);
+  const toggleSettings = useUIStore((state) => state.toggleSettings);
   const theme = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -39,7 +40,7 @@ export function Header() {
         <IconButton className="header-btn" label="찾기" onClick={openFind}>
           <Icon name="search" />
         </IconButton>
-        <IconButton className="header-btn" label="설정">
+        <IconButton className="header-btn" label="설정" onClick={toggleSettings}>
           <Icon name="settings" />
         </IconButton>
         <div className="theme-switcher">
