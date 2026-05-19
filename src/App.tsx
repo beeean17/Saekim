@@ -3,8 +3,10 @@ import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
 import { Sidebar } from './components/sidebar/Sidebar';
+import { useNativeMenuCommands } from './hooks/useNativeMenuCommands';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useShortcuts } from './hooks/useShortcuts';
+import { exportPreviewToPdf } from './lib/pdf/export';
 import { useUIStore } from './store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from './store/workspace';
 
@@ -21,6 +23,7 @@ export function App() {
       onOpen: () => void openFile(),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
+      onExportPdf: () => void exportPreviewToPdf(),
       onFind: openFind,
       onClose: () => {
         if (!activeFile) return;
@@ -32,6 +35,7 @@ export function App() {
   );
 
   useShortcuts(shortcuts);
+  useNativeMenuCommands(shortcuts);
   useSessionPersistence();
 
   return (

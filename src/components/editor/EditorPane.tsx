@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
-import { exportPreviewToPdf } from '../../lib/pdf/export';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
@@ -106,8 +105,6 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
   const openFind = useUIStore((state) => state.openFind);
-  const saveActive = useWorkspaceStore((state) => state.saveActive);
-  const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
 
   return (
     <>
@@ -131,15 +128,6 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
         </div>
         <div className="tool-spacer" />
         <ToolButton icon="search" tooltip="문서 내 탐색" onClick={openFind} />
-        <button className="toolbar-expand" type="button" onClick={() => void exportPreviewToPdf()} title="PDF 내보내기">
-          PDF
-        </button>
-        <button className="toolbar-expand" type="button" onClick={() => void saveActive()} title="저장">
-          저장
-        </button>
-        <button className="toolbar-expand" type="button" onClick={() => void saveActiveAs()} title="다른 이름으로 저장">
-          다른 이름 저장
-        </button>
         <button className={`toolbar-expand ${toolbarExpanded ? 'open' : ''}`} type="button" onClick={toggleToolbarExpanded} title="모든 마크다운 도구 보기">
           <span>모든 도구</span>
           <Icon name="chevronDown" className="ic chev" />
