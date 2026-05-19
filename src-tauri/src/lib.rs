@@ -14,6 +14,7 @@ pub fn run() {
             commands::file::open_folder_dialog,
             commands::file::read_file,
             commands::file::read_folder,
+            commands::file::read_folder_children,
             commands::file::save_file,
             commands::file::save_file_as,
             commands::session::load_session,

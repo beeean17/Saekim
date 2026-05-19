@@ -1,5 +1,5 @@
 import type { BackendAdapter } from './types';
-import type { FolderPayload, OpenFilePayload, ThemeName } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload, ThemeName } from '../../types/workspace';
 
 const sessionKey = 'saekim-browser-session';
 const themeKey = 'saekim-browser-theme';
@@ -27,6 +27,10 @@ export const browserBackend: BackendAdapter = {
       rootPath: path,
       tree: [],
     };
+  },
+
+  async readFolderChildren(_path: string): Promise<FileTreeNode[]> {
+    return [];
   },
 
   async saveFile(path: string | null, content: string): Promise<string | null> {

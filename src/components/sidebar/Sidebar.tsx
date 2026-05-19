@@ -133,7 +133,7 @@ function FileTreeNodeView({
   node: FileTreeNode;
   activePath: string | null;
   openFiles: OpenFile[];
-  onToggle: (path: string) => void;
+  onToggle: (path: string) => Promise<void>;
   onOpen: (path: string) => void;
 }) {
   if (node.type === 'folder') {
@@ -142,7 +142,7 @@ function FileTreeNodeView({
         <button
           className={`folder ${node.isOpen ? 'open' : ''}`}
           type="button"
-          onClick={() => onToggle(node.path)}
+          onClick={() => void onToggle(node.path)}
         >
           <Icon name="chevronRight" className="ic chev" />
           <span>{node.name}</span>

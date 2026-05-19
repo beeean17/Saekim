@@ -1,5 +1,5 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
-import type { FolderPayload, OpenFilePayload } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
 export async function openFileDialog(): Promise<OpenFilePayload | null> {
   if (!isTauriRuntime()) return null;
@@ -17,6 +17,10 @@ export async function readFile(path: string): Promise<OpenFilePayload> {
 
 export async function readFolder(path: string): Promise<FolderPayload> {
   return invokeCommand<FolderPayload>('read_folder', { path });
+}
+
+export async function readFolderChildren(path: string): Promise<FileTreeNode[]> {
+  return invokeCommand<FileTreeNode[]>('read_folder_children', { path });
 }
 
 export async function saveFile(path: string | null, content: string): Promise<string | null> {
