@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
@@ -58,23 +57,33 @@ function PreviewContent() {
   }, [activeFile?.content, theme]);
 
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: theme === 'default' ? 'default' : 'dark',
-      securityLevel: 'strict',
-    });
-
     const root = ref.current;
     if (!root) return;
 
     const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
-    blocks.forEach((block, index) => {
-      const source = decodeURIComponent(block.dataset.source || '');
-      const id = `mermaid-${Date.now()}-${index}`;
-      void mermaid.render(id, source).then(({ svg }) => {
-        block.innerHTML = svg;
+    if (blocks.length === 0) return;
+    let alive = true;
+
+    void import('mermaid').then(({ default: mermaid }) => {
+      if (!alive) return;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme === 'default' ? 'default' : 'dark',
+        securityLevel: 'strict',
+      });
+
+      blocks.forEach((block, index) => {
+        const source = decodeURIComponent(block.dataset.source || '');
+        const id = `mermaid-${Date.now()}-${index}`;
+        void mermaid.render(id, source).then(({ svg }) => {
+          if (alive) block.innerHTML = svg;
+        });
       });
     });
+
+    return () => {
+      alive = false;
+    };
   }, [html, theme]);
 
   return <div className="preview-content" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />;
