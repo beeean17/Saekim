@@ -56,6 +56,8 @@ node_modules/
 jspm_packages/
 pkgroot/
 *.pkg
+src-tauri/target/
+src-tauri/gen/
 
 
 # ============ IDE & Editors ============

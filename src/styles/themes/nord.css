@@ -1,0 +1,18 @@
+[data-theme="nord"] {
+  --bg-app: #2e3440;
+  --bg-surface: #3b4252;
+  --bg-elevated: #434c5e;
+  --bg-sunken: #292e39;
+  --bg-code: #292e39;
+  --border: #4c566a;
+  --border-strong: #5e6779;
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-muted: #97a2b6;
+  --text-faint: #6c7587;
+  --accent: #88c0d0;
+  --accent-hover: #8fbcbb;
+  --accent-soft: rgba(136, 192, 208, 0.18);
+  --accent-border: rgba(136, 192, 208, 0.45);
+  --accent-fg: #2e3440;
+}
