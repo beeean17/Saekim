@@ -602,6 +602,11 @@
   transition: background 0.12s ease, color 0.12s ease;
 }
 
+.rail-tab-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .rail-tab:hover {
   color: var(--text-primary);
   background: var(--bg-elevated);
@@ -633,6 +638,34 @@
   background: var(--warning);
   border: 2px solid var(--bg-surface);
   border-radius: 50%;
+}
+
+.rail-tab-close {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  display: none;
+  width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.rail-tab-wrap:hover .rail-tab-close,
+.rail-tab-wrap:focus-within .rail-tab-close {
+  display: inline-flex;
+}
+
+.rail-tab-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
 
 .editor-pane {

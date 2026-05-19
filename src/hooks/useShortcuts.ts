@@ -5,6 +5,7 @@ interface ShortcutHandlers {
   onSave: () => void;
   onSaveAs: () => void;
   onFind: () => void;
+  onClose: () => void;
 }
 
 export function useShortcuts(handlers: ShortcutHandlers): void {
@@ -27,6 +28,10 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
       if (event.key.toLowerCase() === 'f') {
         event.preventDefault();
         handlers.onFind();
+      }
+      if (event.key.toLowerCase() === 'w') {
+        event.preventDefault();
+        handlers.onClose();
       }
     };
 

@@ -14,6 +14,7 @@ export function Sidebar() {
   const createFile = useWorkspaceStore((state) => state.createFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
+  const closeFile = useWorkspaceStore((state) => state.closeFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
@@ -29,7 +30,7 @@ export function Sidebar() {
           onSearch={() => setFileSearchOpen((open) => !open)}
           onRefresh={() => void refresh()}
         />
-        <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onSelect={setActiveFile} />
+        <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onClose={closeFile} onSelect={setActiveFile} />
         <button className="rail-more" title="더 보기" type="button">
           +{Math.max(0, openFiles.length - 4)}
         </button>
@@ -118,10 +119,12 @@ function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
 function RailTabs({
   openFiles,
   activeFileId,
+  onClose,
   onSelect,
 }: {
   openFiles: OpenFile[];
   activeFileId: string | null;
+  onClose: (id: string) => void;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -129,17 +132,25 @@ function RailTabs({
       <div className="rail-tabs">
         {openFiles.map((file) => {
           const dirty = file.content !== file.savedContent;
+          const close = () => {
+            if (dirty && !window.confirm(`${file.name} 파일의 저장되지 않은 변경사항을 버리고 닫을까요?`)) return;
+            onClose(file.id);
+          };
           return (
-            <button
-              className={`rail-tab ${file.id === activeFileId ? 'active' : ''}`}
-              key={file.id}
-              title={`${file.name}${dirty ? '  ●  수정 중' : ''}`}
-              type="button"
-              onClick={() => onSelect(file.id)}
-            >
-              <Icon name="file" />
-              {dirty ? <span className="dirty-dot" /> : null}
-            </button>
+            <div className="rail-tab-wrap" key={file.id}>
+              <button
+                className={`rail-tab ${file.id === activeFileId ? 'active' : ''}`}
+                title={`${file.name}${dirty ? '  ●  수정 중' : ''}`}
+                type="button"
+                onClick={() => onSelect(file.id)}
+              >
+                <Icon name="file" />
+                {dirty ? <span className="dirty-dot" /> : null}
+              </button>
+              <button className="rail-tab-close" title={`${file.name} 닫기`} type="button" onClick={close}>
+                x
+              </button>
+            </div>
           );
         })}
       </div>
