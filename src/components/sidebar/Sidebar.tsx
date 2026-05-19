@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile } from '../../types/workspace';
@@ -15,6 +16,9 @@ export function Sidebar() {
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
+  const [fileSearchOpen, setFileSearchOpen] = useState(false);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const visibleTree = useMemo(() => filterTree(tree, fileSearchQuery), [fileSearchQuery, tree]);
 
   return (
     <aside className="sidebar">
@@ -23,6 +27,7 @@ export function Sidebar() {
         <SidebarActions
           onCreateFile={() => void createFile()}
           onOpenFolder={() => void openFolder()}
+          onSearch={() => setFileSearchOpen((open) => !open)}
           onRefresh={() => void refresh()}
         />
         <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onSelect={setActiveFile} />
@@ -31,8 +36,25 @@ export function Sidebar() {
         </button>
       </div>
       <PathBar path={rootPath ?? '~/Documents/notes'} />
+      {fileSearchOpen ? (
+        <div className="sidebar-search">
+          <Icon name="search" />
+          <input
+            autoFocus
+            value={fileSearchQuery}
+            placeholder="파일 검색"
+            onChange={(event) => setFileSearchQuery(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setFileSearchQuery('');
+                setFileSearchOpen(false);
+              }
+            }}
+          />
+        </div>
+      ) : null}
       <div className="file-tree">
-        {tree.map((node) => (
+        {visibleTree.map((node) => (
           <FileTreeNodeView
             activePath={activeFile?.path ?? null}
             key={node.id}
@@ -50,10 +72,12 @@ export function Sidebar() {
 function SidebarActions({
   onCreateFile,
   onOpenFolder,
+  onSearch,
   onRefresh,
 }: {
   onCreateFile: () => void;
   onOpenFolder: () => void;
+  onSearch: () => void;
   onRefresh: () => void;
 }) {
   return (
@@ -64,7 +88,7 @@ function SidebarActions({
       <IconButton label="폴더 열기" onClick={onOpenFolder}>
         <Icon name="folder" />
       </IconButton>
-      <IconButton label="파일 검색">
+      <IconButton label="파일 검색" onClick={onSearch}>
         <Icon name="search" />
       </IconButton>
       <IconButton label="새로고침" onClick={onRefresh}>
@@ -72,6 +96,25 @@ function SidebarActions({
       </IconButton>
     </div>
   );
+}
+
+function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return nodes;
+
+  return nodes.flatMap((node) => {
+    const children = node.children ? filterTree(node.children, needle) : [];
+    const matched = node.name.toLowerCase().includes(needle);
+    if (!matched && children.length === 0) return [];
+
+    return [
+      {
+        ...node,
+        isOpen: node.type === 'folder' ? true : node.isOpen,
+        children,
+      },
+    ];
+  });
 }
 
 function PathBar({ path }: { path: string }) {
