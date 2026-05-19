@@ -3,6 +3,7 @@ import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
 import { Sidebar } from './components/sidebar/Sidebar';
+import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useWorkspaceStore } from './store/workspace';
 
@@ -22,6 +23,7 @@ export function App() {
   );
 
   useShortcuts(shortcuts);
+  useSessionPersistence();
 
   return (
     <AppShell>
