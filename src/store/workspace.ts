@@ -127,7 +127,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     const existing = get().openFiles.find((file) => file.path === path);
     if (existing) {
-      set({ activeFileId: existing.id });
+      set((state) => activateOpenFile(state, existing));
       return;
     }
 
@@ -178,7 +178,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tree: updateTreeFolder(state.tree, path, { isOpen: !node.isOpen }),
     }));
   },
-  setActiveFile: (id) => set({ activeFileId: id }),
+  setActiveFile: (id) =>
+    set((state) => {
+      const file = state.openFiles.find((candidate) => candidate.id === id);
+      return file ? activateOpenFile(state, file) : {};
+    }),
   closeFile: (id) =>
     set((state) => {
       const openFiles = state.openFiles.filter((file) => file.id !== id);
@@ -252,8 +256,40 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       console.error('폴더 새로고침 실패:', error);
     }
   },
-  historyPrev: () => undefined,
-  historyNext: () => undefined,
+  historyPrev: () =>
+    set((state) => {
+      const previousPath = state.history.back[state.history.back.length - 1];
+      if (!previousPath) return {};
+
+      const file = state.openFiles.find((candidate) => candidate.path === previousPath);
+      if (!file) return {};
+
+      return {
+        activeFileId: file.id,
+        history: {
+          back: state.history.back.slice(0, -1),
+          forward: state.history.current ? [state.history.current, ...state.history.forward] : state.history.forward,
+          current: previousPath,
+        },
+      };
+    }),
+  historyNext: () =>
+    set((state) => {
+      const nextPath = state.history.forward[0];
+      if (!nextPath) return {};
+
+      const file = state.openFiles.find((candidate) => candidate.path === nextPath);
+      if (!file) return {};
+
+      return {
+        activeFileId: file.id,
+        history: {
+          back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
+          forward: state.history.forward.slice(1),
+          current: nextPath,
+        },
+      };
+    }),
   restoreWorkspace: (workspace) =>
     set({
       rootPath: workspace.rootPath,
@@ -325,6 +361,30 @@ function upsertOpenFile(
   const exists = state.openFiles.some((candidate) => candidate.id === file.id);
   return {
     openFiles: exists ? state.openFiles.map((candidate) => (candidate.id === file.id ? file : candidate)) : [...state.openFiles, file],
+    activeFileId: file.id,
+    history: {
+      back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
+      forward: [],
+      current: file.path,
+    },
+  };
+}
+
+function activateOpenFile(
+  state: WorkspaceState,
+  file: OpenFile,
+): Pick<WorkspaceState, 'activeFileId' | 'history'> {
+  if (state.activeFileId === file.id) {
+    return {
+      activeFileId: file.id,
+      history: {
+        ...state.history,
+        current: file.path,
+      },
+    };
+  }
+
+  return {
     activeFileId: file.id,
     history: {
       back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
