@@ -12,6 +12,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::file::open_file_dialog,
             commands::file::open_folder_dialog,
+            commands::file::import_pdf,
             commands::file::read_file,
             commands::file::read_folder,
             commands::file::read_folder_children,

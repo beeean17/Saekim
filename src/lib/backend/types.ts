@@ -3,6 +3,7 @@ import type { FileTreeNode, FolderPayload, OpenFilePayload, ThemeName } from '..
 export interface BackendAdapter {
   openFileDialog(): Promise<OpenFilePayload | null>;
   openFolderDialog(): Promise<string | null>;
+  importPdf(path: string): Promise<OpenFilePayload>;
   readFile(path: string): Promise<OpenFilePayload>;
   readFolder(path: string): Promise<FolderPayload>;
   readFolderChildren(path: string): Promise<FileTreeNode[]>;

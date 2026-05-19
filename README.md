@@ -7,6 +7,8 @@
 
 > 코드와 다이어그램을 자유롭게 다루는 개발자를 위한 로컬 마크다운 에디터
 
+> 3.0.0 개발 브랜치는 Tauri 기반 런타임으로 전환 중입니다. 3.0.0 MVP에서는 PDF 내보내기를 운영체제 인쇄 대화상자로 처리하며, PDF를 Markdown으로 가져오는 기능은 후속 릴리스로 연기되었습니다.
+
 ## 📝 프로젝트 소개
 
 **새김(Saekim)**은 개발자와 학생을 위한 **로컬 우선(Local-First)** 마크다운 에디터입니다.
@@ -48,8 +50,8 @@
 - **파일 새로고침**: 외부 파일 변경 자동 감지 (F5로 수동 새로고침 가능)
 
 ### 🔄 문서 변환
-- **Markdown → PDF** (QWebEngine): 다이어그램, 수식 포함 고품질 변환
-- **PDF → Markdown** (PyMuPDF): 텍스트 추출, 표 인식, 제목 계층 구조 보존
+- **Markdown → PDF**: 3.0.0에서는 운영체제 인쇄 대화상자의 PDF 저장 기능 사용
+- **PDF → Markdown**: 2.x PyQt 런타임 기능이며, 3.0.0 Tauri MVP에서는 제외
 
 ### 🎨 테마 시스템
 4가지 프리셋 테마 제공: **Nord**, **Catppuccin mocha**, **white**, **black**
@@ -168,8 +170,13 @@ venv\Scripts\activate  # Windows
 # 3. 의존성 설치
 pip install -r requirements.txt
 
-# 4. 실행
+# 4. 2.x PyQt 앱 실행
 python src/main.py
+
+# 5. 3.0.0 Tauri 앱 실행
+corepack enable
+corepack pnpm install
+corepack pnpm tauri:dev
 ```
 
 **주요 의존성**:

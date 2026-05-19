@@ -93,6 +93,18 @@ pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>>
 }
 
 #[tauri::command]
+pub fn import_pdf(path: String) -> CommandResult<OpenFilePayload> {
+    let file_name = Path::new(&path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("selected PDF");
+
+    fail(format!(
+        "PDF import is deferred in Saekim 3.0.0 ({file_name}). Use Saekim 2.x for PDF-to-Markdown conversion until the import pipeline is reintroduced."
+    ))
+}
+
+#[tauri::command]
 pub fn read_folder(path: String) -> CommandResult<FolderPayload> {
     match read_folder_payload(PathBuf::from(path)) {
         Ok(payload) => ok(payload),
