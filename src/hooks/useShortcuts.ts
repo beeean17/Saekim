@@ -4,6 +4,7 @@ interface ShortcutHandlers {
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onExportPdf: () => void;
   onFind: () => void;
   onClose: () => void;
 }
@@ -28,6 +29,10 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
       if (event.key.toLowerCase() === 'f') {
         event.preventDefault();
         handlers.onFind();
+      }
+      if (event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        handlers.onExportPdf();
       }
       if (event.key.toLowerCase() === 'w') {
         event.preventDefault();
