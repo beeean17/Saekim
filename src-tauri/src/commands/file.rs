@@ -49,28 +49,26 @@ pub struct FileTreeNode {
 }
 
 #[tauri::command]
-pub fn open_file_dialog(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> CommandResult<Option<OpenFilePayload>> {
-    let selected = app
-        .dialog()
-        .file()
-        .add_filter("Markdown", &["md", "markdown", "txt"])
-        .blocking_pick_file();
+pub async fn open_file_dialog(app: AppHandle) -> CommandResult<Option<OpenFilePayload>> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        let selected = app
+            .dialog()
+            .file()
+            .add_filter("Markdown", &["md", "markdown", "txt"])
+            .blocking_pick_file();
 
-    let Some(path) = selected else {
-        return ok(None);
-    };
+        let Some(path) = selected else {
+            return Ok(None);
+        };
 
-    match read_file_payload(path.into_path().unwrap_or_default()) {
-        Ok(payload) => {
-            if let Ok(mut active_file) = state.active_file.lock() {
-                *active_file = Some(payload.path.clone());
-            }
-            ok(Some(payload))
-        }
-        Err(error) => fail(error),
+        read_file_payload(path.into_path().unwrap_or_default()).map(Some)
+    })
+    .await;
+
+    match selected {
+        Ok(Ok(payload)) => ok(payload),
+        Ok(Err(error)) => fail(error),
+        Err(error) => fail(format!("failed to open file dialog: {error}")),
     }
 }
 
