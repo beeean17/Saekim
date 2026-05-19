@@ -9,7 +9,7 @@ export const browserBackend: BackendAdapter = {
     return null;
   },
 
-  async openFolderDialog(): Promise<FolderPayload | null> {
+  async openFolderDialog(): Promise<string | null> {
     return null;
   },
 
