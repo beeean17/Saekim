@@ -16,6 +16,9 @@ export function Sidebar() {
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
+  const history = useWorkspaceStore((state) => state.history);
+  const historyPrev = useWorkspaceStore((state) => state.historyPrev);
+  const historyNext = useWorkspaceStore((state) => state.historyNext);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const visibleTree = useMemo(() => filterTree(tree, fileSearchQuery), [fileSearchQuery, tree]);
@@ -35,7 +38,13 @@ export function Sidebar() {
           +{Math.max(0, openFiles.length - 4)}
         </button>
       </div>
-      <PathBar path={rootPath ?? '~/Documents/notes'} />
+      <PathBar
+        canGoBack={history.back.length > 0}
+        canGoForward={history.forward.length > 0}
+        path={rootPath ?? '~/Documents/notes'}
+        onBack={historyPrev}
+        onForward={historyNext}
+      />
       {fileSearchOpen ? (
         <div className="sidebar-search">
           <Icon name="search" />
@@ -117,16 +126,28 @@ function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
   });
 }
 
-function PathBar({ path }: { path: string }) {
+function PathBar({
+  canGoBack,
+  canGoForward,
+  path,
+  onBack,
+  onForward,
+}: {
+  canGoBack: boolean;
+  canGoForward: boolean;
+  path: string;
+  onBack: () => void;
+  onForward: () => void;
+}) {
   return (
     <div className="sidebar-path">
-      <button className="nav-mini" title="뒤로" type="button">
+      <button className="nav-mini" disabled={!canGoBack} title="뒤로" type="button" onClick={onBack}>
         <Icon name="chevronLeft" />
       </button>
-      <button className="nav-mini" title="앞으로" type="button">
+      <button className="nav-mini" disabled={!canGoForward} title="앞으로" type="button" onClick={onForward}>
         <Icon name="chevronRight" />
       </button>
-      <button className="nav-mini" title="상위 폴더" type="button">
+      <button className="nav-mini" disabled title="상위 폴더" type="button">
         <Icon name="chevronUp" />
       </button>
       <span className="path-text">{path}</span>
