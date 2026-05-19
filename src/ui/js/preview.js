@@ -27,6 +27,15 @@ const PreviewModule = {
             });
         }
 
+        const lockButton = document.getElementById('btn-lock-preview');
+        if (lockButton) {
+            lockButton.addEventListener('click', () => {
+                const isActive = lockButton.getAttribute('data-active') === 'true';
+                lockButton.setAttribute('data-active', String(!isActive));
+                lockButton.title = !isActive ? '미리보기 잠금 켜짐' : '미리보기 잠금 꺼짐';
+            });
+        }
+
         console.log('✅ Preview 모듈 초기화 완료');
     },
 
@@ -165,6 +174,8 @@ const PreviewModule = {
                     }
                 });
 
+                processedMarkdown = this.markInfoCardHints(processedMarkdown);
+
                 // Convert markdown to HTML
                 console.log('📄 Calling marked.parse()...');
                 let html = marked.parse(processedMarkdown);
@@ -202,6 +213,7 @@ const PreviewModule = {
 
                 // p 태그로 감싸진 math-display를 unwrap
                 this.unwrapMathDisplays();
+                this.applyPreviewEnhancements();
 
                 // Fix image paths - convert relative paths to absolute file:// URLs
                 console.log('🖼️ Calling fixImagePaths()...');
@@ -237,6 +249,98 @@ const PreviewModule = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    markInfoCardHints(markdown) {
+        return markdown
+            .replace(/<!--\s*info-card\s*-->/gi, '<div class="info-card-marker"></div>')
+            .replace(/^>\s*\[!info\]\s*$/gim, '> [!INFO]');
+    },
+
+    applyPreviewEnhancements() {
+        if (!this.previewElement) return;
+        this.wrapMetaBlock();
+        this.wrapConclusionParagraphs();
+        this.wrapInfoCardPatterns();
+        this.convertInfoCards();
+    },
+
+    wrapMetaBlock() {
+        const firstHeading = this.previewElement.querySelector('h1');
+        if (!firstHeading) return;
+
+        const metaParagraphs = [];
+        let node = firstHeading.nextElementSibling;
+        while (node && node.tagName === 'P') {
+            const text = node.textContent.trim();
+            if (!/^(작성일|수정일|프로젝트)\s*:/i.test(text)) {
+                break;
+            }
+            metaParagraphs.push(node);
+            node = node.nextElementSibling;
+        }
+
+        if (metaParagraphs.length < 2) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'meta-block';
+        metaParagraphs[0].before(wrapper);
+        metaParagraphs.forEach((paragraph) => wrapper.appendChild(paragraph));
+    },
+
+    wrapConclusionParagraphs() {
+        this.previewElement.querySelectorAll('p').forEach((paragraph) => {
+            if (/^결론\s*:/i.test(paragraph.textContent.trim())) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'conclusion';
+                paragraph.before(wrapper);
+                wrapper.appendChild(paragraph);
+            }
+        });
+    },
+
+    wrapInfoCardPatterns() {
+        this.previewElement.querySelectorAll('p').forEach((paragraph) => {
+            if (paragraph.closest('.meta-block, .conclusion, .info-card')) return;
+
+            const text = paragraph.textContent.trim();
+            const next = paragraph.nextElementSibling;
+            if (!next || next.tagName !== 'UL') return;
+            if (!/^.+:\s*$/.test(text)) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'info-card';
+
+            const title = document.createElement('div');
+            title.className = 'info-card-title';
+            title.innerHTML = paragraph.innerHTML.replace(/:\s*$/, '');
+
+            paragraph.before(wrapper);
+            wrapper.appendChild(title);
+            wrapper.appendChild(next);
+            paragraph.remove();
+        });
+    },
+
+    convertInfoCards() {
+        this.previewElement.querySelectorAll('.info-card-marker').forEach((marker) => {
+            const target = marker.nextElementSibling;
+            if (target) {
+                target.classList.add('info-card');
+            }
+            marker.remove();
+        });
+
+        this.previewElement.querySelectorAll('blockquote').forEach((blockquote) => {
+            const text = blockquote.textContent.trim();
+            if (/^\[!INFO\]/i.test(text)) {
+                blockquote.classList.add('info-card');
+                const firstParagraph = blockquote.querySelector('p');
+                if (firstParagraph) {
+                    firstParagraph.innerHTML = firstParagraph.innerHTML.replace(/^\[!INFO\]\s*/i, '');
+                }
+            }
+        });
     },
 
     /**

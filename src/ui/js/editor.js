@@ -4,6 +4,8 @@
 
 const EditorModule = {
     editor: null,
+    lineNumbers: null,
+    highlightBackdrop: null,
     wordCountDisplay: null,
     autoSaveTimeout: null,
     autoSaveDelay: 5000, // 5 seconds
@@ -14,6 +16,8 @@ const EditorModule = {
      */
     init() {
         this.editor = document.getElementById('editor');
+        this.lineNumbers = document.getElementById('line-numbers');
+        this.highlightBackdrop = document.getElementById('highlight-backdrop');
         this.wordCountDisplay = document.getElementById('word-count');
 
         if (!this.editor) {
@@ -23,6 +27,8 @@ const EditorModule = {
 
         this.setupEventListeners();
         this.updateWordCount();
+        this.updateLineNumbers();
+        this.updateActiveLine();
 
         console.log('✅ Editor 모듈 초기화 완료');
     },
@@ -49,6 +55,9 @@ const EditorModule = {
 
         this.editor.addEventListener('input', () => {
             this.updateWordCount();
+            this.updateLineNumbers();
+            this.updateActiveLine();
+            this.updateCursorPosition();
             updatePreview();
 
             // Trigger auto-save (debounced)
@@ -58,14 +67,19 @@ const EditorModule = {
         // Update cursor position on selection change
         this.editor.addEventListener('selectionchange', () => {
             this.updateCursorPosition();
+            this.updateActiveLine();
         });
 
         this.editor.addEventListener('keydown', () => {
-            this.updateCursorPosition();
+            requestAnimationFrame(() => {
+                this.updateCursorPosition();
+                this.updateActiveLine();
+            });
         });
 
         this.editor.addEventListener('click', () => {
             this.updateCursorPosition();
+            this.updateActiveLine();
         });
 
         // Tab key handling
@@ -78,6 +92,8 @@ const EditorModule = {
 
         // Scroll synchronization
         this.editor.addEventListener('scroll', () => {
+            this.syncLineNumberScroll();
+            this.updateActiveLine();
             if (typeof PreviewModule !== 'undefined') {
                 PreviewModule.syncScroll(this.editor);
             }
@@ -98,6 +114,9 @@ const EditorModule = {
         if (this.editor) {
             this.editor.value = content;
             this.updateWordCount();
+            this.updateLineNumbers();
+            this.updateActiveLine();
+            this.updateCursorPosition();
 
             if (typeof PreviewModule !== 'undefined') {
                 PreviewModule.update(content);
@@ -162,6 +181,48 @@ const EditorModule = {
 
         this.wordCountDisplay.textContent = `${wordCount} 단어`;
         this.wordCountDisplay.title = `${wordCount} 단어, ${charCount} 글자`;
+    },
+
+    updateLineNumbers() {
+        if (!this.editor || !this.lineNumbers) return;
+
+        const lineCount = Math.max(1, this.editor.value.split('\n').length);
+        const currentLine = Utils.getCursorPosition(this.editor).line;
+        const html = Array.from({ length: lineCount }, (_, index) => {
+            const line = index + 1;
+            const className = line === currentLine ? ' class="active"' : '';
+            return `<span${className}>${line}</span>`;
+        }).join('');
+
+        this.lineNumbers.innerHTML = html;
+        this.syncLineNumberScroll();
+    },
+
+    syncLineNumberScroll() {
+        if (!this.editor || !this.lineNumbers) return;
+        this.lineNumbers.scrollTop = this.editor.scrollTop;
+    },
+
+    updateActiveLine() {
+        if (!this.editor) return;
+
+        if (this.lineNumbers) {
+            const currentLine = Utils.getCursorPosition(this.editor).line;
+            this.lineNumbers.querySelectorAll('span').forEach((lineEl, index) => {
+                lineEl.classList.toggle('active', index + 1 === currentLine);
+            });
+        }
+
+        if (!this.highlightBackdrop) return;
+
+        const style = window.getComputedStyle(this.editor);
+        const lineHeight = parseFloat(style.lineHeight) || 23;
+        const paddingTop = parseFloat(style.paddingTop) || 0;
+        const currentLine = Utils.getCursorPosition(this.editor).line;
+        const top = paddingTop + ((currentLine - 1) * lineHeight) - this.editor.scrollTop;
+
+        this.highlightBackdrop.style.height = `${lineHeight}px`;
+        this.highlightBackdrop.style.transform = `translateY(${top}px)`;
     },
 
     /**

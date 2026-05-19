@@ -189,6 +189,8 @@ class BackendAPI(QObject):
                 # Update window title
                 title = FileManager.get_file_name(filepath)
                 self.main_window.setWindowTitle(f"새김 - {title}")
+                if hasattr(self.main_window, "on_tab_saved"):
+                    self.main_window.on_tab_saved()
 
             return json.dumps({
                 "success": success,
@@ -259,6 +261,8 @@ class BackendAPI(QObject):
                 # Update window title
                 title = FileManager.get_file_name(file_path)
                 self.main_window.setWindowTitle(f"새김 - {title}")
+                if hasattr(self.main_window, "on_tab_saved"):
+                    self.main_window.on_tab_saved()
 
             return json.dumps({
                 "success": success,
@@ -346,6 +350,8 @@ class BackendAPI(QObject):
         if modified:
             title = f"*{title}"
         self.main_window.setWindowTitle(title)
+        if hasattr(self.main_window, "on_tab_modified_changed"):
+            self.main_window.on_tab_modified_changed()
 
     @pyqtSlot(result=str)
     def get_file_info(self) -> str:

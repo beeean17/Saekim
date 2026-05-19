@@ -1,4 +1,10 @@
-/* Catppuccin Mocha Theme QSS */
+/* Catppuccin mocha Theme QSS */
+/* === Saekim Design Tokens (mockup-aligned) ===
+   bg-app #1E1E2E, bg-titlebar #181825, bg-sidebar #1E1E2E, bg-tabs #181825,
+   bg-editor #1E1E2E, bg-statusbar #181825
+   border-subtle #2A2B3D, border-soft #313244, border-strong #45475A
+   accent #5EEAD4, accent-soft rgba(94,234,212,12%)
+   === */
 QMainWindow {
     background-color: #1E1E2E;
     color: #CDD6F4;
@@ -30,7 +36,35 @@ QDockWidget::title {
     background-color: #181825;
     padding: 5px;
     border-radius: 4px;
-    color: #89B4FA;
+    color: #5EEAD4;
+}
+
+QWidget#ExplorerHeader {
+    background-color: #1E1E2E;
+    border-bottom: 1px solid #2A2B3D;
+}
+
+QLabel#ExplorerTitle {
+    color: #6C7086;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+QLabel#ExplorerPath {
+    color: #A6ADC8;
+    font-size: 11px;
+}
+
+QToolButton#ExplorerActionButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 3px;
+}
+
+QToolButton#ExplorerActionButton:hover {
+    background-color: #313244;
+    border-color: #45475A;
 }
 
 /* Tree View (File Explorer) */
@@ -54,15 +88,15 @@ QTreeView::item:hover {
 
 QTreeView::item:selected {
     background-color: #45475A;
-    color: #89B4FA;
-    border: 1px solid #89B4FA;
+    color: #5EEAD4;
+    border: 1px solid #5EEAD4;
 }
 
 /* Tab Widget */
 QTabWidget::pane {
     border: 1px solid #313244;
     background-color: #1E1E2E;
-    border-radius: 6px;
+    border-radius: 0px;
 }
 
 QTabBar::tab {
@@ -70,17 +104,20 @@ QTabBar::tab {
     color: #A6ADC8;
     border: 1px solid #313244;
     border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    padding: 4px 16px;
-    margin-right: 4px;
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
+    padding: 5px 16px 4px 16px;
+    margin-right: 0px;
     min-width: 100px;
+    font-family: "JetBrains Mono", "Pretendard";
+    font-size: 12px;
 }
 
 QTabBar::tab:selected {
     background-color: #1E1E2E;
-    color: #89B4FA;
-    border-bottom: 2px solid #89B4FA;
+    color: #5EEAD4;
+    border-top: 2px solid #5EEAD4;
+    border-bottom: 1px solid #1E1E2E;
 }
 
 QTabBar::tab:hover {
@@ -225,7 +262,7 @@ QMenu::item {
 
 QMenu::item:selected {
     background-color: #313244;
-    color: #89B4FA;
+    color: #5EEAD4;
 }
 
 /* Status Bar */
@@ -233,6 +270,33 @@ QStatusBar {
     background-color: #181825;
     color: #A6ADC8;
     border-top: 1px solid #313244;
+    font-family: "JetBrains Mono", "Pretendard";
+    font-size: 11px;
+    min-height: 26px;
+}
+
+QStatusBar QLabel {
+    color: #A6ADC8;
+    padding: 0 8px;
+    border-right: 1px solid #2A2B3D;
+}
+
+QStatusBar QLabel[separator="false"] {
+    border-right: none;
+}
+
+QStatusBar QLabel#StatusFilePath {
+    color: #CDD6F4;
+    border-right: none;
+    font-family: "Pretendard";
+}
+
+QStatusBar QLabel[role="saved"][state="saved"] {
+    color: #5EEAD4;
+}
+
+QStatusBar QLabel[role="saved"][state="dirty"] {
+    color: #FAB387;
 }
 
 /* Title Bar Buttons */
@@ -314,18 +378,18 @@ QPushButton#ViewToggleButton:hover {
 }
 
 QPushButton#ViewToggleButton[active="true"] {
-    background-color: #89b4fa;
-    border-color: #89b4fa;
+    background-color: #5EEAD4;
+    border-color: #5EEAD4;
     color: #1e1e2e;
     font-weight: bold;
 }
 
 QPushButton#ViewToggleButton[active="true"][position="middle"] {
-    border-left: 1px solid #89b4fa;
+    border-left: 1px solid #5EEAD4;
 }
 
 QPushButton#ViewToggleButton[active="true"][position="right"] {
-    border-left: 1px solid #89b4fa;
+    border-left: 1px solid #5EEAD4;
 }
 
 QPushButton#ViewToggleButton[active="true"]:hover {
@@ -336,3 +400,34 @@ QPushButton#ViewToggleButton[active="true"]:hover {
 QPushButton#ViewToggleButton:pressed {
     background-color: #585b70;
 }
+
+/* === Mockup-exact shell override === */
+QMainWindow, QWidget { background-color: #0F1419; color: #E6EDF3; }
+QFrame#TitleBar { background-color: #0B0F14; border-bottom: 1px solid #1F2731; }
+QLabel#TitleLabel { color: #9BA8B8; font-size: 12px; font-weight: 500; }
+QDockWidget { background-color: #131820; border: none; border-right: 1px solid #1F2731; }
+QDockWidget::title { background-color: #131820; color: #6A7787; border-bottom: 1px solid #1F2731; }
+QWidget#ExplorerHeader { background-color: #131820; border-bottom: none; }
+QWidget#ExplorerPathBar { background-color: #131820; border-bottom: 1px solid #1F2731; }
+QWidget#ExplorerSortBar { background-color: #131820; border-bottom: 1px solid #1F2731; min-height: 28px; }
+QLabel#ExplorerTitle { color: #6A7787; font-size: 11px; font-weight: 600; }
+QLabel#ExplorerPath { color: #6A7787; font-size: 11px; font-family: "JetBrains Mono"; background-color: transparent; border: none; }
+QTreeView { background-color: #131820; color: #9BA8B8; border: none; padding: 0px; show-decoration-selected: 0; }
+QTreeView::item { padding: 6px 4px; border-radius: 6px; margin: 1px 0; color: #9BA8B8; }
+QTreeView::branch, QTreeView::branch:selected, QTreeView::branch:hover { background: transparent; image: none; }
+QTreeView::item:hover { background-color: rgba(255, 255, 255, 0.03); color: #E6EDF3; }
+QTreeView::item:selected { background-color: rgba(94, 234, 212, 0.12); color: #E6EDF3; border: none; }
+QTabWidget::pane { border: none; background-color: #0F1419; }
+QTabBar { background-color: #0F1419; }
+QTabBar::tab { background-color: transparent; color: #6A7787; border: none; border-top: 2px solid transparent; border-radius: 6px 6px 0 0; padding: 0 12px; margin-right: 2px; height: 32px; max-width: 200px; font-family: "JetBrains Mono", "Pretendard"; font-size: 12px; }
+QTabBar::tab:hover { background-color: rgba(255, 255, 255, 0.02); color: #9BA8B8; }
+QTabBar::tab:selected { background-color: #161C24; color: #E6EDF3; border-top: 2px solid #5EEAD4; border-bottom: none; }
+QToolButton, QPushButton#TitleBarButton, QPushButton#TitleBarCloseButton, QToolButton#ExplorerActionButton, QToolButton#ExplorerSortButton { background-color: transparent; border: none; border-radius: 6px; color: #6A7787; }
+QToolButton:hover, QPushButton#TitleBarButton:hover, QToolButton#ExplorerActionButton:hover, QToolButton#ExplorerSortButton:hover { background-color: #1F2731; color: #E6EDF3; }
+QPushButton#TitleBarCloseButton:hover { background-color: #2D3744; }
+QStatusBar { background-color: #0B0F14; color: #6A7787; border-top: 1px solid #1F2731; font-family: "JetBrains Mono", "Pretendard"; font-size: 11px; min-height: 26px; }
+QStatusBar QLabel { color: #6A7787; padding: 0 8px; border-right: 1px solid #2D3744; }
+QStatusBar QLabel#StatusFilePath { color: #9BA8B8; border-right: none; font-family: "Pretendard"; }
+QStatusBar QLabel[separator="false"] { border-right: none; }
+QStatusBar QLabel[role="saved"][state="saved"] { color: #5EEAD4; }
+QStatusBar QLabel[role="saved"][state="dirty"] { color: #FBBF24; }

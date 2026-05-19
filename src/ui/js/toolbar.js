@@ -163,6 +163,26 @@ document.addEventListener('DOMContentLoaded', () => {
         document.execCommand('redo');
     });
 
+    const btnBold = document.getElementById('btn-bold');
+    if (btnBold) {
+        btnBold.addEventListener('click', () => ToolbarModule.bold());
+    }
+
+    const btnItalic = document.getElementById('btn-italic');
+    if (btnItalic) {
+        btnItalic.addEventListener('click', () => ToolbarModule.italic());
+    }
+
+    const btnHeading = document.getElementById('btn-heading');
+    if (btnHeading) {
+        btnHeading.addEventListener('click', () => ToolbarModule.heading(2));
+    }
+
+    const btnCodeBlock = document.getElementById('btn-code-block');
+    if (btnCodeBlock) {
+        btnCodeBlock.addEventListener('click', () => ToolbarModule.codeBlock());
+    }
+
     // Image button
     const btnInsertImage = document.getElementById('btn-insert-image');
     if (btnInsertImage) {

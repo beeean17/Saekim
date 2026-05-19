@@ -12,16 +12,59 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None, theme_manager=None):
         super().__init__(parent)
         self.theme_manager = theme_manager
-        self.setWindowTitle("Settings")
+        self.setObjectName("SettingsDialog")
+        self.setWindowTitle("설정")
         self.setFont(DesignManager.get_font("body"))
-        self.setFixedSize(400, 350)
+        self.setFixedSize(440, 360)
         self.setModal(True)
+        self.setStyleSheet("""
+            QDialog#SettingsDialog {
+                background: palette(window);
+            }
+            QGroupBox#SettingsSection {
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                margin-top: 12px;
+                padding: 16px 12px 12px 12px;
+                font-weight: 600;
+            }
+            QGroupBox#SettingsSection::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 6px;
+            }
+            QComboBox {
+                min-height: 28px;
+                padding: 4px 8px;
+                border-radius: 6px;
+            }
+            QPushButton {
+                min-height: 30px;
+                padding: 4px 12px;
+                border-radius: 6px;
+            }
+            QPushButton#PrimaryAction {
+                font-weight: 600;
+            }
+        """)
         
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 14)
+        layout.setSpacing(12)
+
+        title_label = QLabel("설정")
+        title_label.setObjectName("DialogTitle")
+        title_font = DesignManager.get_font("header")
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        layout.addWidget(title_label)
         
         # Appearance Group
-        group_appearance = QGroupBox("Appearance")
+        group_appearance = QGroupBox("화면")
+        group_appearance.setObjectName("SettingsSection")
         form_layout = QFormLayout()
+        form_layout.setContentsMargins(0, 4, 0, 0)
+        form_layout.setSpacing(10)
         
         self.combo_theme = QComboBox()
         if self.theme_manager:
@@ -36,20 +79,24 @@ class SettingsDialog(QDialog):
                 
         self.combo_theme.currentIndexChanged.connect(self.on_theme_changed)
         
-        form_layout.addRow("Theme:", self.combo_theme)
+        form_layout.addRow("테마", self.combo_theme)
         group_appearance.setLayout(form_layout)
         layout.addWidget(group_appearance)
         
         # About / License Group
-        group_about = QGroupBox("About")
+        group_about = QGroupBox("정보")
+        group_about.setObjectName("SettingsSection")
         about_layout = QVBoxLayout()
+        about_layout.setContentsMargins(0, 4, 0, 0)
+        about_layout.setSpacing(8)
         
-        btn_license = QPushButton("라이선스 및 오픈소스 정보 (License Info)")
+        btn_license = QPushButton("라이선스 및 오픈소스 정보")
         btn_license.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn_license.clicked.connect(self.open_license_dialog)
         about_layout.addWidget(btn_license)
         
-        btn_check_update = QPushButton("업데이트 확인 (Check for Updates)")
+        btn_check_update = QPushButton("업데이트 확인")
+        btn_check_update.setObjectName("PrimaryAction")
         btn_check_update.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn_check_update.clicked.connect(self.check_for_updates)
         about_layout.addWidget(btn_check_update)
@@ -63,7 +110,7 @@ class SettingsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
-        self.btn_close = QPushButton("Close")
+        self.btn_close = QPushButton("닫기")
         self.btn_close.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_close.clicked.connect(self.accept)
         btn_layout.addWidget(self.btn_close)

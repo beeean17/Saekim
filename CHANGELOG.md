@@ -40,11 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### ViewToggleButton 스타일 개선
 - **모든 테마 지원**: Edit/View/Split 버튼의 active/inactive 상태를 명확히 구분
   - **Nord**: Active (청록 배경/#88C0D0), Inactive (회색 배경)
-  - **Dark**: Active (파란 배경/#007ACC), Inactive (어두운 회색)
-  - **Catppuccin**: Active (라벤더 배경/#89b4fa), Inactive (중간 회색)
-  - **White**: Active (검은 배경), Inactive (밝은 회색)
-  - **Black**: Active (흰 배경), Inactive (어두운 회색)
-  - **GitHub Primer**: Active (GitHub 파랑/#0366d6), Inactive (중간 회색)
+  - **Catppuccin mocha**: Active (라벤더 배경/#89b4fa), Inactive (중간 회색)
+  - **white**: Active (검은 배경), Inactive (밝은 회색)
+  - **black**: Active (흰 배경), Inactive (어두운 회색)
 - **시각적 피드백**: Bold 폰트, hover 효과, 부드러운 색상 전환
 
 #### 파일 새로고침 기능

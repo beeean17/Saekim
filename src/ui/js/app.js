@@ -173,11 +173,8 @@ const App = {
             const maxWidth = containerWidth - minWidth - resizer.offsetWidth;
 
             if (newEditorWidth >= minWidth && newEditorWidth <= maxWidth) {
-                const editorFlex = (newEditorWidth / containerWidth) * 100;
-                const previewFlex = 100 - editorFlex - 1; // 1% for resizer
-
-                editorPane.style.flex = `0 0 ${editorFlex}%`;
-                previewPane.style.flex = `0 0 ${previewFlex}%`;
+                const previewWidth = containerWidth - newEditorWidth - resizer.offsetWidth;
+                resizer.parentElement.style.gridTemplateColumns = `${newEditorWidth}px ${resizer.offsetWidth}px ${previewWidth}px`;
             }
         });
 
@@ -473,6 +470,9 @@ const App = {
      */
     markDirty() {
         this.state.isDirty = true;
+        if (this.backend && this.backend.mark_modified) {
+            this.backend.mark_modified('true');
+        }
     }
 };
 

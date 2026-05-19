@@ -6,30 +6,44 @@ from PyQt6.QtCore import QFile, QTextStream
 class ThemeManager:
     """Manages application themes (QSS and CSS)"""
 
+    THEME_ALIASES = {
+        'catppuccin': 'catppuccin_mocha',
+        'paper': 'white',
+        'github_primer': 'black',
+    }
+
     THEMES = {
         'nord': {
             'name': 'Nord',
             'qss': 'nord.qss',
             'css': 'nord.css',
-            'is_dark': True
+            'is_dark': True,
+            'icon_color': '#9BA8B8',
+            'native_titlebar_color': '#0B0F14'
         },
-        'catppuccin': {
-            'name': 'Catppuccin Mocha',
-            'qss': 'catppuccin.qss',
-            'css': 'catppuccin.css',
-            'is_dark': True
+        'catppuccin_mocha': {
+            'name': 'Catppuccin mocha',
+            'qss': 'catppuccin_mocha.qss',
+            'css': 'catppuccin_mocha.css',
+            'is_dark': True,
+            'icon_color': '#9BA8B8',
+            'native_titlebar_color': '#0B0F14'
         },
-        'paper': {
-            'name': 'White',
-            'qss': 'paper.qss',
-            'css': 'paper.css',
-            'is_dark': False
+        'white': {
+            'name': 'white',
+            'qss': 'white.qss',
+            'css': 'white.css',
+            'is_dark': True,
+            'icon_color': '#9BA8B8',
+            'native_titlebar_color': '#0B0F14'
         },
-        'github_primer': {
-            'name': 'Black',
-            'qss': 'github_primer.qss',
-            'css': 'github_primer.css',
-            'is_dark': True
+        'black': {
+            'name': 'black',
+            'qss': 'black.qss',
+            'css': 'black.css',
+            'is_dark': True,
+            'icon_color': '#9BA8B8',
+            'native_titlebar_color': '#0B0F14'
         }
     }
 
@@ -38,13 +52,17 @@ class ThemeManager:
         self.current_theme = 'nord' # Default to Nord
         self._load_preference()
 
+    def _normalize_theme_name(self, theme_name: str) -> str:
+        """Map old theme keys to current canonical keys."""
+        return self.THEME_ALIASES.get(theme_name, theme_name)
+
     def _load_preference(self):
         """Load theme preference from session file"""
         if self.session_file.exists():
             try:
                 with open(self.session_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.current_theme = data.get('theme', 'nord')
+                    self.current_theme = self._normalize_theme_name(data.get('theme', 'nord'))
             except Exception as e:
                 print(f"[WARN] Failed to load theme preference: {e}")
 
@@ -72,9 +90,10 @@ class ThemeManager:
 
     def apply_theme(self, theme_name: str):
         """Apply the selected theme"""
+        theme_name = self._normalize_theme_name(theme_name)
         if theme_name not in self.THEMES:
             print(f"[WARN] Unknown theme: {theme_name}")
-            return
+            theme_name = 'nord'
 
         self.current_theme = theme_name
         theme_data = self.THEMES[theme_name]
@@ -94,7 +113,7 @@ class ThemeManager:
                     import re
                     
                     # Determine icon color based on theme
-                    icon_color = "#D0D0D0" if theme_data.get('is_dark', True) else "#555555"
+                    icon_color = theme_data.get('icon_color') or ("#E6EDF3" if theme_data.get('is_dark', True) else "#4B5563")
 
                     def format_icon_url(icon_value):
                         if icon_value.strip().startswith("<svg"):
@@ -158,4 +177,5 @@ class ThemeManager:
         return theme_data
 
     def get_current_theme_data(self):
-        return self.THEMES.get(self.current_theme, self.THEMES['catppuccin'])
+        self.current_theme = self._normalize_theme_name(self.current_theme)
+        return self.THEMES.get(self.current_theme, self.THEMES['catppuccin_mocha'])

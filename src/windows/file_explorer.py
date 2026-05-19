@@ -5,11 +5,81 @@ Provides a file system tree view for navigating and opening markdown files
 
 from pathlib import Path
 from PyQt6.QtWidgets import (QDockWidget, QTreeView, QWidget, QVBoxLayout,
-                              QHBoxLayout, QPushButton, QToolButton, QLabel,
-                              QSizePolicy, QMenu, QHeaderView)
-from PyQt6.QtCore import pyqtSignal, Qt, QDir
-from PyQt6.QtGui import QFileSystemModel
+                              QHBoxLayout, QToolButton, QLabel,
+                              QSizePolicy, QHeaderView, QStyledItemDelegate,
+                              QMenu)
+from PyQt6.QtCore import pyqtSignal, Qt, QDateTime, QRect
+from PyQt6.QtGui import QFileSystemModel, QColor, QFont, QPen
 from utils.design_manager import DesignManager
+
+
+def format_relative_time(qdatetime: QDateTime) -> str:
+    """Return compact relative modified time for the file tree."""
+    if not qdatetime.isValid():
+        return ""
+
+    seconds = max(0, qdatetime.secsTo(QDateTime.currentDateTime()))
+    if seconds < 60:
+        return "now"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        return f"{seconds // 3600}h"
+    if seconds < 604800:
+        return f"{seconds // 86400}d"
+    if seconds < 2592000:
+        return f"{seconds // 604800}w"
+    return qdatetime.toString("yy.MM")
+
+
+class FileTreeItemDelegate(QStyledItemDelegate):
+    """Draw dirty marker and file modified metadata."""
+
+    def __init__(self, model: QFileSystemModel, parent=None):
+        super().__init__(parent)
+        self.model = model
+        self.current_file_path = ""
+        self.dirty_files = set()
+        self.meta_color = QColor(106, 119, 135)
+        self.warning_color = QColor(251, 191, 36)
+
+    def set_current_file(self, file_path: str):
+        self.current_file_path = str(file_path or "")
+
+    def set_dirty_files(self, dirty_files: set[str]):
+        self.dirty_files = {str(path) for path in dirty_files if path}
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+
+        if index.column() != 0:
+            return
+
+        file_path = self.model.filePath(index)
+        if not file_path:
+            return
+
+        rect = option.rect
+        normalized_path = str(Path(file_path).resolve())
+        is_dirty = normalized_path in self.dirty_files
+
+        painter.save()
+        if not self.model.isDir(index):
+            meta = format_relative_time(self.model.lastModified(index))
+            if meta:
+                painter.setPen(QPen(self.meta_color))
+                meta_font = QFont(option.font)
+                meta_font.setPointSize(max(8, meta_font.pointSize() - 1))
+                painter.setFont(meta_font)
+                meta_rect = QRect(rect.right() - 50, rect.top(), 46, rect.height())
+                painter.drawText(meta_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, meta)
+
+        if is_dirty:
+            painter.setPen(QPen(self.warning_color))
+            dirty_rect = QRect(rect.right() - 66, rect.top(), 12, rect.height())
+            painter.drawText(dirty_rect, Qt.AlignmentFlag.AlignCenter, "●")
+
+        painter.restore()
 
 
 class FileExplorer(QDockWidget):
@@ -24,6 +94,9 @@ class FileExplorer(QDockWidget):
     
     # New signals for UI actions
     settings_requested = pyqtSignal()
+    new_file_requested = pyqtSignal()
+    new_folder_requested = pyqtSignal()
+    refresh_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__("File Explorer", parent)
@@ -31,11 +104,13 @@ class FileExplorer(QDockWidget):
         # Set dock properties
         self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea |
                             Qt.DockWidgetArea.RightDockWidgetArea)
-        self.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
-                        QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        self.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
+        empty_title_bar = QWidget()
+        empty_title_bar.setFixedHeight(0)
+        self.setTitleBarWidget(empty_title_bar)
 
         # Set minimum width to prevent resizing below navigation buttons
-        self.setMinimumWidth(100)
+        self.setMinimumWidth(240)
 
         # Path history for navigation
         self.path_history = []
@@ -49,27 +124,53 @@ class FileExplorer(QDockWidget):
 
         # --- Header Section ---
         header_widget = QWidget()
+        header_widget.setObjectName("ExplorerHeader")
         header_layout = QVBoxLayout(header_widget)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(2)
-        
-        # 1. File Actions Row - Removed (Moved to Title Bar)
-        
-        # 2. Path Label
+        header_layout.setContentsMargins(10, 8, 10, 6)
+        header_layout.setSpacing(6)
+
+        explorer_row = QHBoxLayout()
+        explorer_row.setContentsMargins(0, 0, 0, 0)
+        explorer_row.setSpacing(4)
+
+        explorer_label = QLabel("EXPLORER")
+        explorer_label.setObjectName("ExplorerTitle")
+        explorer_label.setFont(DesignManager.get_font("small"))
+        explorer_row.addWidget(explorer_label)
+        explorer_row.addStretch()
+
+        self.new_file_button = self._create_header_button(DesignManager.Icons.NEW_FILE, "새 파일")
+        self.new_file_button.clicked.connect(self.new_file_requested.emit)
+        explorer_row.addWidget(self.new_file_button)
+
+        self.new_folder_button = self._create_header_button(DesignManager.Icons.NEW_FOLDER, "새 폴더")
+        self.new_folder_button.clicked.connect(self.new_folder_requested.emit)
+        explorer_row.addWidget(self.new_folder_button)
+
+        self.refresh_button = self._create_header_button(DesignManager.Icons.REFRESH, "새로고침")
+        self.refresh_button.clicked.connect(self.refresh_requested.emit)
+        explorer_row.addWidget(self.refresh_button)
+
+        header_layout.addLayout(explorer_row)
+
+        # Path label is placed in the navigation row to match the mockup path bar.
         self.path_label = QLabel()
         self.path_label.setFont(DesignManager.get_font("small"))
-        self.path_label.setWordWrap(True)
+        self.path_label.setWordWrap(False)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.path_label.setMinimumHeight(0)
         self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.path_label.setContentsMargins(5, 5, 5, 0)
-        header_layout.addWidget(self.path_label)
+        self.path_label.setObjectName("ExplorerPath")
+        self.path_label.setContentsMargins(0, 0, 0, 0)
         
         layout.addWidget(header_widget)
 
-        # Create navigation toolbar
-        nav_layout = QHBoxLayout()
-        nav_layout.setContentsMargins(5, 2, 5, 2)
+        # Create path bar with navigation toolbar
+        path_bar_widget = QWidget()
+        path_bar_widget.setObjectName("ExplorerPathBar")
+        nav_layout = QHBoxLayout(path_bar_widget)
+        nav_layout.setContentsMargins(16, 8, 16, 12)
+        nav_layout.setSpacing(2)
 
         # Back button
         self.back_button = QToolButton()
@@ -79,6 +180,8 @@ class FileExplorer(QDockWidget):
             self.back_button.setIcon(icon)
         self.back_button.setToolTip("이전 경로")
         self.back_button.setEnabled(False)
+        self.back_button.setFixedSize(20, 20)
+        self.back_button.setAutoRaise(True)
         self.back_button.clicked.connect(self.go_back)
         nav_layout.addWidget(self.back_button)
 
@@ -90,6 +193,8 @@ class FileExplorer(QDockWidget):
             self.forward_button.setIcon(icon)
         self.forward_button.setToolTip("다음 경로")
         self.forward_button.setEnabled(False)
+        self.forward_button.setFixedSize(20, 20)
+        self.forward_button.setAutoRaise(True)
         self.forward_button.clicked.connect(self.go_forward)
         nav_layout.addWidget(self.forward_button)
 
@@ -100,12 +205,37 @@ class FileExplorer(QDockWidget):
         if icon:
             self.up_button.setIcon(icon)
         self.up_button.setToolTip("상위 디렉토리")
+        self.up_button.setFixedSize(20, 20)
+        self.up_button.setAutoRaise(True)
         self.up_button.clicked.connect(self.go_up)
         nav_layout.addWidget(self.up_button)
 
-        nav_layout.addStretch()
+        nav_layout.addSpacing(6)
+        nav_layout.addWidget(self.path_label, 1)
 
-        layout.addLayout(nav_layout)
+        layout.addWidget(path_bar_widget)
+
+        sort_bar_widget = QWidget()
+        sort_bar_widget.setObjectName("ExplorerSortBar")
+        sort_layout = QHBoxLayout(sort_bar_widget)
+        sort_layout.setContentsMargins(8, 0, 8, 0)
+        sort_layout.setSpacing(0)
+        sort_layout.addStretch()
+
+        self.sort_button = QToolButton()
+        self.sort_button.setObjectName("ExplorerSortButton")
+        self.sort_button.setText("↕")
+        self.sort_button.setToolTip("정렬")
+        self.sort_button.setFixedSize(24, 24)
+        self.sort_button.setAutoRaise(True)
+        self.sort_menu = QMenu(self.sort_button)
+        self.sort_menu.addAction("Name", lambda: self.sort_by("name"))
+        self.sort_menu.addAction("Date", lambda: self.sort_by("date"))
+        self.sort_button.setMenu(self.sort_menu)
+        self.sort_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        sort_layout.addWidget(self.sort_button)
+
+        layout.addWidget(sort_bar_widget)
 
         # Create file system model
         self.model = QFileSystemModel()
@@ -118,13 +248,16 @@ class FileExplorer(QDockWidget):
         # Create tree view
         self.tree = QTreeView()
         self.tree.setModel(self.model)
+        self.item_delegate = FileTreeItemDelegate(self.model, self.tree)
+        self.tree.setItemDelegate(self.item_delegate)
 
         # Set Pretendard font for Korean file names
         self.tree.setFont(DesignManager.get_font("body"))
 
         # Configure tree view appearance
         self.tree.setAnimated(True)
-        self.tree.setIndentation(20)
+        self.tree.setIndentation(0)
+        self.tree.setRootIsDecorated(False)
         self.tree.setSortingEnabled(True)
         self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
 
@@ -135,6 +268,7 @@ class FileExplorer(QDockWidget):
 
         # Set column width
         self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.tree.header().hide()
         # self.tree.setColumnWidth(0, 250) # Removed fixed width
 
         # Connect double-click signal
@@ -151,6 +285,18 @@ class FileExplorer(QDockWidget):
 
         # Set default root to user's home directory
         self.set_root_path(str(Path.home()))
+
+    def _create_header_button(self, icon_value, tooltip: str) -> QToolButton:
+        button = QToolButton()
+        button.setObjectName("ExplorerActionButton")
+        icon, text = DesignManager.get_icon_data(icon_value)
+        button.setText(text)
+        if icon:
+            button.setIcon(icon)
+        button.setToolTip(tooltip)
+        button.setFixedSize(24, 24)
+        button.setAutoRaise(True)
+        return button
 
     def _on_double_click(self, index):
         """
@@ -209,7 +355,7 @@ class FileExplorer(QDockWidget):
         # Update path label
         # Inject zero-width space after backslashes to allow wrapping
         display_path = path_str.replace('\\', '\\\u200b')
-        self.path_label.setText(f"📁 {display_path}")
+        self.path_label.setText(display_path)
 
         # Update path label styling to match tree view
         # self.update_path_label_style()  # Removed in favor of global QSS
@@ -241,6 +387,9 @@ class FileExplorer(QDockWidget):
                 self.tree.expand(parent)
                 parent = parent.parent()
 
+            self.item_delegate.set_current_file(str(Path(file_path).resolve()))
+            self.tree.viewport().update()
+
     def get_current_path(self) -> str:
         """
         Get the currently selected path in the tree
@@ -258,6 +407,14 @@ class FileExplorer(QDockWidget):
         current_root = self.model.rootPath()
         self.model.setRootPath("")
         self.model.setRootPath(current_root)
+        self.tree.viewport().update()
+
+    def sort_by(self, field: str):
+        """Sort the tree by file name or modified date."""
+        if field == "date":
+            self.tree.sortByColumn(3, Qt.SortOrder.DescendingOrder)
+        else:
+            self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
 
     def go_back(self):
         """Navigate to previous path in history"""
@@ -292,7 +449,14 @@ class FileExplorer(QDockWidget):
 
     def update_icons(self, color):
         """Update icons with new color"""
-        # Header buttons - Removed
+        for button, icon_value in (
+            (self.new_file_button, DesignManager.Icons.NEW_FILE),
+            (self.new_folder_button, DesignManager.Icons.NEW_FOLDER),
+            (self.refresh_button, DesignManager.Icons.REFRESH),
+        ):
+            icon, _ = DesignManager.get_icon_data(icon_value, color)
+            if icon:
+                button.setIcon(icon)
         
         # Navigation buttons
         icon, _ = DesignManager.get_icon_data(DesignManager.Icons.BACK, color)
@@ -303,6 +467,11 @@ class FileExplorer(QDockWidget):
         
         icon, _ = DesignManager.get_icon_data(DesignManager.Icons.UP, color)
         if icon: self.up_button.setIcon(icon)
+
+    def set_dirty_files(self, dirty_files: set[str]):
+        """Update file paths with unsaved changes."""
+        self.item_delegate.set_dirty_files(dirty_files)
+        self.tree.viewport().update()
 
     def set_empty_state(self):
         """Set file explorer to empty state (no root path)"""

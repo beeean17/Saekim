@@ -5,20 +5,38 @@
     --bg-primary: #0F0F1A;
     --bg-secondary: #1A1A2F;
     --bg-tertiary: #252540;
+    --bg-app: #0F1419;
+    --bg-titlebar: #111822;
+    --bg-sidebar: #111822;
+    --bg-tabs: #131B25;
+    --bg-editor: #0F1419;
+    --bg-preview: #101822;
+    --bg-toolbar: #141D27;
+    --bg-statusbar: #101720;
 
     /* Text colors */
     --text-primary: #E0E0E0;
     --text-secondary: #A0A0B0;
     --text-tertiary: #606070;
+    --text-faint: #4A5563;
 
     /* Border colors */
     --border-color: #00F0FF;
     --border-light: #2A2A40;
+    --border-subtle: #1F2731;
+    --border-soft: #263241;
+    --border-strong: #334155;
 
     /* Accent colors */
-    --accent-color: #00F0FF;
-    --accent-hover: #00BFFF;
-    --accent-light: #00FFFF;
+    --accent: #5EEAD4;
+    --accent-dim: #2DD4BF;
+    --accent-soft: rgba(94, 234, 212, 0.12);
+    --accent-border: rgba(94, 234, 212, 0.35);
+    --accent-color: var(--accent);
+    --accent-hover: var(--accent-dim);
+    --accent-light: var(--accent-soft);
+    --accent-muted: var(--accent-soft);
+    --focus-ring: rgba(94, 234, 212, 0.36);
 
     /* Status colors */
     --success-color: #00FF99;
@@ -34,6 +52,48 @@
     --shadow-sm: 0 0 5px rgba(0, 240, 255, 0.2);
     --shadow-md: 0 0 10px rgba(0, 240, 255, 0.15);
     --shadow-lg: 0 0 20px rgba(0, 240, 255, 0.1);
+}
+
+/* Mockup-exact override */
+:root {
+    --bg-app: #0f1419;
+    --bg-titlebar: #0b0f14;
+    --bg-sidebar: #131820;
+    --bg-tabs: #0f1419;
+    --bg-editor: #161c24;
+    --bg-preview: #1a212b;
+    --bg-toolbar: #131820;
+    --bg-statusbar: #0b0f14;
+    --bg-primary: var(--bg-editor);
+    --bg-secondary: var(--bg-toolbar);
+    --bg-tertiary: #1f2731;
+    --border-subtle: #1f2731;
+    --border-soft: #232c38;
+    --border-strong: #2d3744;
+    --border-color: var(--border-soft);
+    --border-light: var(--border-subtle);
+    --text-primary: #e6edf3;
+    --text-secondary: #9ba8b8;
+    --text-muted: #6a7787;
+    --text-tertiary: var(--text-muted);
+    --text-faint: #4a5563;
+    --accent: #5eead4;
+    --accent-dim: #2dd4bf;
+    --accent-soft: rgba(94, 234, 212, 0.12);
+    --accent-border: rgba(94, 234, 212, 0.35);
+    --accent-color: var(--accent);
+    --accent-hover: var(--accent-dim);
+    --accent-light: var(--accent-soft);
+    --accent-muted: var(--accent-soft);
+    --focus-ring: rgba(94, 234, 212, 0.34);
+    --success-color: #4ade80;
+    --warning-color: #fbbf24;
+    --error-color: #f87171;
+    --success: var(--success-color);
+    --warning: var(--warning-color);
+    --danger: var(--error-color);
+    --code-bg: #0b0f14;
+    --code-text: #f8d77c;
 }
 
 /* Override specific elements for dark theme */

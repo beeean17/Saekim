@@ -5,6 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>새김 - 마크다운 에디터</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
 
     <!-- Stylesheets -->
     <link rel="stylesheet" href="css/app.css">
@@ -73,39 +77,66 @@
         <div class="main-area">
             <!-- Content Area -->
             <div class="content-area">
+                <div class="workspace-toolbar">
+                    <div class="toolbar-section">
+                        <span class="toolbar-label">편집기</span>
+                        <div class="toolbar-group">
+                            <button class="btn-icon" id="btn-undo" title="실행 취소">↩️</button>
+                            <button class="btn-icon" id="btn-redo" title="다시 실행">↪️</button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button class="btn-icon" id="btn-bold" title="굵게">B</button>
+                            <button class="btn-icon" id="btn-italic" title="기울임">I</button>
+                            <button class="btn-icon" id="btn-heading" title="제목">H</button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button class="btn-icon" id="btn-insert-image" title="이미지 삽입">🖼️</button>
+                            <button class="btn-icon" id="btn-insert-table" title="표 삽입">📋</button>
+                            <button class="btn-icon" id="btn-code-block" title="코드 블록">&lt;/&gt;</button>
+                            <button class="btn-icon btn-helper" id="btn-katex-helper" title="KaTeX 수식 도우미">
+                                <span class="helper-icon">fx</span>
+                            </button>
+                            <button class="btn-icon btn-helper" id="btn-mermaid-helper" title="Mermaid 다이어그램 도우미">
+                                <span class="helper-icon">◇</span>
+                            </button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button class="btn-icon" id="btn-find" title="찾기">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
+                                    <line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" />
+                                </svg>
+                            </button>
+                            <button class="btn-icon btn-helper" id="btn-markdown-helper" title="마크다운 문법 도우미">
+                                <span class="helper-icon">MD</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="workspace-toolbar-divider"></div>
+                    <div class="toolbar-section">
+                        <span class="toolbar-label">미리보기</span>
+                        <div class="toolbar-group">
+                            <button class="btn-icon" id="btn-sync-scroll" title="스크롤 동기화" data-active="true">
+                                🔗
+                            </button>
+                            <button class="btn-icon" title="확대">＋</button>
+                            <button class="btn-icon" title="목차">☰</button>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn-icon" title="내보내기">⇩</button>
+                            <button class="btn-icon" id="btn-lock-preview" title="미리보기 잠금" data-active="true">
+                                🔒
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="split-container" id="split-container">
                     <!-- Editor pane -->
                     <div class="pane editor-pane" id="editor-pane">
-                        <div class="pane-header">
-                            <span class="pane-title">편집기</span>
-                            <div class="pane-actions">
-                                <button class="btn-icon" id="btn-undo" title="실행 취소">↩️</button>
-                                <button class="btn-icon" id="btn-redo" title="다시 실행">↪️</button>
-                                <button class="btn-icon" id="btn-insert-image" title="이미지 삽입">🖼️</button>
-                                <button class="btn-icon" id="btn-insert-table" title="표 삽입">📋</button>
-                                <button class="btn-icon btn-helper" id="btn-markdown-helper"
-                                    title="마크다운 문법 도우미">
-                                    <span class="helper-icon">MD</span>
-                                </button>
-                                <button class="btn-icon btn-helper" id="btn-katex-helper"
-                                    title="KaTeX 수식 도우미">
-                                    <span class="helper-icon">fx</span>
-                                </button>
-                                <button class="btn-icon btn-helper" id="btn-mermaid-helper"
-                                    title="Mermaid 다이어그램 도우미">
-                                    <span class="helper-icon">◇</span>
-                                </button>
-                                <button class="btn-icon" id="btn-find" title="찾기">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
-                                        <line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5"
-                                            stroke-linecap="round" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="pane-content">
+                        <div class="pane-content editor-content">
+                            <div id="line-numbers" class="line-numbers" aria-hidden="true">1</div>
                             <div id="highlight-backdrop" class="highlight-backdrop" aria-hidden="true"></div>
                             <textarea id="editor" placeholder="# 여기에 마크다운을 작성하세요..."></textarea>
                         </div>
@@ -116,14 +147,6 @@
 
                     <!-- Preview pane -->
                     <div class="pane preview-pane" id="preview-pane">
-                        <div class="pane-header">
-                            <span class="pane-title">미리보기</span>
-                            <div class="pane-actions">
-                                <button class="btn-icon" id="btn-sync-scroll" title="스크롤 동기화" data-active="true">
-                                    🔗
-                                </button>
-                            </div>
-                        </div>
                         <div class="pane-content" id="preview">
                             <div class="preview-placeholder">
                                 <p>마크다운 미리보기가 여기에 표시됩니다.</p>

@@ -28,9 +28,9 @@ class TitleBar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent
-        self.setFixedHeight(32) # Compact title bar height
+        self.setFixedHeight(38)
         self.setObjectName("TitleBar")
-        self.current_icon_color = "#D0D0D0" # Default color
+        self.current_icon_color = "#E6EDF3" # Default color
 
         # Main layout
         layout = QHBoxLayout(self)
@@ -245,7 +245,7 @@ class TitleBar(QFrame):
         if not self.main_window:
             return
             
-        color = getattr(self, 'current_icon_color', "#D0D0D0")
+        color = getattr(self, 'current_icon_color', "#E6EDF3")
             
         if self.main_window.isMaximized():
             icon, text = DesignManager.get_icon_data(DesignManager.Icons.RESTORE, color)

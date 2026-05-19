@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QStackedWidget, QWidget,
-                              QVBoxLayout, QHBoxLayout, QLabel, QPushButton)
+                              QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+                              QInputDialog, QMessageBox)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtWebChannel import QWebChannel
@@ -73,7 +74,7 @@ class MainWindow(BaseMainWindow):
         self._uses_native_window_frame = sys.platform == "darwin"
 
         # Layout constants (used for overlays/spacing)
-        self._title_bar_height = 0 if self._uses_native_window_frame else 32
+        self._title_bar_height = 0 if self._uses_native_window_frame else 38
 
         # Enable drag visual feedback on entire window
         self.setAcceptDrops(True)
@@ -126,6 +127,8 @@ class MainWindow(BaseMainWindow):
     def showEvent(self, event):
         """Handle window show - start update check after delay"""
         super().showEvent(event)
+        if hasattr(self, 'theme_manager'):
+            self._apply_native_window_appearance(self.theme_manager.get_current_theme_data())
         
         # Only check once per session
         if not self._update_check_done:
@@ -216,9 +219,10 @@ class MainWindow(BaseMainWindow):
 
         # Save preference
         self.theme_manager.save_preference()
+        self._apply_native_window_appearance(theme_data)
 
         # Determine icon color
-        icon_color = "#D0D0D0" if theme_data.get('is_dark', True) else "#555555"
+        icon_color = self._get_theme_icon_color(theme_data)
 
         # Update UI icons
         if hasattr(self, 'title_bar'):
@@ -238,6 +242,50 @@ class MainWindow(BaseMainWindow):
                 # Also update icons in webview
                 icons_json = json.dumps(DesignManager.get_web_icons(icon_color))
                 webview.page().runJavaScript(f"if(window.updateIcons) window.updateIcons({icons_json});")
+
+    def _get_theme_icon_color(self, theme_data: dict) -> str:
+        """Return a readable icon color for the active theme."""
+        return theme_data.get('icon_color') or ("#E6EDF3" if theme_data.get('is_dark', True) else "#4B5563")
+
+    def _apply_native_window_appearance(self, theme_data: dict):
+        """Apply macOS native title bar appearance when Cocoa APIs are available."""
+        if sys.platform != "darwin" or not getattr(self, "_uses_native_window_frame", False):
+            return
+
+        titlebar_color = theme_data.get('native_titlebar_color') or ("#242B36" if theme_data.get('is_dark', True) else "#F6F8FA")
+        is_dark = theme_data.get('is_dark', True)
+
+        def apply_appearance():
+            try:
+                self.winId()
+                from ctypes import c_void_p
+                from AppKit import NSApp, NSColor, NSAppearance
+                import objc
+
+                ns_window = None
+                try:
+                    ns_view = objc.objc_object(c_void_p=int(self.winId()))
+                    ns_window = ns_view.window()
+                except Exception:
+                    ns_window = NSApp.keyWindow() or NSApp.mainWindow()
+
+                if ns_window is None:
+                    return
+
+                color = titlebar_color.lstrip("#")
+                red = int(color[0:2], 16) / 255.0
+                green = int(color[2:4], 16) / 255.0
+                blue = int(color[4:6], 16) / 255.0
+                ns_color = NSColor.colorWithCalibratedRed_green_blue_alpha_(red, green, blue, 1.0)
+
+                appearance_name = "NSAppearanceNameVibrantDark" if is_dark else "NSAppearanceNameAqua"
+                ns_window.setAppearance_(NSAppearance.appearanceNamed_(appearance_name))
+                ns_window.setTitlebarAppearsTransparent_(True)
+                ns_window.setBackgroundColor_(ns_color)
+            except Exception as e:
+                print(f"[WARN] Failed to apply native window appearance: {e}")
+
+        QTimer.singleShot(0, apply_appearance)
 
     def update_welcome_screen_theme(self, theme_data: dict, icon_color: str):
         """Update welcome screen styling via JS"""
@@ -297,6 +345,9 @@ class MainWindow(BaseMainWindow):
         self.file_explorer.file_double_clicked.connect(self.open_file_in_new_tab)
         self.file_explorer.file_dropped.connect(self.open_file_in_new_tab)
         self.file_explorer.pdf_dropped.connect(self._handle_dropped_pdf)
+        self.file_explorer.new_file_requested.connect(self.backend.new_file)
+        self.file_explorer.new_folder_requested.connect(self.create_folder_dialog)
+        self.file_explorer.refresh_requested.connect(self.file_explorer.refresh)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.file_explorer)
 
         # Create tab widget
@@ -323,6 +374,10 @@ class MainWindow(BaseMainWindow):
 
         # Set stacked widget as central widget
         self.setCentralWidget(self.stacked_widget)
+
+        self.status_bar = StatusBar(self)
+        self.setStatusBar(self.status_bar)
+        self.status_bar.reset_for_empty_document()
 
         # Start with tab widget visible
         self.stacked_widget.setCurrentWidget(self.tab_widget)
@@ -357,6 +412,26 @@ class MainWindow(BaseMainWindow):
         # Note: Ctrl+Shift+M (Mermaid helper) is handled in JavaScript (mermaid-helper.js)
 
         print("[OK] Tab interface and file explorer initialized")
+
+    def create_folder_dialog(self):
+        """Create a folder under the current explorer context."""
+        current_path = Path(self.file_explorer.get_current_path() or self.file_explorer.model.rootPath() or str(Path.home()))
+        base_dir = current_path if current_path.is_dir() else current_path.parent
+
+        folder_name, ok = QInputDialog.getText(self, "새 폴더", "폴더 이름:")
+        if not ok or not folder_name.strip():
+            return
+
+        try:
+            new_folder = base_dir / folder_name.strip()
+            new_folder.mkdir(parents=False, exist_ok=False)
+            self.file_explorer.refresh()
+            self.file_explorer.set_root_path(str(base_dir))
+            self.status_bar.show_message(f"폴더 생성됨: {new_folder.name}")
+        except FileExistsError:
+            QMessageBox.warning(self, "새 폴더", "같은 이름의 폴더가 이미 있습니다.")
+        except Exception as e:
+            QMessageBox.critical(self, "새 폴더", f"폴더 생성 중 오류가 발생했습니다:\n{e}")
 
     def _create_welcome_widget(self):
         """Create welcome screen using QWebEngineView"""
@@ -458,7 +533,7 @@ class MainWindow(BaseMainWindow):
             # Inject icons
             # Determine icon color
             theme_data = self.theme_manager.get_current_theme_data()
-            icon_color = "#D0D0D0" if theme_data.get('is_dark', True) else "#555555"
+            icon_color = self._get_theme_icon_color(theme_data)
             icons_json = json.dumps(DesignManager.get_web_icons(icon_color))
             webview.page().runJavaScript(f"if(window.updateIcons) window.updateIcons({icons_json});")
 
@@ -535,6 +610,8 @@ class MainWindow(BaseMainWindow):
 
     def setup_native_menu_bar(self):
         """Setup native macOS menu bar and system window chrome."""
+        if hasattr(self, "setUnifiedTitleAndToolBarOnMac"):
+            self.setUnifiedTitleAndToolBarOnMac(True)
         self.menu_bar = MenuBar(self)
         self.menu_bar.setNativeMenuBar(True)
         self.setMenuBar(self.menu_bar)
@@ -588,18 +665,18 @@ class MainWindow(BaseMainWindow):
                 editorPane.style.display = 'flex';
                 previewPane.style.display = 'flex';
                 resizer.style.display = 'block';
+                editorPane.parentElement.style.gridTemplateColumns = '1fr 4px 1fr';
 
                 if ('{mode}' === 'edit') {{
                     previewPane.style.display = 'none';
                     resizer.style.display = 'none';
-                    editorPane.style.flex = '1';
+                    editorPane.parentElement.style.gridTemplateColumns = '1fr';
                 }} else if ('{mode}' === 'split') {{
-                    editorPane.style.flex = '1';
-                    previewPane.style.flex = '1';
+                    editorPane.parentElement.style.gridTemplateColumns = '1fr 4px 1fr';
                 }} else if ('{mode}' === 'preview') {{
                     editorPane.style.display = 'none';
                     resizer.style.display = 'none';
-                    previewPane.style.flex = '1';
+                    editorPane.parentElement.style.gridTemplateColumns = '1fr';
                 }}
             }})();
         """
@@ -612,6 +689,89 @@ class MainWindow(BaseMainWindow):
             webview = self.webview_cache.get(tab.tab_id)
             if webview:
                 webview.page().runJavaScript(js_code)
+
+    def sync_dirty_files(self):
+        """Push dirty file paths to the sidebar delegate."""
+        if not hasattr(self, 'file_explorer'):
+            return
+
+        dirty_files = {
+            str(tab.file_path.resolve())
+            for tab in self.tab_manager.get_modified_tabs()
+            if tab.file_path
+        }
+        self.file_explorer.set_dirty_files(dirty_files)
+
+    def update_status_for_active_tab(self, content: Optional[str] = None):
+        """Refresh status bar metadata from the active tab."""
+        if not hasattr(self, 'status_bar'):
+            return
+
+        tab = self.tab_manager.get_active_tab()
+        if not tab:
+            self.status_bar.reset_for_empty_document()
+            return
+
+        text = tab.content if content is None else content
+        word_count = len(text.split()) if text else 0
+        char_count = len(text or "")
+        file_path = str(tab.file_path) if tab.file_path else ""
+
+        self.status_bar.update_file_path(file_path)
+        self.status_bar.update_save_status(tab.is_modified, not tab.is_modified)
+        self.status_bar.update_file_meta(
+            self._language_for_path(tab.file_path),
+            self._detect_encoding(tab.file_path),
+            self._detect_eol(text),
+        )
+        self.status_bar.update_word_count(word_count, char_count)
+
+    def on_tab_modified_changed(self):
+        """Synchronize UI after the active tab dirty state changes."""
+        self.sync_dirty_files()
+        tab = self.tab_manager.get_active_tab()
+        if tab and hasattr(self, 'status_bar'):
+            self.status_bar.update_save_status(tab.is_modified, not tab.is_modified)
+
+    def on_tab_saved(self):
+        """Synchronize UI after a save completes."""
+        self.sync_dirty_files()
+        self.update_status_for_active_tab()
+
+    def _language_for_path(self, file_path: Optional[Path]) -> str:
+        if not file_path:
+            return "Markdown"
+
+        suffix = file_path.suffix.lower()
+        if suffix in (".md", ".markdown"):
+            return "Markdown"
+        if suffix == ".txt":
+            return "Plain Text"
+        return suffix.lstrip(".").upper() or "Text"
+
+    def _detect_encoding(self, file_path: Optional[Path]) -> str:
+        if not file_path or not file_path.exists():
+            return "UTF-8"
+
+        try:
+            sample = file_path.read_bytes()[:8192]
+            if not sample:
+                return "UTF-8"
+            try:
+                import chardet
+                detected = chardet.detect(sample)
+                encoding = detected.get("encoding") or "UTF-8"
+                if encoding.lower() in ("ascii", "utf_8"):
+                    return "UTF-8"
+                return encoding.upper()
+            except Exception:
+                sample.decode("utf-8")
+                return "UTF-8"
+        except Exception:
+            return "UTF-8"
+
+    def _detect_eol(self, content: str) -> str:
+        return "CRLF" if "\r\n" in (content or "") else "LF"
 
     def toggle_file_explorer(self):
         """Toggle file explorer visibility"""
@@ -748,6 +908,8 @@ class MainWindow(BaseMainWindow):
             self.setWindowTitle(f"{title} - Saekim")
             if hasattr(self, 'title_bar'):
                 self.title_bar.set_title(f"{title} - Saekim")
+            self.update_status_for_active_tab()
+            self.sync_dirty_files()
 
         # Update file explorer to show current tab's file directory
         if tab and tab.file_path:
@@ -790,6 +952,9 @@ class MainWindow(BaseMainWindow):
             self.setWindowTitle("새김 - 마크다운 에디터")
             if hasattr(self, 'title_bar'):
                 self.title_bar.set_title("새김 - 마크다운 에디터")
+            if hasattr(self, 'status_bar'):
+                self.status_bar.reset_for_empty_document()
+            self.sync_dirty_files()
             # Show welcome screen - check if explorer has path
             has_explorer_path = self.file_explorer.has_root_path()
             self.show_welcome_screen(show_folder_button=not has_explorer_path, hide_explorer=False)
@@ -867,6 +1032,8 @@ class MainWindow(BaseMainWindow):
 
         # Update file explorer root to file's directory
         self.file_explorer.set_root_path(str(Path(file_path).parent))
+        self.update_status_for_active_tab(content)
+        self.sync_dirty_files()
 
     def show_welcome_screen(self, show_folder_button=True, hide_explorer=False):
         """
@@ -883,7 +1050,7 @@ class MainWindow(BaseMainWindow):
         # Apply current theme to welcome screen
         if hasattr(self, 'theme_manager'):
             theme_data = self.theme_manager.THEMES.get(self.theme_manager.current_theme, {})
-            icon_color = "#D0D0D0" if theme_data.get('is_dark', True) else "#555555"
+            icon_color = self._get_theme_icon_color(theme_data)
             self.update_welcome_screen_theme(theme_data, icon_color)
 
         # Switch to welcome screen
@@ -1050,6 +1217,9 @@ class MainWindow(BaseMainWindow):
         else:
             print(f"[WARN] Tab {tab_id[:8]} not in webview cache")
 
+        self.update_status_for_active_tab(new_content)
+        self.sync_dirty_files()
+
     def _on_file_changed_external(self, file_path: str):
         """Handle external file modification - auto-reload content"""
         print(f"[OK] File changed externally: {file_path}")
@@ -1084,6 +1254,10 @@ class MainWindow(BaseMainWindow):
             """
             webview.page().runJavaScript(js_code)
             print(f"[OK] Auto-refresh: tab {tab_id[:8]} content reloaded")
+
+        if self.tab_manager.get_active_tab() and self.tab_manager.get_active_tab().tab_id == tab_id:
+            self.update_status_for_active_tab(new_content)
+        self.sync_dirty_files()
         
         # Re-add to watcher (some systems remove path after change)
         if file_path not in self.file_watcher.files():

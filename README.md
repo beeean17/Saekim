@@ -52,7 +52,7 @@
 - **PDF → Markdown** (PyMuPDF): 텍스트 추출, 표 인식, 제목 계층 구조 보존
 
 ### 🎨 테마 시스템
-5가지 프리셋 테마 제공: **Nord**, **Catppuccin Mocha**, **White**, **Black**, **GitHub Primer**
+4가지 프리셋 테마 제공: **Nord**, **Catppuccin mocha**, **white**, **black**
 - 에디터, 미리보기, 코드 블록 테마 자동 매칭
 
 ### 🔍 찾기 및 바꾸기

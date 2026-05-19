@@ -8,7 +8,12 @@ from PyQt6.QtGui import QFont
 class DesignManager:
     # Font Families
     FONT_FAMILY = "Pretendard, 'Segoe UI', 'Roboto', sans-serif"
-    CODE_FONT_FAMILY = "'Consolas', 'Monaco', monospace"
+    CODE_FONT_FAMILY = "'JetBrains Mono', 'Consolas', 'Monaco', monospace"
+
+    # Shared redesign colors
+    ACCENT = "#5EEAD4"
+    ICON_ACTIVE = "#5EEAD4"
+    ICON_MUTED = "#8B949E"
     
     # App Icon
     APP_ICON = "app_icon.png"
@@ -27,6 +32,7 @@ class DesignManager:
         NEW_FILE = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 9,2 L 11,4 L 11,13 A 1,1 0 0 1 10,14 L 4,14 A 1,1 0 0 1 3,13 L 3,3 A 1,1 0 0 1 4,2 Z" stroke="{color}" stroke-width="1.5" fill="none" stroke-linejoin="round"/><line x1="7" y1="6" x2="7" y2="10" stroke="{color}" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="8" x2="9" y2="8" stroke="{color}" stroke-width="1.5" stroke-linecap="round"/></svg>'
         OPEN_FOLDER = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 2,4 A 1,1 0 0 1 3,3 L 6,3 L 7,4 L 13,4 A 1,1 0 0 1 14,5 L 14,12 A 1,1 0 0 1 13,13 L 3,13 A 1,1 0 0 1 2,12 Z" stroke="{color}" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>'
         OPEN_FILE = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 3,3 L 3,13 A 1,1 0 0 0 4,14 L 12,14 A 1,1 0 0 0 13,13 L 13,5 L 11,3 Z" stroke="{color}" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="M 11,3 L 11,5 L 13,5" stroke="{color}" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="M 8,10 L 8,7 M 6,8 L 8,6 L 10,8" stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        NEW_FOLDER = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 2,5 A 1,1 0 0 1 3,4 L 6,4 L 7,5 L 13,5 A 1,1 0 0 1 14,6 L 14,12 A 1,1 0 0 1 13,13 L 3,13 A 1,1 0 0 1 2,12 Z" stroke="{color}" stroke-width="1.5" fill="none" stroke-linejoin="round"/><line x1="8" y1="7.5" x2="8" y2="11.5" stroke="{color}" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="9.5" x2="10" y2="9.5" stroke="{color}" stroke-width="1.5" stroke-linecap="round"/></svg>'
         IMPORT = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 8,2 L 8,10 M 5,7 L 8,10 L 11,7 M 4,13 L 12,13" stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         EXPORT = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 8,10 L 8,2 M 5,5 L 8,2 L 11,5 M 4,13 L 12,13" stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         IMPORT_EXPORT = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M 8,3 L 8,13 M 5,10 L 8,13 L 11,10" stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -62,13 +68,14 @@ class DesignManager:
 
         # Web Preview
         SYNC_SCROLL = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="7" width="6" height="5" rx="1" stroke="{color}" stroke-width="1.5" fill="none"/><path d="M 5,7 L 5,5 A 3,3 0 0 1 11,5 L 11,7" stroke="{color}" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>'
+        LOCK = '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="8" height="6" rx="1" stroke="{color}" stroke-width="1.5" fill="none"/><path d="M 5.5,7 L 5.5,5.5 A 2.5,2.5 0 0 1 10.5,5.5 L 10.5,7" stroke="{color}" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>'
 
     @staticmethod
     def get_font(style="body"):
         """Get QFont for specific style"""
         font = QFont()
         if style == "code":
-            font.setFamily("Consolas") # Fallback to system mono
+            font.setFamily("JetBrains Mono") # Fallback to system mono through Qt
         else:
             font.setFamily("Pretendard") # Fallback to system sans
             
@@ -83,7 +90,7 @@ class DesignManager:
         return font
 
     @classmethod
-    def get_icon_data(cls, icon_value, color="#D0D0D0"):
+    def get_icon_data(cls, icon_value, color="#E6EDF3"):
         """
         Get icon data for PyQt widgets.
         Returns tuple (QIcon, text).
@@ -134,7 +141,7 @@ class DesignManager:
             return None, icon_value
 
     @staticmethod
-    def get_web_icons(color="#D0D0D0"):
+    def get_web_icons(color="#E6EDF3"):
         """Return dictionary of icons for Web UI injection"""
         from pathlib import Path
         import os
@@ -156,7 +163,8 @@ class DesignManager:
             "btn-mermaid-helper": DesignManager.Icons.MERMAID,
             "btn-font-decrease": DesignManager.Icons.FONT_DEC,
             "btn-font-increase": DesignManager.Icons.FONT_INC,
-            "btn-sync-scroll": DesignManager.Icons.SYNC_SCROLL
+            "btn-sync-scroll": DesignManager.Icons.SYNC_SCROLL,
+            "btn-lock-preview": DesignManager.Icons.LOCK
         }.items():
             # If it looks like an image or SVG XML, wrap in img tag
             lower_val = value.lower()
@@ -166,18 +174,18 @@ class DesignManager:
                 # Encode SVG XML to Base64 data URI
                 b64 = base64.b64encode(value.encode('utf-8')).decode('ascii')
                 data_uri = f"data:image/svg+xml;base64,{b64}"
-                web_icons[key] = f'<img src="{data_uri}" class="toolbar-icon" style="width: 16px; height: 16px;">'
+                web_icons[key] = f'<img src="{data_uri}" class="toolbar-icon" style="width: 18px; height: 18px;">'
             elif lower_val.endswith(('.png', '.svg', '.jpg', '.jpeg')):
                 # Convert to file URI or relative path
                 if os.path.exists(value):
                     abs_path = Path(value).resolve().as_uri()
-                    web_icons[key] = f'<img src="{abs_path}" class="toolbar-icon" style="width: 16px; height: 16px;">'
+                    web_icons[key] = f'<img src="{abs_path}" class="toolbar-icon" style="width: 18px; height: 18px;">'
                 else:
                     # Try resource path
                     # res_path = Path(__file__).parent.parent / 'resources' / 'icons' / value
                     # if res_path.exists():
                     #      abs_path = res_path.resolve().as_uri()
-                    #      web_icons[key] = f'<img src="{abs_path}" class="toolbar-icon" style="width: 16px; height: 16px;">'
+                    #      web_icons[key] = f'<img src="{abs_path}" class="toolbar-icon" style="width: 18px; height: 18px;">'
                     # else:
                     web_icons[key] = value # Fallback
             else:
