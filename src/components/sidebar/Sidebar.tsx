@@ -9,7 +9,9 @@ export function Sidebar() {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const activeFile = useWorkspaceStore(selectActiveFile);
+  const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openFile = useWorkspaceStore((state) => state.openFile);
+  const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
 
@@ -17,7 +19,10 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-head">
         <div className="sidebar-title">탐색기</div>
-        <SidebarActions onOpen={() => void openFile()} onRefresh={() => void refresh()} />
+        <SidebarActions
+          onOpenFolder={() => void openFolder()}
+          onRefresh={() => void refresh()}
+        />
         <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onSelect={setActiveFile} />
         <button className="rail-more" title="더 보기" type="button">
           +{Math.max(0, openFiles.length - 4)}
@@ -26,20 +31,33 @@ export function Sidebar() {
       <PathBar path={rootPath ?? '~/Documents/notes'} />
       <div className="file-tree">
         {tree.map((node) => (
-          <FileTreeNodeView activePath={activeFile?.path ?? null} key={node.id} node={node} onOpen={(path) => void openFile(path)} />
+          <FileTreeNodeView
+            activePath={activeFile?.path ?? null}
+            key={node.id}
+            node={node}
+            openFiles={openFiles}
+            onToggle={toggleFolder}
+            onOpen={(path) => void openFile(path)}
+          />
         ))}
       </div>
     </aside>
   );
 }
 
-function SidebarActions({ onOpen, onRefresh }: { onOpen: () => void; onRefresh: () => void }) {
+function SidebarActions({
+  onOpenFolder,
+  onRefresh,
+}: {
+  onOpenFolder: () => void;
+  onRefresh: () => void;
+}) {
   return (
     <div className="sidebar-actions">
       <IconButton label="새 파일">
         <Icon name="filePlus" />
       </IconButton>
-      <IconButton label="폴더 열기" onClick={onOpen}>
+      <IconButton label="폴더 열기" onClick={onOpenFolder}>
         <Icon name="folder" />
       </IconButton>
       <IconButton label="파일 검색">
@@ -104,23 +122,38 @@ function RailTabs({
 function FileTreeNodeView({
   node,
   activePath,
+  openFiles,
+  onToggle,
   onOpen,
 }: {
   node: FileTreeNode;
   activePath: string | null;
+  openFiles: OpenFile[];
+  onToggle: (path: string) => void;
   onOpen: (path: string) => void;
 }) {
   if (node.type === 'folder') {
     return (
       <div>
-        <div className={`folder ${node.isOpen ? 'open' : ''}`}>
+        <button
+          className={`folder ${node.isOpen ? 'open' : ''}`}
+          type="button"
+          onClick={() => onToggle(node.path)}
+        >
           <Icon name="chevronRight" className="ic chev" />
           <span>{node.name}</span>
-        </div>
+        </button>
         {node.isOpen && node.children ? (
           <div className="file-list">
             {node.children.map((child) => (
-              <FileTreeNodeView activePath={activePath} key={child.id} node={child} onOpen={onOpen} />
+              <FileTreeNodeView
+                activePath={activePath}
+                key={child.id}
+                node={child}
+                openFiles={openFiles}
+                onToggle={onToggle}
+                onOpen={onOpen}
+              />
             ))}
           </div>
         ) : null}
@@ -129,11 +162,13 @@ function FileTreeNodeView({
   }
 
   const active = node.path === activePath;
+  const openFile = openFiles.find((file) => file.path === node.path);
+  const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
   return (
     <button className={`file ${active ? 'current' : ''}`} type="button" onClick={() => onOpen(node.path)}>
       <Icon name="file" />
       <span className="name">{node.name}</span>
-      {active ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(node.modifiedAt)}</span>}
+      {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(node.modifiedAt)}</span>}
     </button>
   );
 }

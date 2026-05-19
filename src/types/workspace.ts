@@ -34,3 +34,8 @@ export interface OpenFilePayload {
   name: string;
   content: string;
 }
+
+export interface FolderPayload {
+  rootPath: string;
+  tree: FileTreeNode[];
+}

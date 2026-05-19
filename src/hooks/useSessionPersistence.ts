@@ -10,6 +10,7 @@ export function useSessionPersistence(): void {
   const saveTimer = useRef<number | null>(null);
 
   const rootPath = useWorkspaceStore((state) => state.rootPath);
+  const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
@@ -56,6 +57,7 @@ export function useSessionPersistence(): void {
         savedAt: new Date().toISOString(),
         workspace: {
           rootPath,
+          tree,
           openFiles,
           activeFileId,
         },
@@ -93,6 +95,7 @@ export function useSessionPersistence(): void {
     syncScroll,
     theme,
     toolbarExpanded,
+    tree,
     viewMode,
   ]);
 }
