@@ -54,6 +54,7 @@ BETA_README.md
 # install packages
 node_modules/
 jspm_packages/
+.vite/
 pkgroot/
 *.pkg
 src-tauri/target/
