@@ -246,6 +246,38 @@
   font-size: 11.5px;
 }
 
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-search .ic {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.sidebar-search input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.sidebar-search input:focus {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
 .nav-mini {
   display: inline-flex;
   width: 22px;
@@ -395,6 +427,7 @@
 
 .app[data-sidebar="collapsed"] .sidebar-title,
 .app[data-sidebar="collapsed"] .sidebar-path,
+.app[data-sidebar="collapsed"] .sidebar-search,
 .app[data-sidebar="collapsed"] .file-tree {
   display: none;
 }
@@ -527,10 +560,10 @@
 }
 
 .editor-pane {
-  display: grid;
+  display: flex;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto auto 1fr;
+  flex-direction: column;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
 }
@@ -665,8 +698,73 @@
   transition: transform 0.2s ease;
 }
 
+.find-bar {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.find-bar .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.find-bar input {
+  width: min(280px, 100%);
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.find-bar input:focus {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
+.find-count {
+  min-width: 44px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.find-bar button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.find-bar button:not(.find-close) {
+  width: 28px;
+}
+
+.find-bar button:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.find-close {
+  padding: 0 9px;
+}
+
 .editor-content {
   display: grid;
+  flex: 1;
   min-height: 0;
   grid-template-columns: 48px 1fr;
   overflow: hidden;

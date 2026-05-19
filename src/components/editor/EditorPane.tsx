@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { exportPreviewToPdf } from '../../lib/pdf/export';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -10,10 +10,13 @@ export function EditorPane() {
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef.current);
+  const findOpen = useUIStore((state) => state.findOpen);
+  const closeFind = useUIStore((state) => state.closeFind);
 
   return (
     <section className="editor-pane">
       <Toolbar textareaRef={textareaRef} />
+      {findOpen ? <FindBar content={activeFile?.content ?? ''} textareaRef={textareaRef} onClose={closeFind} /> : null}
       <EditorContent
         activeLine={cursor.row}
         value={activeFile?.content ?? ''}
@@ -21,6 +24,81 @@ export function EditorPane() {
         textareaRef={textareaRef}
       />
     </section>
+  );
+}
+
+function FindBar({
+  content,
+  textareaRef,
+  onClose,
+}: {
+  content: string;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const matches = useMemo(() => findMatches(content, query), [content, query]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query]);
+
+  useEffect(() => {
+    if (matches.length === 0) return;
+    const match = matches[activeIndex % matches.length];
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.focus();
+    textarea.setSelectionRange(match.start, match.end);
+    inputRef.current?.focus();
+  }, [activeIndex, matches, textareaRef]);
+
+  const go = (direction: 1 | -1) => {
+    if (matches.length === 0) return;
+    setActiveIndex((index) => (index + direction + matches.length) % matches.length);
+  };
+
+  return (
+    <div className="find-bar">
+      <Icon name="search" />
+      <input
+        ref={inputRef}
+        value={query}
+        placeholder="현재 문서 찾기"
+        onChange={(event) => setQuery(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            onClose();
+            textareaRef.current?.focus();
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            go(event.shiftKey ? -1 : 1);
+          }
+        }}
+      />
+      <span className="find-count">
+        {matches.length > 0 ? `${(activeIndex % matches.length) + 1}/${matches.length}` : query ? '0/0' : '-'}
+      </span>
+      <button type="button" title="이전 결과" onClick={() => go(-1)}>
+        <Icon name="chevronUp" />
+      </button>
+      <button type="button" title="다음 결과" onClick={() => go(1)}>
+        <Icon name="chevronDown" />
+      </button>
+      <button className="find-close" type="button" onClick={onClose}>
+        닫기
+      </button>
+    </div>
   );
 }
 
@@ -148,6 +226,23 @@ function EditorContent({
       />
     </div>
   );
+}
+
+function findMatches(content: string, query: string): Array<{ start: number; end: number }> {
+  const needle = query.trim();
+  if (!needle) return [];
+
+  const matches: Array<{ start: number; end: number }> = [];
+  const haystack = content.toLowerCase();
+  const lowerNeedle = needle.toLowerCase();
+  let index = haystack.indexOf(lowerNeedle);
+
+  while (index !== -1) {
+    matches.push({ start: index, end: index + lowerNeedle.length });
+    index = haystack.indexOf(lowerNeedle, index + lowerNeedle.length);
+  }
+
+  return matches;
 }
 
 function insertMarkdown(textarea: HTMLTextAreaElement | null, before: string, after: string): void {
