@@ -10,6 +10,7 @@ interface UIState {
   splitRatio: number;
   syncScroll: boolean;
   findOpen: boolean;
+  settingsOpen: boolean;
   toggleSidebar: () => void;
   toggleToolbarExpanded: () => void;
   setViewMode: (mode: ViewMode) => void;
@@ -17,6 +18,8 @@ interface UIState {
   toggleSyncScroll: () => void;
   openFind: () => void;
   closeFind: () => void;
+  toggleSettings: () => void;
+  closeSettings: () => void;
   restoreUI: (ui: UISession) => void;
 }
 
@@ -29,6 +32,7 @@ export const useUIStore = create<UIState>()(
       splitRatio: 0.5,
       syncScroll: true,
       findOpen: false,
+      settingsOpen: false,
       toggleSidebar: () =>
         set((state) => ({
           sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
@@ -42,7 +46,9 @@ export const useUIStore = create<UIState>()(
       toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
       openFind: () => set({ findOpen: true }),
       closeFind: () => set({ findOpen: false }),
-      restoreUI: (ui) => set({ ...ui, findOpen: false }),
+      toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
+      closeSettings: () => set({ settingsOpen: false }),
+      restoreUI: (ui) => set({ ...ui, findOpen: false, settingsOpen: false }),
     }),
     {
       name: 'saekim-ui',

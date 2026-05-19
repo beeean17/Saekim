@@ -9,7 +9,14 @@ interface SettingsState {
   fontSize: number;
   editorFontFamily: string;
   setTheme: (theme: ThemeName) => void;
+  setFontSize: (fontSize: number) => void;
+  setEditorFontFamily: (editorFontFamily: string) => void;
   restoreSettings: (settings: SettingsSession) => void;
+}
+
+function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
+  document.documentElement.style.setProperty('--editor-font-size', `${fontSize}px`);
+  document.documentElement.style.setProperty('--editor-font-family', editorFontFamily);
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -23,8 +30,21 @@ export const useSettingsStore = create<SettingsState>()(
         void Backend.setTheme(theme);
         set({ theme });
       },
+      setFontSize: (fontSize) => {
+        set((state) => {
+          applyEditorSettings(fontSize, state.editorFontFamily);
+          return { fontSize };
+        });
+      },
+      setEditorFontFamily: (editorFontFamily) => {
+        set((state) => {
+          applyEditorSettings(state.fontSize, editorFontFamily);
+          return { editorFontFamily };
+        });
+      },
       restoreSettings: (settings) => {
         document.documentElement.setAttribute('data-theme', settings.theme);
+        applyEditorSettings(settings.fontSize, settings.editorFontFamily);
         set(settings);
       },
     }),
@@ -38,6 +58,9 @@ export const useSettingsStore = create<SettingsState>()(
       onRehydrateStorage: () => (state) => {
         if (state?.theme) {
           document.documentElement.setAttribute('data-theme', state.theme);
+        }
+        if (state) {
+          applyEditorSettings(state.fontSize, state.editorFontFamily);
         }
       },
     },
