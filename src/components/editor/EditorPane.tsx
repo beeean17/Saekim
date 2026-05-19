@@ -105,6 +105,7 @@ function FindBar({
 function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
+  const openFind = useUIStore((state) => state.openFind);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
 
@@ -129,6 +130,7 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
           <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식" onClick={() => wrapSelection(textareaRef.current, '$', '$')} />
         </div>
         <div className="tool-spacer" />
+        <ToolButton icon="search" tooltip="문서 내 탐색" onClick={openFind} />
         <button className="toolbar-expand" type="button" onClick={() => void exportPreviewToPdf()} title="PDF 내보내기">
           PDF
         </button>

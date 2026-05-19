@@ -5,7 +5,6 @@ import { IconButton } from '../primitives/IconButton';
 
 export function Header() {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
-  const openFind = useUIStore((state) => state.openFind);
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
@@ -32,9 +31,6 @@ export function Header() {
 
       <div className="header-right">
         <ViewToggle />
-        <IconButton className="header-btn" label="찾기" onClick={openFind}>
-          <Icon name="search" />
-        </IconButton>
         <IconButton className="header-btn" label="설정" onClick={toggleSettings}>
           <Icon name="settings" />
         </IconButton>
