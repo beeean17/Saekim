@@ -8,6 +8,7 @@ import './styles/themes/nord.css';
 import './styles/globals.css';
 import './styles/app.css';
 import './styles/preview.css';
+import './styles/print.css';
 import { App } from './App';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
