@@ -24,7 +24,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       theme: 'default',
       fontSize: 13.5,
-      editorFontFamily: 'JetBrains Mono',
+      editorFontFamily: 'Pretendard Variable',
       setTheme: (theme) => {
         document.documentElement.setAttribute('data-theme', theme);
         void Backend.setTheme(theme);
