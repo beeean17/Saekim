@@ -112,12 +112,18 @@
 .preview-content .katex-display {
   margin: 14px 0;
   padding: 14px 18px;
-  overflow-x: auto;
+  overflow: visible;
   color: var(--text-primary);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   text-align: center;
+}
+
+.preview-content .katex-display > .katex {
+  display: inline-block;
+  max-width: 100%;
+  text-align: initial;
 }
 
 .preview-content .mermaid-block {
