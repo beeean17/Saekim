@@ -920,7 +920,6 @@
 }
 
 .line-numbers {
-  padding: var(--editor-padding-y) 10px var(--editor-padding-y) 0;
   overflow: hidden;
   color: var(--text-faint);
   border-right: 1px solid var(--border);
@@ -932,7 +931,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.line-numbers > span {
+.line-number-list {
+  padding: var(--editor-padding-y) 10px var(--editor-padding-y) 0;
+  will-change: transform;
+}
+
+.line-number-list > span {
   display: flex;
   height: var(--editor-row-height);
   align-items: center;
@@ -951,17 +955,17 @@
   line-height: 1.28;
 }
 
-.line-numbers > span.active .line-number-text {
+.line-number-list > span.active .line-number-text {
   color: var(--accent);
   font-weight: 600;
 }
 
-.line-numbers > span.selected .line-number-text {
+.line-number-list > span.selected .line-number-text {
   color: var(--text-primary);
   background: var(--accent-soft);
 }
 
-.line-numbers > span.active.selected .line-number-text {
+.line-number-list > span.active.selected .line-number-text {
   color: var(--accent);
 }
 
