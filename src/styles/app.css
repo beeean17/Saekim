@@ -532,7 +532,19 @@
 }
 
 .app[data-sidebar="collapsed"] .sidebar-actions {
-  display: none;
+  width: 100%;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app[data-sidebar="collapsed"] .sidebar-actions::after {
+  display: block;
+  width: 28px;
+  height: 1px;
+  margin: 6px auto 2px;
+  background: var(--border);
+  content: "";
 }
 
 .app[data-sidebar="collapsed"] .icon-btn {
@@ -562,8 +574,10 @@
   align-items: center;
   flex-direction: column;
   gap: 3px;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 2px 0 20px;
+  scrollbar-width: thin;
 }
 
 .app[data-sidebar="collapsed"] .rail-tabs-wrap::after {
@@ -611,9 +625,7 @@
 .rail-tab-label {
   position: absolute;
   z-index: 20;
-  top: 50%;
   left: 46px;
-  display: none;
   max-width: 260px;
   padding: 6px 8px;
   overflow: hidden;
@@ -628,11 +640,6 @@
   text-overflow: ellipsis;
   transform: translateY(-50%);
   white-space: nowrap;
-}
-
-.rail-tab-wrap:hover .rail-tab-label,
-.rail-tab-wrap:focus-within .rail-tab-label {
-  display: block;
 }
 
 .rail-tab:hover {
