@@ -13,10 +13,12 @@ export function AppShell({ children }: AppShellProps) {
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
+  const editorWidth = useUIStore((state) => state.editorWidth);
   const layoutStyle = {
     '--sidebar-w': `${sidebarWidth}px`,
     '--editor-fr': `${splitRatio}fr`,
     '--preview-fr': `${1 - splitRatio}fr`,
+    '--editor-w': `${editorWidth}px`,
   } as CSSProperties;
 
   return (

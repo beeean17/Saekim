@@ -25,8 +25,9 @@ export function App() {
   const viewMode = useUIStore((state) => state.viewMode);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
+  const editorWidth = useUIStore((state) => state.editorWidth);
   const setSidebarWidth = useUIStore((state) => state.setSidebarWidth);
-  const setSplitRatio = useUIStore((state) => state.setSplitRatio);
+  const setEditorWidth = useUIStore((state) => state.setEditorWidth);
 
   const shortcuts = useMemo(
     () => ({
@@ -73,17 +74,17 @@ export function App() {
     const app = body.closest<HTMLElement>('.app');
     const rect = body.getBoundingClientRect();
     const handleWidth = 12;
-    const remainingWidth = Math.max(1, rect.width - sidebarWidth - handleWidth);
-    let nextRatio = 0.5;
+    const activeSidebarWidth = sidebarMode === 'collapsed' ? 56 : sidebarWidth;
+    const maxEditorWidth = Math.max(280, rect.width - activeSidebarWidth - handleWidth - 280);
+    let nextWidth = clamp(editorWidth, 280, maxEditorWidth);
 
     beginHorizontalDrag({
       onMove: (clientX) => {
-        const editorWidth = clientX - rect.left - sidebarWidth - handleWidth / 2;
-        nextRatio = clamp(editorWidth / remainingWidth, 0.25, 0.75);
-        app?.style.setProperty('--editor-fr', `${nextRatio}fr`);
-        app?.style.setProperty('--preview-fr', `${1 - nextRatio}fr`);
+        const rawWidth = clientX - rect.left - activeSidebarWidth - handleWidth / 2;
+        nextWidth = clamp(rawWidth, 280, maxEditorWidth);
+        app?.style.setProperty('--editor-w', `${nextWidth}px`);
       },
-      onEnd: () => setSplitRatio(nextRatio),
+      onEnd: () => setEditorWidth(nextWidth),
     });
   };
 
