@@ -18,7 +18,6 @@ const PAGE_BREAK_AVOID_SELECTOR = [
   'li',
   'table',
   'img',
-  'svg',
   'pre',
   'blockquote',
   '.shiki',
@@ -193,6 +192,7 @@ function applyBlockPageBreaks(root: HTMLElement): void {
 
 function isPageBreakCandidate(element: HTMLElement): boolean {
   if (element.closest(`.${PAGE_SPACER_CLASS}`)) return false;
+  if (element.closest('.katex')) return false;
 
   const parentAvoidBlock = element.parentElement?.closest(PAGE_BREAK_AVOID_SELECTOR);
   if (!parentAvoidBlock) return true;

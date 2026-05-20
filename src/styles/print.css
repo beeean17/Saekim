@@ -30,7 +30,7 @@
   pointer-events: none;
 }
 
-.pdf-export-root * {
+.pdf-export-root :where(.pdf-cover, .pdf-content, h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, th, td, hr, img, .shiki, .mermaid-block, .pdf-page-spacer) {
   box-sizing: border-box;
 }
 
@@ -170,17 +170,15 @@
   border: 0;
 }
 
-.pdf-export-root img,
-.pdf-export-root svg {
+.pdf-export-root img {
   max-width: 100%;
   height: auto;
 }
 
-.pdf-export-root .katex-display,
-.pdf-export-root .mermaid-block {
+.pdf-export-root .katex-display {
   margin: 16px 0;
   padding: 16px;
-  overflow: hidden;
+  overflow: visible;
   color: #111827 !important;
   background: #ffffff !important;
   border: 1px solid #d8dde8;
@@ -190,9 +188,22 @@
 .pdf-export-root .mermaid-block {
   display: grid;
   place-items: center;
+  margin: 16px 0;
+  padding: 16px;
+  overflow: hidden;
+  color: #111827 !important;
+  background: #ffffff !important;
+  border: 1px solid #d8dde8;
+  border-radius: 6px;
 }
 
 .pdf-export-root .katex,
+.pdf-export-root .katex * {
+  box-sizing: content-box;
+}
+
+.pdf-export-root .katex,
+.pdf-export-root .katex .katex-html,
 .pdf-export-root .katex .base,
 .pdf-export-root .katex .mord,
 .pdf-export-root .katex .mop,
@@ -218,11 +229,11 @@
 .pdf-export-root .katex svg,
 .pdf-export-root .katex svg path {
   fill: #111827 !important;
-  stroke: #111827 !important;
 }
 
 .pdf-export-root .mermaid-block svg {
   max-width: 100%;
+  height: auto;
   background: #ffffff !important;
   color: #111827 !important;
 }
