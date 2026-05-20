@@ -43,7 +43,8 @@ pub fn run() {
             commands::session::load_session,
             commands::session::save_session,
             commands::theme::get_theme,
-            commands::theme::set_theme
+            commands::theme::set_theme,
+            commands::window::set_window_min_size
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Saekim");
