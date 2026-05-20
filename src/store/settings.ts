@@ -14,6 +14,7 @@ interface SettingsState {
 
 function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
   document.documentElement.style.setProperty('--editor-font-size', `${fontSize}px`);
+  document.documentElement.style.setProperty('--editor-line-height-size', `${fontSize * 1.75}px`);
   document.documentElement.style.setProperty('--editor-font-family', editorFontFamily);
 }
 

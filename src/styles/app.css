@@ -904,6 +904,8 @@
 }
 
 .editor-content {
+  --editor-line-height: 1.75;
+
   display: grid;
   flex: 1;
   min-height: 0;
@@ -912,7 +914,7 @@
   background: var(--bg-surface);
   font-family: var(--editor-font-family, var(--font-ui));
   font-size: var(--editor-font-size, 13.5px);
-  line-height: 1.75;
+  line-height: var(--editor-line-height);
 }
 
 .line-numbers {
@@ -921,19 +923,30 @@
   color: var(--text-faint);
   border-right: 1px solid var(--border);
   font-size: var(--editor-font-size, 13.5px);
-  line-height: 1.75;
+  line-height: var(--editor-line-height-size, 23.625px);
   text-align: right;
   user-select: none;
 }
 
 .line-numbers span {
   display: block;
-  height: 1.75em;
+  height: var(--editor-line-height-size, 23.625px);
+  padding-right: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .line-numbers span.active {
   color: var(--accent);
   font-weight: 600;
+}
+
+.line-numbers span.selected {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.line-numbers span.active.selected {
+  color: var(--accent);
 }
 
 .editor-textarea {
@@ -945,7 +958,7 @@
   background: var(--bg-surface);
   font-family: var(--editor-font-family, var(--font-ui));
   font-size: var(--editor-font-size, 13.5px);
-  line-height: 1.75;
+  line-height: var(--editor-line-height-size, 23.625px);
   white-space: pre;
 }
 
