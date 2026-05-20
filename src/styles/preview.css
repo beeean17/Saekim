@@ -2,6 +2,8 @@
   overflow-y: auto;
   padding: 28px 36px 60px;
   color: var(--text-primary);
+  font-family: var(--editor-font-family, var(--font-ui));
+  font-size: var(--editor-font-size, 13.5px);
 }
 
 .preview-content h1 {
@@ -29,7 +31,7 @@
 .preview-content p {
   margin-bottom: 12px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 1em;
   line-height: 1.72;
 }
 
@@ -53,7 +55,7 @@
 .preview-content li {
   margin-bottom: 5px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 1em;
 }
 
 .preview-content li::marker {
