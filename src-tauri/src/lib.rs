@@ -2,8 +2,9 @@ mod app_state;
 mod commands;
 
 use app_state::AppState;
+use std::path::PathBuf;
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
@@ -17,13 +18,18 @@ const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
 const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
+const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .setup(|app| {
+            queue_open_files(app.handle(), startup_markdown_args());
+            Ok(())
+        })
         .menu(build_menu)
         .on_menu_event(|app, event| {
             let event_name = match event.id().as_ref() {
@@ -49,12 +55,55 @@ pub fn run() {
             commands::file::read_folder_children,
             commands::file::save_file,
             commands::file::save_file_as,
+            commands::file::take_pending_open_files,
             commands::session::load_session,
             commands::session::save_session,
             commands::window::set_window_min_size
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Saekim");
+        .build(tauri::generate_context!())
+        .expect("failed to build Saekim");
+
+    app.run(|app, event| {
+        if let tauri::RunEvent::Opened { urls } = event {
+            let paths = urls
+                .into_iter()
+                .filter_map(|url| url.to_file_path().ok())
+                .filter(is_markdown_path)
+                .map(|path| path.to_string_lossy().to_string())
+                .collect();
+
+            queue_open_files(app, paths);
+        }
+    });
+}
+
+fn startup_markdown_args() -> Vec<String> {
+    std::env::args_os()
+        .skip(1)
+        .map(PathBuf::from)
+        .filter(is_markdown_path)
+        .map(|path| path.to_string_lossy().to_string())
+        .collect()
+}
+
+fn is_markdown_path(path: &PathBuf) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "md" | "markdown"))
+        .unwrap_or(false)
+}
+
+fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
+    if paths.is_empty() {
+        return;
+    }
+
+    let state = app.state::<AppState>();
+    if let Ok(mut pending) = state.pending_open_files.lock() {
+        pending.extend(paths.iter().cloned());
+    }
+
+    let _ = app.emit(EVENT_OPEN_EXTERNAL_FILES, paths);
 }
 
 fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {

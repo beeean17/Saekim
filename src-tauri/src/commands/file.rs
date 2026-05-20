@@ -103,6 +103,14 @@ pub fn import_pdf(path: String) -> CommandResult<OpenFilePayload> {
 }
 
 #[tauri::command]
+pub fn take_pending_open_files(state: tauri::State<AppState>) -> CommandResult<Vec<String>> {
+    match state.pending_open_files.lock() {
+        Ok(mut pending) => ok(pending.drain(..).collect()),
+        Err(error) => fail(format!("failed to read pending open files: {error}")),
+    }
+}
+
+#[tauri::command]
 pub fn read_folder(path: String) -> CommandResult<FolderPayload> {
     match read_folder_payload(PathBuf::from(path)) {
         Ok(payload) => ok(payload),

@@ -3,6 +3,7 @@ import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
 import { Sidebar } from './components/sidebar/Sidebar';
+import { useExternalFileOpen } from './hooks/useExternalFileOpen';
 import { useNativeMenuCommands } from './hooks/useNativeMenuCommands';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useResponsiveSplitWidth } from './hooks/useResponsiveSplitWidth';
@@ -53,6 +54,7 @@ export function App() {
 
   useShortcuts(shortcuts);
   useNativeMenuCommands(shortcuts);
+  useExternalFileOpen(openFile);
   useScrollSync(editorRef, previewRef, syncScroll && viewMode === 'split');
   useResponsiveSplitWidth(bodyRef, viewMode, sidebarMode, sidebarWidth, editorWidth);
   useWindowSizeConstraints(viewMode, sidebarMode, sidebarWidth);

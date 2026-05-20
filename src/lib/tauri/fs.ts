@@ -19,6 +19,11 @@ export async function readFile(path: string): Promise<OpenFilePayload> {
   return invokeCommand<OpenFilePayload>('read_file', { path });
 }
 
+export async function takePendingOpenFiles(): Promise<string[]> {
+  if (!isTauriRuntime()) return [];
+  return invokeCommand<string[]>('take_pending_open_files');
+}
+
 export async function readFolder(path: string): Promise<FolderPayload> {
   return invokeCommand<FolderPayload>('read_folder', { path });
 }
