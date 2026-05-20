@@ -207,6 +207,53 @@ pub async fn save_file_as(
     }
 }
 
+#[tauri::command]
+pub async fn pick_pdf_export_path(
+    app: AppHandle,
+    suggested_name: String,
+) -> CommandResult<Option<String>> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        let selected = app
+            .dialog()
+            .file()
+            .add_filter("PDF", &["pdf"])
+            .set_file_name(&suggested_name)
+            .blocking_save_file();
+
+        let Some(path) = selected else {
+            return Ok(None);
+        };
+
+        let mut path = path.into_path().unwrap_or_default();
+        let is_pdf = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|extension| extension.eq_ignore_ascii_case("pdf"))
+            .unwrap_or(false);
+        if !is_pdf {
+            path.set_extension("pdf");
+        }
+
+        Ok(Some(path.to_string_lossy().to_string()))
+    })
+    .await;
+
+    match selected {
+        Ok(Ok(Some(path))) => ok(Some(path)),
+        Ok(Ok(None)) => ok(None),
+        Ok(Err(error)) => fail(error),
+        Err(error) => fail(format!("failed to run PDF save dialog: {error}")),
+    }
+}
+
+#[tauri::command]
+pub fn write_pdf_export(path: String, bytes: Vec<u8>) -> CommandResult<String> {
+    match fs::write(&path, bytes) {
+        Ok(()) => ok(path),
+        Err(error) => fail(format!("failed to save PDF: {error}")),
+    }
+}
+
 fn read_file_payload(path: PathBuf) -> Result<OpenFilePayload, String> {
     let content =
         fs::read_to_string(&path).map_err(|error| format!("failed to read file: {error}"))?;

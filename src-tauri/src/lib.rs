@@ -49,6 +49,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::file::open_file_dialog,
             commands::file::open_folder_dialog,
+            commands::file::pick_pdf_export_path,
             commands::file::import_pdf,
             commands::file::read_file,
             commands::file::read_folder,
@@ -56,9 +57,9 @@ pub fn run() {
             commands::file::save_file,
             commands::file::save_file_as,
             commands::file::take_pending_open_files,
+            commands::file::write_pdf_export,
             commands::session::load_session,
             commands::session::save_session,
-            commands::window::print_current_webview,
             commands::window::set_window_min_size
         ])
         .build(tauri::generate_context!())
