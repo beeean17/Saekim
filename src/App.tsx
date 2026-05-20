@@ -53,9 +53,16 @@ export function App() {
     const body = bodyRef.current;
     if (!body || sidebarMode === 'collapsed') return;
     event.preventDefault();
-    beginDrag(() => {
-      const rect = body.getBoundingClientRect();
-      return (nextEvent) => setSidebarWidth(nextEvent.clientX - rect.left);
+    const app = body.closest<HTMLElement>('.app');
+    const rect = body.getBoundingClientRect();
+    let nextWidth = sidebarWidth;
+
+    beginHorizontalDrag({
+      onMove: (clientX) => {
+        nextWidth = clamp(clientX - rect.left, 180, 420);
+        app?.style.setProperty('--sidebar-w', `${nextWidth}px`);
+      },
+      onEnd: () => setSidebarWidth(nextWidth),
     });
   };
 
@@ -63,14 +70,20 @@ export function App() {
     const body = bodyRef.current;
     if (!body || viewMode !== 'split') return;
     event.preventDefault();
-    beginDrag(() => {
-      const rect = body.getBoundingClientRect();
-      const handleWidth = 12;
-      const remainingWidth = Math.max(1, rect.width - sidebarWidth - handleWidth);
-      return (nextEvent) => {
-        const editorWidth = nextEvent.clientX - rect.left - sidebarWidth - handleWidth / 2;
-        setSplitRatio(editorWidth / remainingWidth);
-      };
+    const app = body.closest<HTMLElement>('.app');
+    const rect = body.getBoundingClientRect();
+    const handleWidth = 12;
+    const remainingWidth = Math.max(1, rect.width - sidebarWidth - handleWidth);
+    let nextRatio = 0.5;
+
+    beginHorizontalDrag({
+      onMove: (clientX) => {
+        const editorWidth = clientX - rect.left - sidebarWidth - handleWidth / 2;
+        nextRatio = clamp(editorWidth / remainingWidth, 0.25, 0.75);
+        app?.style.setProperty('--editor-fr', `${nextRatio}fr`);
+        app?.style.setProperty('--preview-fr', `${1 - nextRatio}fr`);
+      },
+      onEnd: () => setSplitRatio(nextRatio),
     });
   };
 
@@ -107,19 +120,45 @@ function PaneResizer({
   );
 }
 
-function beginDrag(createMoveHandler: () => (event: PointerEvent) => void): void {
-  const onMove = createMoveHandler();
+function beginHorizontalDrag({
+  onMove,
+  onEnd,
+}: {
+  onMove: (clientX: number) => void;
+  onEnd: () => void;
+}): void {
+  let animationFrame = 0;
+  let latestClientX: number | null = null;
   const previousCursor = document.body.style.cursor;
   const previousUserSelect = document.body.style.userSelect;
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
 
+  const flush = () => {
+    animationFrame = 0;
+    if (latestClientX === null) return;
+    onMove(latestClientX);
+  };
+  const onPointerMove = (event: PointerEvent) => {
+    latestClientX = event.clientX;
+    if (animationFrame) return;
+    animationFrame = window.requestAnimationFrame(flush);
+  };
   const stop = () => {
-    window.removeEventListener('pointermove', onMove);
+    if (animationFrame) {
+      window.cancelAnimationFrame(animationFrame);
+      flush();
+    }
+    window.removeEventListener('pointermove', onPointerMove);
     document.body.style.cursor = previousCursor;
     document.body.style.userSelect = previousUserSelect;
+    onEnd();
   };
 
-  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', stop, { once: true });
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
