@@ -247,29 +247,39 @@
   width: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: var(--sidebar-w) 6px minmax(280px, var(--editor-w)) 6px minmax(0, 1fr);
+  grid-template-columns:
+    var(--sidebar-w)
+    var(--pane-resizer-w)
+    minmax(var(--pane-min-w), min(var(--editor-w), calc(100% - var(--sidebar-w) - var(--pane-resizer-w) - var(--pane-resizer-w) - var(--pane-min-w))))
+    var(--pane-resizer-w)
+    minmax(var(--pane-min-w), 1fr);
   background: var(--bg-app);
   overflow: hidden;
 }
 
 .app[data-sidebar="collapsed"] .body {
-  grid-template-columns: var(--sidebar-w-collapsed) 0 minmax(280px, var(--editor-w)) 6px minmax(0, 1fr);
+  grid-template-columns:
+    var(--sidebar-w-collapsed)
+    0
+    minmax(var(--pane-min-w), min(var(--editor-w), calc(100% - var(--sidebar-w-collapsed) - var(--pane-resizer-w) - var(--pane-min-w))))
+    var(--pane-resizer-w)
+    minmax(var(--pane-min-w), 1fr);
 }
 
 .app[data-view="edit"] .body {
-  grid-template-columns: var(--sidebar-w) 6px minmax(0, 1fr) 0 0;
+  grid-template-columns: var(--sidebar-w) var(--pane-resizer-w) minmax(var(--pane-min-w), 1fr) 0 0;
 }
 
 .app[data-view="preview"] .body {
-  grid-template-columns: var(--sidebar-w) 6px 0 0 minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w) var(--pane-resizer-w) 0 0 minmax(var(--pane-min-w), 1fr);
 }
 
 .app[data-sidebar="collapsed"][data-view="edit"] .body {
-  grid-template-columns: var(--sidebar-w-collapsed) 0 minmax(0, 1fr) 0 0;
+  grid-template-columns: var(--sidebar-w-collapsed) 0 minmax(var(--pane-min-w), 1fr) 0 0;
 }
 
 .app[data-sidebar="collapsed"][data-view="preview"] .body {
-  grid-template-columns: var(--sidebar-w-collapsed) 0 0 0 minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w-collapsed) 0 0 0 minmax(var(--pane-min-w), 1fr);
 }
 
 .pane-resizer {
@@ -1040,16 +1050,23 @@
 
 @media (max-width: 860px) {
   .body,
-  .app[data-sidebar="collapsed"] .body,
-  .app[data-view="edit"] .body,
-  .app[data-view="preview"] .body,
-  .app[data-sidebar="collapsed"][data-view="edit"] .body,
-  .app[data-sidebar="collapsed"][data-view="preview"] .body {
-    grid-template-columns: var(--sidebar-w-collapsed) 0 minmax(0, 1fr) 0 0;
+  .app[data-sidebar="collapsed"] .body {
+    grid-template-columns:
+      var(--sidebar-w-collapsed)
+      0
+      minmax(var(--pane-min-w), min(var(--editor-w), calc(100% - var(--sidebar-w-collapsed) - var(--pane-resizer-w) - var(--pane-min-w))))
+      var(--pane-resizer-w)
+      minmax(var(--pane-min-w), 1fr);
   }
 
-  .preview-pane {
-    display: none;
+  .app[data-view="edit"] .body,
+  .app[data-sidebar="collapsed"][data-view="edit"] .body {
+    grid-template-columns: var(--sidebar-w-collapsed) 0 minmax(var(--pane-min-w), 1fr) 0 0;
+  }
+
+  .app[data-view="preview"] .body,
+  .app[data-sidebar="collapsed"][data-view="preview"] .body {
+    grid-template-columns: var(--sidebar-w-collapsed) 0 0 0 minmax(var(--pane-min-w), 1fr);
   }
 
   .pane-resizer {

@@ -7,6 +7,7 @@ import { useNativeMenuCommands } from './hooks/useNativeMenuCommands';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
+import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { exportPreviewToPdf } from './lib/pdf/export';
 import { useUIStore } from './store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from './store/workspace';
@@ -48,6 +49,7 @@ export function App() {
   useShortcuts(shortcuts);
   useNativeMenuCommands(shortcuts);
   useScrollSync(editorRef, previewRef, syncScroll && viewMode === 'split');
+  useWindowSizeConstraints(viewMode, sidebarMode, sidebarWidth);
   useSessionPersistence();
 
   const startSidebarResize = (event: React.PointerEvent<HTMLDivElement>) => {
