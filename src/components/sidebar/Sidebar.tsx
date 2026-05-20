@@ -1,20 +1,21 @@
 import { useMemo, useState } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import type { FileTreeNode, OpenFile } from '../../types/workspace';
+import type { FileTreeNode, OpenFile, RecentFile } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
+
+const maxCollapsedRecentFiles = 12;
 
 export function Sidebar() {
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
+  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openFile = useWorkspaceStore((state) => state.openFile);
   const createFile = useWorkspaceStore((state) => state.createFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
-  const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
-  const closeFile = useWorkspaceStore((state) => state.closeFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
@@ -30,10 +31,17 @@ export function Sidebar() {
           onSearch={() => setFileSearchOpen((open) => !open)}
           onRefresh={() => void refresh()}
         />
-        <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onClose={closeFile} onSelect={setActiveFile} />
-        <button className="rail-more" title="더 보기" type="button">
-          +{Math.max(0, openFiles.length - 4)}
-        </button>
+        <RecentRailFiles
+          activePath={activeFile?.path ?? null}
+          openFiles={openFiles}
+          recentFiles={recentFiles}
+          onOpen={(path) => void openFile(path)}
+        />
+        {recentFiles.length > maxCollapsedRecentFiles ? (
+          <button className="rail-more" title={`${recentFiles.length - maxCollapsedRecentFiles}개 더 있음`} type="button">
+            +{recentFiles.length - maxCollapsedRecentFiles}
+          </button>
+        ) : null}
       </div>
       {fileSearchOpen ? (
         <div className="sidebar-search">
@@ -116,40 +124,38 @@ function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
   });
 }
 
-function RailTabs({
+function RecentRailFiles({
+  recentFiles,
   openFiles,
-  activeFileId,
-  onClose,
-  onSelect,
+  activePath,
+  onOpen,
 }: {
+  recentFiles: RecentFile[];
   openFiles: OpenFile[];
-  activeFileId: string | null;
-  onClose: (id: string) => void;
-  onSelect: (id: string) => void;
+  activePath: string | null;
+  onOpen: (path: string) => void;
 }) {
   return (
     <div className="rail-tabs-wrap">
       <div className="rail-tabs">
-        {openFiles.map((file) => {
-          const dirty = file.content !== file.savedContent;
-          const close = () => {
-            if (dirty && !window.confirm(`${file.name} 파일의 저장되지 않은 변경사항을 버리고 닫을까요?`)) return;
-            onClose(file.id);
-          };
+        {recentFiles.slice(0, maxCollapsedRecentFiles).map((file) => {
+          const openFile = openFiles.find((candidate) => candidate.path === file.path);
+          const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
           return (
-            <div className="rail-tab-wrap" key={file.id}>
+            <div className="rail-tab-wrap" key={file.path}>
               <button
-                className={`rail-tab ${file.id === activeFileId ? 'active' : ''}`}
+                aria-label={`${file.name}${dirty ? ', 수정 중' : ''}`}
+                className={`rail-tab ${file.path === activePath ? 'active' : ''}`}
                 title={`${file.name}${dirty ? '  ●  수정 중' : ''}`}
                 type="button"
-                onClick={() => onSelect(file.id)}
+                onClick={() => onOpen(file.path)}
               >
                 <Icon name="file" />
                 {dirty ? <span className="dirty-dot" /> : null}
               </button>
-              <button className="rail-tab-close" title={`${file.name} 닫기`} type="button" onClick={close}>
-                x
-              </button>
+              <span className="rail-tab-label" role="tooltip">
+                {file.name}
+              </span>
             </div>
           );
         })}

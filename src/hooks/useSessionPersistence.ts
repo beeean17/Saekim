@@ -70,6 +70,7 @@ export function useSessionPersistence(): void {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
+  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
 
@@ -127,6 +128,7 @@ export function useSessionPersistence(): void {
           rootPath,
           tree,
           openFiles,
+          recentFiles,
           activeFileId,
         },
         ui: {
@@ -160,6 +162,7 @@ export function useSessionPersistence(): void {
     fontSize,
     loaded,
     openFiles,
+    recentFiles,
     rootPath,
     sidebarMode,
     sidebarWidth,

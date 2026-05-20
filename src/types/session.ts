@@ -1,10 +1,11 @@
-import type { FileTreeNode, OpenFile, SidebarMode, ThemeName, ViewMode } from './workspace';
+import type { FileTreeNode, OpenFile, RecentFile, SidebarMode, ThemeName, ViewMode } from './workspace';
 
 export interface WorkspaceSession {
   rootPath: string | null;
   tree: FileTreeNode[];
   openFiles: OpenFile[];
   activeFileId: string | null;
+  recentFiles?: RecentFile[];
 }
 
 export interface UISession {
