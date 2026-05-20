@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import type { ThemeName, ViewMode } from '../../types/workspace';
@@ -18,6 +18,7 @@ const viewModes: Array<{ id: ViewMode; label: string }> = [
 const fontFamilies = ['JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'ui-monospace'];
 
 export function SettingsPanel() {
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const open = useUIStore((state) => state.settingsOpen);
   const close = useUIStore((state) => state.closeSettings);
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
@@ -42,15 +43,24 @@ export function SettingsPanel() {
         close();
       }
     };
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Node && panelRef.current?.contains(target)) return;
+      close();
+    };
 
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('click', onClick);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('click', onClick);
+    };
   }, [close, open]);
 
   if (!open) return null;
 
   return (
-    <div className="settings-popover" role="dialog" aria-label="설정">
+    <div className="settings-popover" role="dialog" aria-label="설정" ref={panelRef}>
       <div className="settings-head">
         <div>
           <div className="settings-title">설정</div>
