@@ -193,7 +193,22 @@ function EditorContent({
   const lineNumbersRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef(0);
   const latestScrollTopRef = useRef(0);
+  const [selectionLines, setSelectionLines] = useState<{ start: number; end: number } | null>(null);
   const lineCount = Math.max(1, value.split('\n').length);
+  const updateSelectionLines = (textarea: HTMLTextAreaElement) => {
+    const start = Math.min(textarea.selectionStart, textarea.selectionEnd);
+    const end = Math.max(textarea.selectionStart, textarea.selectionEnd);
+
+    if (start === end) {
+      setSelectionLines(null);
+      return;
+    }
+
+    const selectedEnd = Math.max(start, end - 1);
+    const startLine = getLineNumberAtIndex(textarea.value, start);
+    const endLine = getLineNumberAtIndex(textarea.value, selectedEnd);
+    setSelectionLines({ start: startLine, end: Math.max(startLine, endLine) });
+  };
   const syncLineNumbers = (scrollTop: number) => {
     latestScrollTopRef.current = scrollTop;
     if (scrollFrameRef.current) return;
@@ -215,11 +230,15 @@ function EditorContent({
   return (
     <div className="editor-content">
       <div className="line-numbers" ref={lineNumbersRef}>
-        {Array.from({ length: lineCount }, (_, index) => (
-          <span className={index + 1 === activeLine ? 'active' : ''} key={index}>
-            {index + 1}
-          </span>
-        ))}
+        {Array.from({ length: lineCount }, (_, index) => {
+          const line = index + 1;
+          const selected = Boolean(selectionLines && line >= selectionLines.start && line <= selectionLines.end);
+          return (
+            <span className={`${line === activeLine ? 'active' : ''} ${selected ? 'selected' : ''}`.trim()} key={index}>
+              {line}
+            </span>
+          );
+        })}
       </div>
       <textarea
         ref={textareaRef}
@@ -227,10 +246,27 @@ function EditorContent({
         value={value}
         spellCheck={false}
         onScroll={(event) => syncLineNumbers(event.currentTarget.scrollTop)}
-        onChange={(event) => onChange(event.currentTarget.value)}
+        onSelect={(event) => updateSelectionLines(event.currentTarget)}
+        onKeyUp={(event) => updateSelectionLines(event.currentTarget)}
+        onMouseUp={(event) => updateSelectionLines(event.currentTarget)}
+        onChange={(event) => {
+          onChange(event.currentTarget.value);
+          updateSelectionLines(event.currentTarget);
+        }}
       />
     </div>
   );
+}
+
+function getLineNumberAtIndex(text: string, index: number): number {
+  let line = 1;
+  const clampedIndex = Math.max(0, Math.min(index, text.length));
+
+  for (let i = 0; i < clampedIndex; i += 1) {
+    if (text.charCodeAt(i) === 10) line += 1;
+  }
+
+  return line;
 }
 
 function findMatches(content: string, query: string): Array<{ start: number; end: number }> {
