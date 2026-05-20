@@ -84,7 +84,7 @@
   border-radius: var(--radius);
   font-family: var(--font-mono);
   font-size: 12.5px;
-  line-height: 1.42;
+  line-height: 1.08;
 }
 
 .preview-content .shiki::before {
@@ -115,7 +115,7 @@
 .preview-content .shiki .line {
   display: block;
   padding: 0 16px 0 52px;
-  line-height: 1.42;
+  line-height: 1.08;
 }
 
 .preview-content .shiki .line::before {
