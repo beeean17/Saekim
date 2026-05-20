@@ -1,55 +1,114 @@
-import { invoke } from '@tauri-apps/api/core';
+import { pickPdfExportPath, writePdfExport } from '../tauri/fs';
 import { isTauriRuntime } from '../tauri/invoke';
 
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
-const EXPORTING_CLASS = 'pdf-exporting';
+const A4_WIDTH_PX = 794;
+const A4_WIDTH_PT = 595.28;
+const A4_HEIGHT_PT = 841.89;
 
-export async function exportPreviewToPdf(): Promise<void> {
+interface PdfExportOptions {
+  suggestedName?: string;
+  title?: string;
+}
+
+export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promise<void> {
   const preview = document.querySelector<HTMLElement>('.preview-content:not(.pdf-export-root)');
   if (!preview) return;
 
-  const printRoot = createPrintRoot(preview);
-  document.body.appendChild(printRoot);
-  document.body.classList.add(EXPORTING_CLASS);
+  const title = options.title || getDocumentTitle(preview, options.suggestedName);
+  const suggestedName = toPdfFileName(options.suggestedName || title);
+  const targetPath = await pickExportTarget(suggestedName);
+  if (isTauriRuntime() && !targetPath) return;
 
-  const cleanup = createPrintCleanup(printRoot);
-  window.addEventListener('afterprint', cleanup, { once: true });
+  const exportRoot = createPdfTemplate(preview, title);
+  document.body.appendChild(exportRoot);
 
   try {
-    await waitForPrintAssets(printRoot);
-    await openPrintDialog();
-    window.setTimeout(cleanup, 60_000);
-  } catch (error) {
-    cleanup();
-    throw error;
+    await waitForTemplateAssets(exportRoot);
+    const pdfBytes = await renderTemplateToPdf(exportRoot);
+    await savePdfBytes(pdfBytes, suggestedName, targetPath);
+  } finally {
+    exportRoot.remove();
   }
 }
 
-function createPrintRoot(preview: HTMLElement): HTMLElement {
+function createPdfTemplate(preview: HTMLElement, title: string): HTMLElement {
   document.querySelectorAll(`.${EXPORT_ROOT_CLASS}`).forEach((node) => node.remove());
 
-  const printRoot = document.createElement('main');
-  printRoot.className = `${EXPORT_ROOT_CLASS} preview-content`;
-  printRoot.innerHTML = preview.innerHTML;
+  const exportRoot = document.createElement('article');
+  exportRoot.className = `${EXPORT_ROOT_CLASS} preview-content`;
+  exportRoot.setAttribute('aria-hidden', 'true');
+  exportRoot.innerHTML = `
+    <header class="pdf-cover">
+      <p class="pdf-kicker">Saekim Markdown Export</p>
+      <h1>${escapeHtml(title)}</h1>
+    </header>
+    <main class="pdf-content">${preview.innerHTML}</main>
+  `;
 
-  return printRoot;
+  return exportRoot;
 }
 
-function createPrintCleanup(printRoot: HTMLElement): () => void {
-  let cleaned = false;
+async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array> {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+  const canvas = await html2canvas(exportRoot, {
+    backgroundColor: '#ffffff',
+    scale: Math.min(2, window.devicePixelRatio || 1),
+    useCORS: true,
+    windowWidth: A4_WIDTH_PX,
+  });
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
+  const pageHeightPx = Math.floor((canvas.width * A4_HEIGHT_PT) / A4_WIDTH_PT);
+  const pageCanvas = document.createElement('canvas');
+  const pageContext = pageCanvas.getContext('2d');
 
-  const cleanup = () => {
-    if (cleaned) return;
-    cleaned = true;
-    window.removeEventListener('afterprint', cleanup);
-    printRoot.remove();
-    document.body.classList.remove(EXPORTING_CLASS);
-  };
+  if (!pageContext) {
+    throw new Error('PDF canvas context unavailable');
+  }
 
-  return cleanup;
+  pageCanvas.width = canvas.width;
+
+  for (let offsetY = 0, pageIndex = 0; offsetY < canvas.height; offsetY += pageHeightPx, pageIndex += 1) {
+    const sliceHeight = Math.min(pageHeightPx, canvas.height - offsetY);
+    pageCanvas.height = sliceHeight;
+    pageContext.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+    pageContext.drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, pageCanvas.width, sliceHeight);
+
+    if (pageIndex > 0) {
+      pdf.addPage();
+    }
+
+    const sliceHeightPt = (sliceHeight * A4_WIDTH_PT) / canvas.width;
+    pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, A4_WIDTH_PT, sliceHeightPt);
+  }
+
+  return new Uint8Array(pdf.output('arraybuffer'));
 }
 
-async function waitForPrintAssets(root: HTMLElement): Promise<void> {
+async function pickExportTarget(suggestedName: string): Promise<string | null> {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+
+  return pickPdfExportPath(suggestedName);
+}
+
+async function savePdfBytes(bytes: Uint8Array, suggestedName: string, targetPath: string | null): Promise<void> {
+  if (targetPath) {
+    await writePdfExport(targetPath, Array.from(bytes));
+    return;
+  }
+
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const url = URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = suggestedName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function waitForTemplateAssets(root: HTMLElement): Promise<void> {
   const fontsReady = document.fonts?.ready ?? Promise.resolve();
   const images = Array.from(root.querySelectorAll('img')).map((image) => {
     if (image.complete) return Promise.resolve();
@@ -63,11 +122,26 @@ async function waitForPrintAssets(root: HTMLElement): Promise<void> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
-async function openPrintDialog(): Promise<void> {
-  if (isTauriRuntime()) {
-    await invoke('print_current_webview');
-    return;
-  }
+function getDocumentTitle(preview: HTMLElement, suggestedName?: string): string {
+  const heading = preview.querySelector('h1, h2, h3')?.textContent?.trim();
+  if (heading) return heading;
 
-  window.print();
+  const name = suggestedName?.trim();
+  if (name) return name.replace(/\.(md|markdown|txt)$/i, '');
+
+  return 'Document';
+}
+
+function toPdfFileName(value: string): string {
+  const baseName = value.trim().replace(/\.(md|markdown|txt|pdf)$/i, '') || 'document';
+  return `${baseName}.pdf`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

@@ -45,3 +45,14 @@ export async function saveFileAs(content: string, suggestedName: string): Promis
   }
   return invokeCommand<string | null>('save_file_as', { content, suggestedName });
 }
+
+export async function pickPdfExportPath(suggestedName: string): Promise<string | null> {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+  return invokeCommand<string | null>('pick_pdf_export_path', { suggestedName });
+}
+
+export async function writePdfExport(path: string, bytes: number[]): Promise<string> {
+  return invokeCommand<string>('write_pdf_export', { path, bytes });
+}

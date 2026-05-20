@@ -41,7 +41,7 @@ export function App() {
       onOpenFolder: () => void openFolder(),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
-      onExportPdf: () => void exportPreviewToPdf(),
+      onExportPdf: () => void exportPreviewToPdf({ suggestedName: activeFile?.name }),
       onFind: openFind,
       onClose: () => {
         if (!activeFile) return;
