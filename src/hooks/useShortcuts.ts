@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 interface ShortcutHandlers {
   onOpen: () => void;
+  onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
   onExportPdf: () => void;
@@ -15,7 +16,10 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
       const meta = event.metaKey || event.ctrlKey;
       if (!meta) return;
 
-      if (event.key.toLowerCase() === 'o') {
+      if (event.key.toLowerCase() === 'o' && event.shiftKey) {
+        event.preventDefault();
+        handlers.onOpenFolder();
+      } else if (event.key.toLowerCase() === 'o') {
         event.preventDefault();
         handlers.onOpen();
       }
