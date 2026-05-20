@@ -125,9 +125,9 @@
   margin: 14px 0;
   padding: 14px 16px;
   overflow: hidden;
-  color: #e5e7eb;
-  background: #111827 !important;
-  border: 1px solid #1f2937;
+  color: #111827 !important;
+  background: #f8fafc !important;
+  border: 1px solid #d8dde8;
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -138,9 +138,14 @@
 .pdf-export-root pre code,
 .pdf-export-root .shiki code {
   padding: 0;
-  color: inherit;
-  background: transparent;
+  color: #111827 !important;
+  background: transparent !important;
   border: 0;
+}
+
+.pdf-export-root .shiki span {
+  color: #1f2937 !important;
+  background: transparent !important;
 }
 
 .pdf-export-root table {
