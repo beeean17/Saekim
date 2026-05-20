@@ -245,7 +245,6 @@
   grid-template-columns: var(--sidebar-w) 6px minmax(240px, var(--editor-fr)) 6px minmax(240px, var(--preview-fr));
   min-height: 0;
   overflow: hidden;
-  transition: grid-template-columns 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app[data-sidebar="collapsed"] .body {
