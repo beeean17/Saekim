@@ -73,7 +73,7 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
         template.innerHTML = highlighted.trim();
         const highlightedPre = template.content.firstElementChild;
         if (highlightedPre instanceof HTMLElement) {
-          highlightedPre.dataset.lang = lang;
+          enhanceHighlightedCodeBlock(doc, highlightedPre, lang);
           pre.replaceWith(highlightedPre);
         } else {
           pre.outerHTML = highlighted;
@@ -89,6 +89,61 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
   );
 
   return doc.querySelector('main')?.innerHTML ?? rawFallback(html);
+}
+
+function enhanceHighlightedCodeBlock(doc: Document, pre: HTMLElement, lang: string): void {
+  pre.dataset.lang = lang;
+  pre.setAttribute('data-label', formatLanguageLabel(lang));
+  pre.querySelectorAll<HTMLElement>('.line').forEach((line, index) => {
+    const text = line.textContent ?? '';
+    line.dataset.line = String(index + 1);
+    if (text.startsWith('+')) line.classList.add('diff-add');
+    if (text.startsWith('-')) line.classList.add('diff-remove');
+  });
+
+  const code = pre.querySelector('code');
+  if (!code) {
+    const fallbackCode = doc.createElement('code');
+    while (pre.firstChild) fallbackCode.append(pre.firstChild);
+    pre.append(fallbackCode);
+  }
+}
+
+function formatLanguageLabel(lang: string): string {
+  const normalized = lang.toLowerCase();
+  const labels: Record<string, string> = {
+    bash: 'Shell',
+    cjs: 'JavaScript',
+    cpp: 'C++',
+    csharp: 'C#',
+    css: 'CSS',
+    diff: 'Diff',
+    go: 'Go',
+    html: 'HTML',
+    java: 'Java',
+    js: 'JavaScript',
+    json: 'JSON',
+    jsx: 'JSX',
+    kotlin: 'Kotlin',
+    kt: 'Kotlin',
+    markdown: 'Markdown',
+    md: 'Markdown',
+    mjs: 'JavaScript',
+    py: 'Python',
+    python: 'Python',
+    rs: 'Rust',
+    rust: 'Rust',
+    sh: 'Shell',
+    shell: 'Shell',
+    sql: 'SQL',
+    swift: 'Swift',
+    ts: 'TypeScript',
+    tsx: 'TSX',
+    txt: 'Text',
+    yaml: 'YAML',
+    yml: 'YAML',
+  };
+  return labels[normalized] ?? normalized.toUpperCase();
 }
 
 function rawFallback(html: string): string {

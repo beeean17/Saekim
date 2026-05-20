@@ -74,8 +74,9 @@
 
 .preview-content pre,
 .preview-content .shiki {
+  position: relative;
   margin: 14px 0;
-  padding: 14px 16px;
+  padding: 34px 0 14px;
   overflow-x: auto;
   color: var(--text-primary);
   background: var(--bg-code) !important;
@@ -86,11 +87,55 @@
   line-height: 1.65;
 }
 
+.preview-content .shiki::before {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 6px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  content: attr(data-label);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
 .preview-content pre code,
 .preview-content .shiki code {
+  display: block;
+  min-width: max-content;
   padding: 0;
   background: transparent;
   border: 0;
+}
+
+.preview-content .shiki .line {
+  display: block;
+  min-height: 1.65em;
+  padding: 0 16px 0 52px;
+}
+
+.preview-content .shiki .line::before {
+  display: inline-block;
+  width: 28px;
+  margin-left: -42px;
+  margin-right: 14px;
+  color: var(--text-faint);
+  content: attr(data-line);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+}
+
+.preview-content .shiki .line.diff-add {
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.preview-content .shiki .line.diff-remove {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .preview-content blockquote {

@@ -96,7 +96,7 @@ async function renderCodeBlocksForPdf(root: HTMLElement): Promise<void> {
         template.innerHTML = highlighted.trim();
         const highlightedPre = template.content.firstElementChild;
         if (highlightedPre instanceof HTMLElement) {
-          highlightedPre.dataset.lang = lang;
+          enhancePdfCodeBlock(highlightedPre, lang);
           block.replaceWith(highlightedPre);
         }
       } catch {
@@ -105,6 +105,54 @@ async function renderCodeBlocksForPdf(root: HTMLElement): Promise<void> {
       }
     }),
   );
+}
+
+function enhancePdfCodeBlock(pre: HTMLElement, lang: string): void {
+  pre.dataset.lang = lang;
+  pre.setAttribute('data-label', formatPdfLanguageLabel(lang));
+  pre.querySelectorAll<HTMLElement>('.line').forEach((line, index) => {
+    const text = line.textContent ?? '';
+    line.dataset.line = String(index + 1);
+    if (text.startsWith('+')) line.classList.add('diff-add');
+    if (text.startsWith('-')) line.classList.add('diff-remove');
+  });
+}
+
+function formatPdfLanguageLabel(lang: string): string {
+  const normalized = lang.toLowerCase();
+  const labels: Record<string, string> = {
+    bash: 'Shell',
+    cjs: 'JavaScript',
+    cpp: 'C++',
+    csharp: 'C#',
+    css: 'CSS',
+    diff: 'Diff',
+    go: 'Go',
+    html: 'HTML',
+    java: 'Java',
+    js: 'JavaScript',
+    json: 'JSON',
+    jsx: 'JSX',
+    kotlin: 'Kotlin',
+    kt: 'Kotlin',
+    markdown: 'Markdown',
+    md: 'Markdown',
+    mjs: 'JavaScript',
+    py: 'Python',
+    python: 'Python',
+    rs: 'Rust',
+    rust: 'Rust',
+    sh: 'Shell',
+    shell: 'Shell',
+    sql: 'SQL',
+    swift: 'Swift',
+    ts: 'TypeScript',
+    tsx: 'TSX',
+    txt: 'Text',
+    yaml: 'YAML',
+    yml: 'YAML',
+  };
+  return labels[normalized] ?? normalized.toUpperCase();
 }
 
 async function renderMermaidForPdf(root: HTMLElement): Promise<void> {
