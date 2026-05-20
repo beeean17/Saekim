@@ -196,18 +196,7 @@ function EditorContent({
   const [selectionLines, setSelectionLines] = useState<{ start: number; end: number } | null>(null);
   const lineCount = Math.max(1, value.split('\n').length);
   const updateSelectionLines = (textarea: HTMLTextAreaElement) => {
-    const start = Math.min(textarea.selectionStart, textarea.selectionEnd);
-    const end = Math.max(textarea.selectionStart, textarea.selectionEnd);
-
-    if (start === end) {
-      setSelectionLines(null);
-      return;
-    }
-
-    const selectedEnd = Math.max(start, end - 1);
-    const startLine = getLineNumberAtIndex(textarea.value, start);
-    const endLine = getLineNumberAtIndex(textarea.value, selectedEnd);
-    setSelectionLines({ start: startLine, end: Math.max(startLine, endLine) });
+    setSelectionLines(getSelectionLines(textarea));
   };
   const syncLineNumbers = (scrollTop: number) => {
     latestScrollTopRef.current = scrollTop;
@@ -227,6 +216,26 @@ function EditorContent({
     [],
   );
 
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const syncSelection = () => {
+      if (document.activeElement !== textarea) {
+        setSelectionLines(null);
+        return;
+      }
+      updateSelectionLines(textarea);
+    };
+
+    document.addEventListener('selectionchange', syncSelection);
+    textarea.addEventListener('blur', syncSelection);
+    return () => {
+      document.removeEventListener('selectionchange', syncSelection);
+      textarea.removeEventListener('blur', syncSelection);
+    };
+  }, [textareaRef]);
+
   return (
     <div className="editor-content">
       <div className="line-numbers" ref={lineNumbersRef}>
@@ -245,6 +254,7 @@ function EditorContent({
         className="editor-textarea"
         value={value}
         spellCheck={false}
+        wrap="off"
         onScroll={(event) => syncLineNumbers(event.currentTarget.scrollTop)}
         onSelect={(event) => updateSelectionLines(event.currentTarget)}
         onKeyUp={(event) => updateSelectionLines(event.currentTarget)}
@@ -256,6 +266,18 @@ function EditorContent({
       />
     </div>
   );
+}
+
+function getSelectionLines(textarea: HTMLTextAreaElement): { start: number; end: number } | null {
+  const start = Math.min(textarea.selectionStart, textarea.selectionEnd);
+  const end = Math.max(textarea.selectionStart, textarea.selectionEnd);
+
+  if (start === end) return null;
+
+  const selectedEnd = Math.max(start, end - 1);
+  const startLine = getLineNumberAtIndex(textarea.value, start);
+  const endLine = getLineNumberAtIndex(textarea.value, selectedEnd);
+  return { start: startLine, end: Math.max(startLine, endLine) };
 }
 
 function getLineNumberAtIndex(text: string, index: number): number {
