@@ -15,7 +15,7 @@
         "title": "Saekim",
         "width": 1280,
         "height": 820,
-        "minWidth": 820,
+        "minWidth": 622,
         "minHeight": 640,
         "resizable": true,
         "fullscreen": false

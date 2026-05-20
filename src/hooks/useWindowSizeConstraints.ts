@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
 const PANE_MIN_WIDTH = 280;
@@ -15,17 +16,17 @@ export function useWindowSizeConstraints(viewMode: ViewMode, sidebarMode: Sideba
     const minWidth = Math.round(activeSidebarWidth + sidebarResizerWidth + contentWidth);
     let cancelled = false;
 
-    void import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow, LogicalSize }) => {
-        if (!cancelled) {
-          return getCurrentWindow().setMinSize(new LogicalSize(minWidth, MIN_WINDOW_HEIGHT));
-        }
-        return undefined;
-      })
-      .catch(() => undefined);
+    const frameId = window.requestAnimationFrame(() => {
+      if (!cancelled) {
+        void invoke('set_window_min_size', { width: minWidth, height: MIN_WINDOW_HEIGHT }).catch(
+          () => undefined,
+        );
+      }
+    });
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(frameId);
     };
   }, [sidebarMode, sidebarWidth, viewMode]);
 }
