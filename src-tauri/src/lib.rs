@@ -58,6 +58,7 @@ pub fn run() {
             commands::file::take_pending_open_files,
             commands::session::load_session,
             commands::session::save_session,
+            commands::window::print_current_webview,
             commands::window::set_window_min_size
         ])
         .build(tauri::generate_context!())

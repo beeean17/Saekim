@@ -1,3 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from '../tauri/invoke';
+
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
 const EXPORTING_CLASS = 'pdf-exporting';
 
@@ -14,7 +17,7 @@ export async function exportPreviewToPdf(): Promise<void> {
 
   try {
     await waitForPrintAssets(printRoot);
-    window.print();
+    await openPrintDialog();
     window.setTimeout(cleanup, 60_000);
   } catch (error) {
     cleanup();
@@ -58,4 +61,13 @@ async function waitForPrintAssets(root: HTMLElement): Promise<void> {
 
   await Promise.all([fontsReady, ...images]);
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
+async function openPrintDialog(): Promise<void> {
+  if (isTauriRuntime()) {
+    await invoke('print_current_webview');
+    return;
+  }
+
+  window.print();
 }
