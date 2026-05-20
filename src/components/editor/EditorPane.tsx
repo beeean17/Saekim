@@ -190,7 +190,7 @@ function EditorContent({
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   activeLine: number;
 }) {
-  const lineNumbersRef = useRef<HTMLDivElement | null>(null);
+  const lineNumberListRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef(0);
   const latestScrollTopRef = useRef(0);
   const [selectionLines, setSelectionLines] = useState<{ start: number; end: number } | null>(null);
@@ -203,8 +203,8 @@ function EditorContent({
     if (scrollFrameRef.current) return;
     scrollFrameRef.current = window.requestAnimationFrame(() => {
       scrollFrameRef.current = 0;
-      if (lineNumbersRef.current) {
-        lineNumbersRef.current.style.transform = `translateY(${-latestScrollTopRef.current}px)`;
+      if (lineNumberListRef.current) {
+        lineNumberListRef.current.style.transform = `translateY(${-latestScrollTopRef.current}px)`;
       }
     });
   };
@@ -238,16 +238,18 @@ function EditorContent({
 
   return (
     <div className="editor-content">
-      <div className="line-numbers" ref={lineNumbersRef}>
-        {Array.from({ length: lineCount }, (_, index) => {
-          const line = index + 1;
-          const selected = Boolean(selectionLines && line >= selectionLines.start && line <= selectionLines.end);
-          return (
-            <span className={`${line === activeLine ? 'active' : ''} ${selected ? 'selected' : ''}`.trim()} key={index}>
-              <span className="line-number-text">{line}</span>
-            </span>
-          );
-        })}
+      <div className="line-numbers">
+        <div className="line-number-list" ref={lineNumberListRef}>
+          {Array.from({ length: lineCount }, (_, index) => {
+            const line = index + 1;
+            const selected = Boolean(selectionLines && line >= selectionLines.start && line <= selectionLines.end);
+            return (
+              <span className={`${line === activeLine ? 'active' : ''} ${selected ? 'selected' : ''}`.trim()} key={index}>
+                <span className="line-number-text">{line}</span>
+              </span>
+            );
+          })}
+        </div>
       </div>
       <textarea
         ref={textareaRef}
