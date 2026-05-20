@@ -49,9 +49,13 @@ export function SettingsPanel() {
       close();
     };
 
+    const clickListenerId = window.setTimeout(() => {
+      window.addEventListener('click', onClick);
+    }, 0);
+
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('click', onClick);
     return () => {
+      window.clearTimeout(clickListenerId);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('click', onClick);
     };
