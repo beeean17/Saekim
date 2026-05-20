@@ -905,6 +905,8 @@
 
 .editor-content {
   --editor-line-height: 1.75;
+  --editor-row-height: 1.75em;
+  --editor-padding-y: 20px;
 
   display: grid;
   flex: 1;
@@ -918,12 +920,13 @@
 }
 
 .line-numbers {
-  padding: 20px 10px 20px 0;
+  padding: var(--editor-padding-y) 10px var(--editor-padding-y) 0;
   overflow: hidden;
   color: var(--text-faint);
   border-right: 1px solid var(--border);
+  font-family: var(--editor-font-family, var(--font-ui));
   font-size: var(--editor-font-size, 13.5px);
-  line-height: var(--editor-line-height-size, 23.625px);
+  line-height: var(--editor-line-height);
   text-align: right;
   user-select: none;
   font-variant-numeric: tabular-nums;
@@ -931,7 +934,7 @@
 
 .line-numbers > span {
   display: flex;
-  height: var(--editor-line-height-size, 23.625px);
+  height: var(--editor-row-height);
   align-items: center;
   justify-content: flex-end;
   padding-right: 4px;
@@ -965,13 +968,17 @@
 .editor-textarea {
   width: 100%;
   height: 100%;
-  padding: 20px 24px 20px 18px;
+  display: block;
+  margin: 0;
+  padding: var(--editor-padding-y) 24px var(--editor-padding-y) 18px;
   overflow: auto;
+  -webkit-appearance: none;
+  appearance: none;
   color: var(--text-primary);
   background: var(--bg-surface);
   font-family: var(--editor-font-family, var(--font-ui));
   font-size: var(--editor-font-size, 13.5px);
-  line-height: var(--editor-line-height-size, 23.625px);
+  line-height: var(--editor-line-height);
   white-space: pre;
 }
 
