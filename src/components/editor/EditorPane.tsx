@@ -113,14 +113,13 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
           <ToolButton icon="redo" tooltip="다시 실행" onClick={() => textareaRef.current?.focus()} />
         </div>
         <div className="tool-group">
-          <ToolButton label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램" onClick={() => insertMarkdown(textareaRef.current, '```mermaid\\nflowchart LR\\n  A --> B\\n', '\\n```')} />
-          <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식" onClick={() => wrapSelection(textareaRef.current, '$', '$')} />
+          <ToolButton icon="mermaid" special="mermaid" tooltip="Mermaid 다이어그램" onClick={() => insertMarkdown(textareaRef.current, '```mermaid\\nflowchart LR\\n  A --> B\\n', '\\n```')} />
+          <ToolButton icon="katex" special="katex" tooltip="KaTeX 수식" onClick={() => wrapSelection(textareaRef.current, '$', '$')} />
         </div>
         <div className="tool-spacer" />
         <ToolButton icon="search" tooltip="문서 내 탐색" onClick={openFind} />
-        <button className={`toolbar-expand ${toolbarExpanded ? 'open' : ''}`} type="button" onClick={toggleToolbarExpanded} title="모든 마크다운 도구 보기">
-          <span>모든 도구</span>
-          <Icon name="chevronDown" className="ic chev" />
+        <button className={`toolbar-expand ${toolbarExpanded ? 'open' : ''}`} type="button" onClick={toggleToolbarExpanded} title="모든 마크다운 도구 보기" aria-label="모든 마크다운 도구 보기">
+          <Icon name="tools" className="ic" />
         </button>
       </div>
       {toolbarExpanded ? <ToolbarExpanded textareaRef={textareaRef} /> : null}
@@ -132,9 +131,9 @@ function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTex
   return (
     <div className="toolbar-expanded">
       <div className="tool-group">
-        <ToolButton label="H1" tooltip="제목 1" onClick={() => insertMarkdown(textareaRef.current, '# ', '')} />
-        <ToolButton label="H2" tooltip="제목 2" onClick={() => insertMarkdown(textareaRef.current, '## ', '')} />
-        <ToolButton label="H3" tooltip="제목 3" onClick={() => insertMarkdown(textareaRef.current, '### ', '')} />
+        <ToolButton icon="heading1" tooltip="제목 1" onClick={() => insertMarkdown(textareaRef.current, '# ', '')} />
+        <ToolButton icon="heading2" tooltip="제목 2" onClick={() => insertMarkdown(textareaRef.current, '## ', '')} />
+        <ToolButton icon="heading3" tooltip="제목 3" onClick={() => insertMarkdown(textareaRef.current, '### ', '')} />
       </div>
       <div className="tool-group">
         <ToolButton icon="bold" tooltip="볼드" onClick={() => wrapSelection(textareaRef.current, '**', '**')} />
@@ -164,18 +163,16 @@ function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTex
 }
 
 interface ToolButtonProps {
-  icon?: Parameters<typeof Icon>[0]['name'];
-  label?: string;
+  icon: Parameters<typeof Icon>[0]['name'];
   tooltip: string;
   special?: 'mermaid' | 'katex';
   onClick: () => void;
 }
 
-function ToolButton({ icon, label, tooltip, special, onClick }: ToolButtonProps) {
+function ToolButton({ icon, tooltip, special, onClick }: ToolButtonProps) {
   return (
-    <button className="tool-btn" data-special={special} title={tooltip} type="button" onClick={onClick}>
-      {icon ? <Icon name={icon} /> : null}
-      {label ? <span className="label">{label}</span> : null}
+    <button className="tool-btn" data-special={special} title={tooltip} aria-label={tooltip} type="button" onClick={onClick}>
+      <Icon name={icon} />
     </button>
   );
 }

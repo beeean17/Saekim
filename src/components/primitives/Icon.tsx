@@ -14,7 +14,11 @@ type IconName =
   | 'chevronDown'
   | 'undo'
   | 'redo'
+  | 'tools'
   | 'heading'
+  | 'heading1'
+  | 'heading2'
+  | 'heading3'
   | 'bold'
   | 'italic'
   | 'link'
@@ -30,6 +34,8 @@ type IconName =
   | 'divider'
   | 'image'
   | 'footnote'
+  | 'mermaid'
+  | 'katex'
   | 'edit'
   | 'split'
   | 'eye';
@@ -90,11 +96,43 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3L21 13" />
     </>
   ),
+  tools: (
+    <>
+      <path d="M14.7 6.3a4 4 0 0 0-5 5L3 18v3h3l6.7-6.7a4 4 0 0 0 5-5l-2.4 2.4-2.8-2.8z" />
+      <path d="M17 3l4 4" />
+      <path d="M19 5l-7 7" />
+    </>
+  ),
   heading: (
     <>
       <path d="M6 4v16" />
       <path d="M18 4v16" />
       <path d="M6 12h12" />
+    </>
+  ),
+  heading1: (
+    <>
+      <path d="M4 5v14" />
+      <path d="M12 5v14" />
+      <path d="M4 12h8" />
+      <path d="M17 19V9l-2 2" />
+      <path d="M15 19h4" />
+    </>
+  ),
+  heading2: (
+    <>
+      <path d="M4 5v14" />
+      <path d="M12 5v14" />
+      <path d="M4 12h8" />
+      <path d="M15 11a2 2 0 1 1 4 0c0 3-4 3-4 8h4" />
+    </>
+  ),
+  heading3: (
+    <>
+      <path d="M4 5v14" />
+      <path d="M12 5v14" />
+      <path d="M4 12h8" />
+      <path d="M15 9h4l-2.5 4a3 3 0 1 1-1.5 5.6" />
     </>
   ),
   bold: (
@@ -203,6 +241,23 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M6 8h12" />
       <circle cx="6" cy="18" r="2" />
       <circle cx="18" cy="18" r="2" />
+    </>
+  ),
+  mermaid: (
+    <>
+      <path d="M12 3l4 4-4 4-4-4z" />
+      <path d="M5 14l3 3-3 3-3-3z" />
+      <path d="M19 14l3 3-3 3-3-3z" />
+      <path d="M12 11v3" />
+      <path d="M8 17h8" />
+    </>
+  ),
+  katex: (
+    <>
+      <path d="M4 19c2.5-3.5 4-8.5 5-14" />
+      <path d="M6 9h6" />
+      <path d="M14 10l6 8" />
+      <path d="M20 10l-6 8" />
     </>
   ),
   edit: (
