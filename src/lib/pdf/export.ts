@@ -22,6 +22,7 @@ const PAGE_BREAK_AVOID_SELECTOR = [
   'blockquote',
   '.shiki',
   '.mermaid-block',
+  '.math-block',
   '.katex-display',
 ].join(', ');
 
@@ -197,7 +198,7 @@ function isPageBreakCandidate(element: HTMLElement): boolean {
   const parentAvoidBlock = element.parentElement?.closest(PAGE_BREAK_AVOID_SELECTOR);
   if (!parentAvoidBlock) return true;
 
-  return !element.closest('table, pre, blockquote, .shiki, .mermaid-block, .katex-display');
+  return !element.closest('table, pre, blockquote, .shiki, .mermaid-block, .math-block, .katex-display');
 }
 
 function getDocumentTitle(preview: HTMLElement, suggestedName?: string): string {
