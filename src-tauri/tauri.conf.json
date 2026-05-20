@@ -38,6 +38,7 @@
     "fileAssociations": [
       {
         "ext": ["md", "markdown"],
+        "contentTypes": ["net.daringfireball.markdown", "public.plain-text"],
         "name": "Markdown Document",
         "description": "Markdown document",
         "mimeType": "text/markdown",
