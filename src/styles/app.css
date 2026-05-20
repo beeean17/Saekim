@@ -757,8 +757,8 @@
 }
 
 .tool-btn {
-  min-width: 30px;
-  padding: 0 7px;
+  width: 30px;
+  padding: 0;
 }
 
 .tool-btn:hover,
@@ -783,34 +783,18 @@
   color: var(--accent);
 }
 
-.tool-btn[data-special="mermaid"] .label,
-.tool-btn[data-special="katex"] .label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .tool-spacer {
   flex: 1;
 }
 
 .toolbar-expand {
-  padding: 0 10px;
+  width: 30px;
+  padding: 0;
   border: 1px solid var(--border);
 }
 
 .toolbar-expand.open {
   border-color: var(--accent-border);
-}
-
-.toolbar-expand.open .chev {
-  transform: rotate(180deg);
-}
-
-.toolbar-expand .chev {
-  width: 12px;
-  height: 12px;
-  transition: transform 0.2s ease;
 }
 
 .find-bar {
