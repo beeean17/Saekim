@@ -30,15 +30,6 @@
   border-bottom: 2px solid #5f6bff;
 }
 
-.pdf-export-root .pdf-kicker {
-  margin: 0 0 8px;
-  color: #687285;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .pdf-export-root .pdf-cover h1 {
   margin: 0;
   color: #111827;
@@ -188,6 +179,13 @@
 .pdf-export-root .mermaid-block {
   display: grid;
   place-items: center;
+}
+
+.pdf-export-root .pdf-page-spacer {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 @media print {
