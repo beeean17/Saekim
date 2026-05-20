@@ -7,6 +7,24 @@ const A4_WIDTH_PX = 794;
 const A4_WIDTH_PT = 595.28;
 const A4_HEIGHT_PT = 841.89;
 const A4_HEIGHT_PX = (A4_WIDTH_PX * A4_HEIGHT_PT) / A4_WIDTH_PT;
+const PAGE_BREAK_AVOID_SELECTOR = [
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'p',
+  'li',
+  'table',
+  'img',
+  'svg',
+  'pre',
+  'blockquote',
+  '.shiki',
+  '.mermaid-block',
+  '.katex-display',
+].join(', ');
 
 interface PdfExportOptions {
   suggestedName?: string;
@@ -128,10 +146,8 @@ function applyBlockPageBreaks(root: HTMLElement): void {
   root.querySelectorAll(`.${PAGE_SPACER_CLASS}`).forEach((node) => node.remove());
 
   const avoidBlocks = Array.from(
-    root.querySelectorAll<HTMLElement>(
-      'table, img, svg, pre, blockquote, .shiki, .mermaid-block, .katex-display',
-    ),
-  ).filter((element) => !element.closest(`.${PAGE_SPACER_CLASS}`));
+    root.querySelectorAll<HTMLElement>(PAGE_BREAK_AVOID_SELECTOR),
+  ).filter((element) => isPageBreakCandidate(element));
 
   for (const block of avoidBlocks) {
     const height = block.offsetHeight;
@@ -148,6 +164,15 @@ function applyBlockPageBreaks(root: HTMLElement): void {
     spacer.style.height = `${pageBottom - top}px`;
     block.before(spacer);
   }
+}
+
+function isPageBreakCandidate(element: HTMLElement): boolean {
+  if (element.closest(`.${PAGE_SPACER_CLASS}`)) return false;
+
+  const parentAvoidBlock = element.parentElement?.closest(PAGE_BREAK_AVOID_SELECTOR);
+  if (!parentAvoidBlock) return true;
+
+  return !element.closest('table, pre, blockquote, .shiki, .mermaid-block, .katex-display');
 }
 
 function getDocumentTitle(preview: HTMLElement, suggestedName?: string): string {
