@@ -34,10 +34,14 @@ md.renderer.rules.math_block = (tokens, idx) => {
 md.renderer.rules.fence = (tokens, idx) => {
   const token = tokens[idx];
   const info = token.info.trim();
-  const lang = info.split(/\s+/)[0] || 'text';
+  const lang = info.split(/\s+/)[0] || '';
 
   if (lang === 'mermaid') {
     return `<div class="mermaid-block" data-source="${encodeURIComponent(token.content)}"></div>`;
+  }
+
+  if (!lang) {
+    return `<pre><code>${escapeHtml(token.content)}</code></pre>`;
   }
 
   return `<pre data-lang="${escapeHtml(lang)}"><code>${escapeHtml(token.content)}</code></pre>`;
@@ -56,14 +60,24 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
   await Promise.all(
     blocks.map(async (pre) => {
       const code = pre.textContent ?? '';
-      const lang = pre.getAttribute('data-lang') || 'text';
+      const lang = pre.getAttribute('data-lang');
+      if (!lang) return;
+
       try {
         const { codeToHtml } = await import('shiki');
         const highlighted = await codeToHtml(code, {
           lang,
           theme: theme === 'dark' ? 'github-dark' : 'github-light',
         });
-        pre.outerHTML = highlighted;
+        const template = doc.createElement('template');
+        template.innerHTML = highlighted.trim();
+        const highlightedPre = template.content.firstElementChild;
+        if (highlightedPre instanceof HTMLElement) {
+          highlightedPre.dataset.lang = lang;
+          pre.replaceWith(highlightedPre);
+        } else {
+          pre.outerHTML = highlighted;
+        }
       } catch {
         const fallback = doc.createElement('pre');
         const codeNode = doc.createElement('code');
