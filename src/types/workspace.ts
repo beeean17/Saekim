@@ -24,12 +24,6 @@ export interface OpenFile {
   eol: 'LF' | 'CRLF';
 }
 
-export interface RecentFile {
-  path: string;
-  name: string;
-  openedAt: number;
-}
-
 export interface CommandResult<T> {
   success: boolean;
   data?: T;
