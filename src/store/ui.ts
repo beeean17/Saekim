@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { UISession } from '../types/session';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
@@ -50,48 +49,32 @@ interface UIState {
   restoreUI: (ui: UISession) => void;
 }
 
-export const useUIStore = create<UIState>()(
-  persist(
-    (set) => ({
-      sidebarMode: 'expanded',
-      toolbarExpanded: true,
-      viewMode: 'split',
-      sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
-      splitRatio: 0.5,
-      editorWidth: getInitialEditorWidth(),
-      syncScroll: true,
-      findOpen: false,
-      settingsOpen: false,
-      toggleSidebar: () =>
-        set((state) => ({
-          sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
-        })),
-      toggleToolbarExpanded: () =>
-        set((state) => ({
-          toolbarExpanded: !state.toolbarExpanded,
-        })),
-      setViewMode: (mode) => set({ viewMode: mode }),
-      setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
-      setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
-      setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
-      toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
-      openFind: () => set({ findOpen: true }),
-      closeFind: () => set({ findOpen: false }),
-      toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
-      closeSettings: () => set({ settingsOpen: false }),
-      restoreUI: (ui) => set({ ...ui, editorWidth: restoreEditorWidth(ui), findOpen: false, settingsOpen: false }),
-    }),
-    {
-      name: 'saekim-ui',
-      partialize: (state) => ({
-        sidebarMode: state.sidebarMode,
-        toolbarExpanded: state.toolbarExpanded,
-        viewMode: state.viewMode,
-        sidebarWidth: state.sidebarWidth,
-        splitRatio: state.splitRatio,
-        editorWidth: state.editorWidth,
-        syncScroll: state.syncScroll,
-      }),
-    },
-  ),
-);
+export const useUIStore = create<UIState>()((set) => ({
+  sidebarMode: 'expanded',
+  toolbarExpanded: true,
+  viewMode: 'split',
+  sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  splitRatio: 0.5,
+  editorWidth: getInitialEditorWidth(),
+  syncScroll: true,
+  findOpen: false,
+  settingsOpen: false,
+  toggleSidebar: () =>
+    set((state) => ({
+      sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
+    })),
+  toggleToolbarExpanded: () =>
+    set((state) => ({
+      toolbarExpanded: !state.toolbarExpanded,
+    })),
+  setViewMode: (mode) => set({ viewMode: mode }),
+  setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
+  setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
+  setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
+  toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
+  openFind: () => set({ findOpen: true }),
+  closeFind: () => set({ findOpen: false }),
+  toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
+  closeSettings: () => set({ settingsOpen: false }),
+  restoreUI: (ui) => set({ ...ui, editorWidth: restoreEditorWidth(ui), findOpen: false, settingsOpen: false }),
+}));

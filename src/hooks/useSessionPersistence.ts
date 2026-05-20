@@ -1,9 +1,67 @@
 import { useEffect, useRef, useState } from 'react';
 import { Backend } from '../lib/backend';
+import { isTauriRuntime } from '../lib/tauri/invoke';
 import { useSettingsStore } from '../store/settings';
 import { useUIStore } from '../store/ui';
 import { useWorkspaceStore } from '../store/workspace';
-import type { AppSession } from '../types/session';
+import type { AppSession, SettingsSession, UISession } from '../types/session';
+
+const legacyLocalStorageKeys = ['saekim-ui', 'saekim-settings'];
+
+interface LegacyPersistedState<T> {
+  state?: Partial<T>;
+}
+
+interface LegacyMetadata {
+  settings: SettingsSession | null;
+  ui: UISession | null;
+}
+
+function readLegacyPersistedState<T>(key: string): Partial<T> | null {
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return null;
+
+  try {
+    return (JSON.parse(raw) as LegacyPersistedState<T>).state ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readLegacyMetadata(): LegacyMetadata {
+  const settings = readLegacyPersistedState<SettingsSession>('saekim-settings');
+  const ui = readLegacyPersistedState<UISession>('saekim-ui');
+
+  return {
+    settings:
+      settings?.theme && typeof settings.fontSize === 'number' && settings.editorFontFamily
+        ? {
+            theme: settings.theme,
+            fontSize: settings.fontSize,
+            editorFontFamily: settings.editorFontFamily,
+          }
+        : null,
+    ui:
+      ui?.sidebarMode && ui.toolbarExpanded !== undefined && ui.viewMode && typeof ui.sidebarWidth === 'number'
+        ? {
+            sidebarMode: ui.sidebarMode,
+            toolbarExpanded: ui.toolbarExpanded,
+            viewMode: ui.viewMode,
+            sidebarWidth: ui.sidebarWidth,
+            splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
+            editorWidth: ui.editorWidth,
+            syncScroll: ui.syncScroll ?? true,
+          }
+        : null,
+  };
+}
+
+function clearLegacyLocalStorage(): void {
+  if (!isTauriRuntime()) return;
+  for (const key of legacyLocalStorageKeys) {
+    window.localStorage.removeItem(key);
+  }
+}
 
 export function useSessionPersistence(): void {
   const [loaded, setLoaded] = useState(false);
@@ -31,9 +89,17 @@ export function useSessionPersistence(): void {
 
   useEffect(() => {
     let alive = true;
+    const legacyMetadata = isTauriRuntime() ? readLegacyMetadata() : null;
+    clearLegacyLocalStorage();
+
     void Backend.loadSession<AppSession>()
       .then((session) => {
-        if (!alive || !session) return;
+        if (!alive) return;
+        if (!session) {
+          if (legacyMetadata?.ui) restoreUI(legacyMetadata.ui);
+          if (legacyMetadata?.settings) restoreSettings(legacyMetadata.settings);
+          return;
+        }
         restoreWorkspace(session.workspace);
         restoreUI(session.ui);
         restoreSettings(session.settings);

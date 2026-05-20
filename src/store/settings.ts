@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { Backend } from '../lib/backend';
 import type { SettingsSession } from '../types/session';
 import type { ThemeName } from '../types/workspace';
 
@@ -19,50 +17,29 @@ function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
   document.documentElement.style.setProperty('--editor-font-family', editorFontFamily);
 }
 
-export const useSettingsStore = create<SettingsState>()(
-  persist(
-    (set) => ({
-      theme: 'default',
-      fontSize: 13.5,
-      editorFontFamily: 'Pretendard Variable',
-      setTheme: (theme) => {
-        document.documentElement.setAttribute('data-theme', theme);
-        void Backend.setTheme(theme);
-        set({ theme });
-      },
-      setFontSize: (fontSize) => {
-        set((state) => {
-          applyEditorSettings(fontSize, state.editorFontFamily);
-          return { fontSize };
-        });
-      },
-      setEditorFontFamily: (editorFontFamily) => {
-        set((state) => {
-          applyEditorSettings(state.fontSize, editorFontFamily);
-          return { editorFontFamily };
-        });
-      },
-      restoreSettings: (settings) => {
-        document.documentElement.setAttribute('data-theme', settings.theme);
-        applyEditorSettings(settings.fontSize, settings.editorFontFamily);
-        set(settings);
-      },
-    }),
-    {
-      name: 'saekim-settings',
-      partialize: (state) => ({
-        theme: state.theme,
-        fontSize: state.fontSize,
-        editorFontFamily: state.editorFontFamily,
-      }),
-      onRehydrateStorage: () => (state) => {
-        if (state?.theme) {
-          document.documentElement.setAttribute('data-theme', state.theme);
-        }
-        if (state) {
-          applyEditorSettings(state.fontSize, state.editorFontFamily);
-        }
-      },
-    },
-  ),
-);
+export const useSettingsStore = create<SettingsState>()((set) => ({
+  theme: 'default',
+  fontSize: 13.5,
+  editorFontFamily: 'Pretendard Variable',
+  setTheme: (theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+    set({ theme });
+  },
+  setFontSize: (fontSize) => {
+    set((state) => {
+      applyEditorSettings(fontSize, state.editorFontFamily);
+      return { fontSize };
+    });
+  },
+  setEditorFontFamily: (editorFontFamily) => {
+    set((state) => {
+      applyEditorSettings(state.fontSize, editorFontFamily);
+      return { editorFontFamily };
+    });
+  },
+  restoreSettings: (settings) => {
+    document.documentElement.setAttribute('data-theme', settings.theme);
+    applyEditorSettings(settings.fontSize, settings.editorFontFamily);
+    set(settings);
+  },
+}));

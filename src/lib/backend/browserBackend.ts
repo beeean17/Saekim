@@ -1,8 +1,7 @@
 import type { BackendAdapter } from './types';
-import type { FileTreeNode, FolderPayload, OpenFilePayload, ThemeName } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
 const sessionKey = 'saekim-browser-session';
-const themeKey = 'saekim-browser-theme';
 
 export const browserBackend: BackendAdapter = {
   async openFileDialog(): Promise<OpenFilePayload | null> {
@@ -56,13 +55,5 @@ export const browserBackend: BackendAdapter = {
 
   async saveSession<T>(session: T): Promise<void> {
     localStorage.setItem(sessionKey, JSON.stringify(session));
-  },
-
-  async getTheme(): Promise<ThemeName | null> {
-    return (localStorage.getItem(themeKey) as ThemeName | null) ?? null;
-  },
-
-  async setTheme(theme: ThemeName): Promise<void> {
-    localStorage.setItem(themeKey, theme);
   },
 };
