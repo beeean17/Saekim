@@ -109,10 +109,11 @@
   border: 0;
 }
 
-.preview-content .katex-display {
+.preview-content .math-block {
   margin: 14px 0;
   padding: 14px 18px;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
   color: var(--text-primary);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -120,10 +121,8 @@
   text-align: center;
 }
 
-.preview-content .katex-display > .katex {
-  display: inline-block;
-  max-width: 100%;
-  text-align: initial;
+.preview-content .math-block .katex-display {
+  margin: 0;
 }
 
 .preview-content .mermaid-block {

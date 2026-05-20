@@ -30,7 +30,7 @@
   pointer-events: none;
 }
 
-.pdf-export-root :where(.pdf-cover, .pdf-content, h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, th, td, hr, img, .shiki, .mermaid-block, .pdf-page-spacer) {
+.pdf-export-root :where(.pdf-cover, .pdf-content, h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, th, td, hr, img, .shiki, .math-block, .mermaid-block, .pdf-page-spacer) {
   box-sizing: border-box;
 }
 
@@ -175,7 +175,7 @@
   height: auto;
 }
 
-.pdf-export-root .katex-display {
+.pdf-export-root .math-block {
   margin: 16px 0;
   padding: 16px;
   overflow: visible;
@@ -183,6 +183,10 @@
   background: #ffffff !important;
   border: 1px solid #d8dde8;
   border-radius: 6px;
+}
+
+.pdf-export-root .math-block .katex-display {
+  margin: 0;
 }
 
 .pdf-export-root .mermaid-block {
@@ -343,6 +347,7 @@
   table,
   img,
   .mermaid-block,
+  .math-block,
   .katex-display {
     break-inside: avoid;
     page-break-inside: avoid;

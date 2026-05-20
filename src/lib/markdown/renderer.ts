@@ -1,6 +1,12 @@
 import MarkdownIt from 'markdown-it';
+import katex from 'katex';
 import markdownItKatex from 'markdown-it-katex';
 import { escapeHtml } from './escape';
+
+const katexOptions = {
+  throwOnError: false,
+  errorColor: 'var(--danger)',
+};
 
 const md = new MarkdownIt({
   html: false,
@@ -9,10 +15,21 @@ const md = new MarkdownIt({
   breaks: false,
 });
 
-md.use(markdownItKatex, {
-  throwOnError: false,
-  errorColor: 'var(--danger)',
-});
+md.use(markdownItKatex, katexOptions);
+
+md.renderer.rules.math_inline = (tokens, idx) =>
+  katex.renderToString(tokens[idx].content, {
+    ...katexOptions,
+    displayMode: false,
+  });
+
+md.renderer.rules.math_block = (tokens, idx) => {
+  const html = katex.renderToString(tokens[idx].content.trim(), {
+    ...katexOptions,
+    displayMode: true,
+  });
+  return `<div class="math-block">${html}</div>\n`;
+};
 
 md.renderer.rules.fence = (tokens, idx) => {
   const token = tokens[idx];
