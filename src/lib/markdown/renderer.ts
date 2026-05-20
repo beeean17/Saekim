@@ -5,7 +5,7 @@ import { escapeHtml } from './escape';
 
 const katexOptions = {
   throwOnError: false,
-  errorColor: 'var(--danger)',
+  errorColor: '#cc3344',
 };
 
 const md = new MarkdownIt({
