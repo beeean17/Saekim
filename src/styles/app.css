@@ -926,26 +926,39 @@
   line-height: var(--editor-line-height-size, 23.625px);
   text-align: right;
   user-select: none;
+  font-variant-numeric: tabular-nums;
 }
 
-.line-numbers span {
-  display: block;
+.line-numbers > span {
+  display: flex;
   height: var(--editor-line-height-size, 23.625px);
+  align-items: center;
+  justify-content: flex-end;
   padding-right: 4px;
-  border-radius: var(--radius-sm);
 }
 
-.line-numbers span.active {
+.line-number-text {
+  display: inline-flex;
+  min-width: 1.35em;
+  height: 1.28em;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  line-height: 1.28;
+}
+
+.line-numbers > span.active .line-number-text {
   color: var(--accent);
   font-weight: 600;
 }
 
-.line-numbers span.selected {
+.line-numbers > span.selected .line-number-text {
   color: var(--text-primary);
   background: var(--accent-soft);
 }
 
-.line-numbers span.active.selected {
+.line-numbers > span.active.selected .line-number-text {
   color: var(--accent);
 }
 

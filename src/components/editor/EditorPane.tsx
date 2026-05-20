@@ -244,7 +244,7 @@ function EditorContent({
           const selected = Boolean(selectionLines && line >= selectionLines.start && line <= selectionLines.end);
           return (
             <span className={`${line === activeLine ? 'active' : ''} ${selected ? 'selected' : ''}`.trim()} key={index}>
-              {line}
+              <span className="line-number-text">{line}</span>
             </span>
           );
         })}
