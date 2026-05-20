@@ -132,7 +132,7 @@
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 12px;
-  line-height: 1.38;
+  line-height: 1.08;
   white-space: pre-wrap;
 }
 
@@ -165,7 +165,7 @@
 .pdf-export-root .shiki .line {
   display: block;
   padding: 0 16px 0 52px;
-  line-height: 1.38;
+  line-height: 1.08;
 }
 
 .pdf-export-root .shiki .line::before {
