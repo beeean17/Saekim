@@ -44,6 +44,7 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
   document.body.appendChild(exportRoot);
 
   try {
+    prepareKatexForCanvas(exportRoot);
     await renderMermaidForPdf(exportRoot);
     await waitForTemplateAssets(exportRoot);
     applyBlockPageBreaks(exportRoot);
@@ -69,6 +70,10 @@ function createPdfTemplate(preview: HTMLElement, title: string): HTMLElement {
   `;
 
   return exportRoot;
+}
+
+function prepareKatexForCanvas(root: HTMLElement): void {
+  root.querySelectorAll('.katex-mathml').forEach((node) => node.remove());
 }
 
 async function renderMermaidForPdf(root: HTMLElement): Promise<void> {
