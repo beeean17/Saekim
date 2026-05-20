@@ -20,6 +20,7 @@ export function useSessionPersistence(): void {
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
+  const editorWidth = useUIStore((state) => state.editorWidth);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const restoreUI = useUIStore((state) => state.restoreUI);
 
@@ -68,6 +69,7 @@ export function useSessionPersistence(): void {
           viewMode,
           sidebarWidth,
           splitRatio,
+          editorWidth,
           syncScroll,
         },
         settings: {
@@ -88,6 +90,7 @@ export function useSessionPersistence(): void {
   }, [
     activeFileId,
     editorFontFamily,
+    editorWidth,
     fontSize,
     loaded,
     openFiles,

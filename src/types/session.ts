@@ -13,6 +13,7 @@ export interface UISession {
   viewMode: ViewMode;
   sidebarWidth: number;
   splitRatio: number;
+  editorWidth?: number;
   syncScroll: boolean;
 }
 
