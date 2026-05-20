@@ -1,75 +1,54 @@
-const printCss = `
-@page {
-  size: A4;
-  margin: 20mm 18mm;
-}
-
-@media print {
-  html,
-  body {
-    background: white !important;
-    color: #111 !important;
-  }
-
-  body {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 11pt;
-    line-height: 1.6;
-  }
-
-  pre,
-  blockquote,
-  table,
-  img,
-  .mermaid-block,
-  .katex-display {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  h1,
-  h2,
-  h3 {
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-}
-`;
+const EXPORT_ROOT_CLASS = 'pdf-export-root';
+const EXPORTING_CLASS = 'pdf-exporting';
 
 export async function exportPreviewToPdf(): Promise<void> {
-  const preview = document.querySelector<HTMLElement>('.preview-content');
+  const preview = document.querySelector<HTMLElement>('.preview-content:not(.pdf-export-root)');
   if (!preview) return;
 
-  const printWindow = window.open('', 'saekim-print-preview', 'width=960,height=720');
-  if (!printWindow) return;
+  const printRoot = createPrintRoot(preview);
+  document.body.appendChild(printRoot);
+  document.body.classList.add(EXPORTING_CLASS);
 
-  const styles = Array.from(document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style'))
-    .map((node) => node.outerHTML)
-    .join('\n');
+  const cleanup = createPrintCleanup(printRoot);
+  window.addEventListener('afterprint', cleanup, { once: true });
 
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html>
-<html lang="ko" data-theme="${document.documentElement.getAttribute('data-theme') || 'default'}">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Saekim PDF Export</title>
-    ${styles}
-    <style>${printCss}</style>
-  </head>
-  <body>
-    <main class="preview-content">${preview.innerHTML}</main>
-  </body>
-</html>`);
-  printWindow.document.close();
-
-  await waitForPrintAssets(printWindow);
-  printWindow.focus();
-  printWindow.print();
+  try {
+    await waitForPrintAssets(printRoot);
+    window.print();
+    window.setTimeout(cleanup, 60_000);
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }
 
-async function waitForPrintAssets(printWindow: Window): Promise<void> {
-  const fontsReady = printWindow.document.fonts?.ready ?? Promise.resolve();
-  const images = Array.from(printWindow.document.images).map((image) => {
+function createPrintRoot(preview: HTMLElement): HTMLElement {
+  document.querySelectorAll(`.${EXPORT_ROOT_CLASS}`).forEach((node) => node.remove());
+
+  const printRoot = document.createElement('main');
+  printRoot.className = `${EXPORT_ROOT_CLASS} preview-content`;
+  printRoot.innerHTML = preview.innerHTML;
+
+  return printRoot;
+}
+
+function createPrintCleanup(printRoot: HTMLElement): () => void {
+  let cleaned = false;
+
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    window.removeEventListener('afterprint', cleanup);
+    printRoot.remove();
+    document.body.classList.remove(EXPORTING_CLASS);
+  };
+
+  return cleanup;
+}
+
+async function waitForPrintAssets(root: HTMLElement): Promise<void> {
+  const fontsReady = document.fonts?.ready ?? Promise.resolve();
+  const images = Array.from(root.querySelectorAll('img')).map((image) => {
     if (image.complete) return Promise.resolve();
     return new Promise<void>((resolve) => {
       image.addEventListener('load', () => resolve(), { once: true });
@@ -78,5 +57,5 @@ async function waitForPrintAssets(printWindow: Window): Promise<void> {
   });
 
   await Promise.all([fontsReady, ...images]);
-  await new Promise((resolve) => printWindow.setTimeout(resolve, 80));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }

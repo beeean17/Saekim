@@ -1,4 +1,19 @@
+@page {
+  size: A4;
+  margin: 20mm 18mm;
+}
+
+.pdf-export-root {
+  display: none;
+}
+
 @media print {
+  html,
+  body {
+    background: white !important;
+    color: #111 !important;
+  }
+
   .app {
     display: block;
     height: auto;
@@ -23,5 +38,43 @@
   .preview-content {
     overflow: visible;
     padding: 0;
+  }
+
+  body.pdf-exporting .app {
+    display: none !important;
+  }
+
+  body.pdf-exporting .pdf-export-root {
+    --text-primary: #111;
+    --text-secondary: #3f4652;
+    --bg-code: #f6f7f9;
+    --bg-elevated: #fff;
+    --border: #d6dbe3;
+    --accent: #5f6bff;
+    --accent-soft: #eef0ff;
+
+    display: block !important;
+    background: white !important;
+    color: #111 !important;
+    font-family: var(--editor-font-family, var(--font-ui));
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+
+  pre,
+  blockquote,
+  table,
+  img,
+  .mermaid-block,
+  .katex-display {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 }
