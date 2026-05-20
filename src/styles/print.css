@@ -4,6 +4,15 @@
 }
 
 .pdf-export-root {
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #687285;
+  --bg-code: #f3f4f6;
+  --bg-elevated: #ffffff;
+  --border: #d8dde8;
+  --accent: #5f6bff;
+  --accent-soft: #f3f5ff;
+
   position: fixed;
   top: 0;
   left: -10000px;
@@ -17,6 +26,7 @@
   font-family: var(--editor-font-family, var(--font-ui));
   font-size: 14px;
   line-height: 1.72;
+  color-scheme: light;
   pointer-events: none;
 }
 
@@ -171,7 +181,8 @@
   margin: 16px 0;
   padding: 16px;
   overflow: hidden;
-  background: #f9fafb;
+  color: #111827 !important;
+  background: #ffffff !important;
   border: 1px solid #d8dde8;
   border-radius: 6px;
 }
@@ -179,6 +190,64 @@
 .pdf-export-root .mermaid-block {
   display: grid;
   place-items: center;
+}
+
+.pdf-export-root .katex,
+.pdf-export-root .katex * {
+  color: #111827 !important;
+  border-color: #111827 !important;
+}
+
+.pdf-export-root .katex .frac-line,
+.pdf-export-root .katex .rule,
+.pdf-export-root .katex .sqrt-line {
+  border-color: #111827 !important;
+  background: #111827 !important;
+}
+
+.pdf-export-root .mermaid-block svg {
+  max-width: 100%;
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+.pdf-export-root .mermaid-block svg text,
+.pdf-export-root .mermaid-block svg tspan,
+.pdf-export-root .mermaid-block svg .label,
+.pdf-export-root .mermaid-block svg .nodeLabel,
+.pdf-export-root .mermaid-block svg .edgeLabel,
+.pdf-export-root .mermaid-block svg .cluster-label {
+  fill: #111827 !important;
+  color: #111827 !important;
+}
+
+.pdf-export-root .mermaid-block svg .node rect,
+.pdf-export-root .mermaid-block svg .node circle,
+.pdf-export-root .mermaid-block svg .node ellipse,
+.pdf-export-root .mermaid-block svg .node polygon,
+.pdf-export-root .mermaid-block svg .node path {
+  fill: #f8fafc !important;
+  stroke: #64748b !important;
+}
+
+.pdf-export-root .mermaid-block svg .edgePath path,
+.pdf-export-root .mermaid-block svg .flowchart-link,
+.pdf-export-root .mermaid-block svg .messageLine0,
+.pdf-export-root .mermaid-block svg .messageLine1 {
+  stroke: #64748b !important;
+}
+
+.pdf-export-root .mermaid-block svg marker,
+.pdf-export-root .mermaid-block svg marker path,
+.pdf-export-root .mermaid-block svg .arrowheadPath {
+  fill: #64748b !important;
+  stroke: #64748b !important;
+}
+
+.pdf-export-root .mermaid-block svg .edgeLabel,
+.pdf-export-root .mermaid-block svg .edgeLabel rect {
+  background: #ffffff !important;
+  fill: #ffffff !important;
 }
 
 .pdf-export-root .pdf-page-spacer {

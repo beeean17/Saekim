@@ -31,23 +31,25 @@ interface PdfExportOptions {
   title?: string;
 }
 
-export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promise<void> {
+export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promise<boolean> {
   const preview = document.querySelector<HTMLElement>('.preview-content:not(.pdf-export-root)');
-  if (!preview) return;
+  if (!preview) return false;
 
   const title = options.title || getDocumentTitle(preview, options.suggestedName);
   const suggestedName = toPdfFileName(options.suggestedName || title);
   const targetPath = await pickExportTarget(suggestedName);
-  if (isTauriRuntime() && !targetPath) return;
+  if (isTauriRuntime() && !targetPath) return false;
 
   const exportRoot = createPdfTemplate(preview, title);
   document.body.appendChild(exportRoot);
 
   try {
+    await renderMermaidForPdf(exportRoot);
     await waitForTemplateAssets(exportRoot);
     applyBlockPageBreaks(exportRoot);
     const pdfBytes = await renderTemplateToPdf(exportRoot);
     await savePdfBytes(pdfBytes, suggestedName, targetPath);
+    return true;
   } finally {
     exportRoot.remove();
   }
@@ -67,6 +69,29 @@ function createPdfTemplate(preview: HTMLElement, title: string): HTMLElement {
   `;
 
   return exportRoot;
+}
+
+async function renderMermaidForPdf(root: HTMLElement): Promise<void> {
+  const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
+  if (blocks.length === 0) return;
+
+  const { default: mermaid } = await import('mermaid');
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    securityLevel: 'strict',
+  });
+
+  await Promise.all(
+    blocks.map(async (block, index) => {
+      const source = decodeURIComponent(block.dataset.source || '');
+      if (!source) return;
+
+      const id = `pdf-mermaid-${Date.now()}-${index}`;
+      const { svg } = await mermaid.render(id, source);
+      block.innerHTML = svg;
+    }),
+  );
 }
 
 async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array> {
