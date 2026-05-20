@@ -191,12 +191,31 @@ function EditorContent({
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   activeLine: number;
 }) {
-  const [scrollTop, setScrollTop] = useState(0);
+  const lineNumbersRef = useRef<HTMLDivElement | null>(null);
+  const scrollFrameRef = useRef(0);
+  const latestScrollTopRef = useRef(0);
   const lineCount = Math.max(1, value.split('\n').length);
+  const syncLineNumbers = (scrollTop: number) => {
+    latestScrollTopRef.current = scrollTop;
+    if (scrollFrameRef.current) return;
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = 0;
+      if (lineNumbersRef.current) {
+        lineNumbersRef.current.style.transform = `translateY(${-latestScrollTopRef.current}px)`;
+      }
+    });
+  };
+
+  useEffect(
+    () => () => {
+      if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+    },
+    [],
+  );
 
   return (
     <div className="editor-content">
-      <div className="line-numbers" style={{ transform: `translateY(${-scrollTop}px)` }}>
+      <div className="line-numbers" ref={lineNumbersRef}>
         {Array.from({ length: lineCount }, (_, index) => (
           <span className={index + 1 === activeLine ? 'active' : ''} key={index}>
             {index + 1}
@@ -208,7 +227,7 @@ function EditorContent({
         className="editor-textarea"
         value={value}
         spellCheck={false}
-        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        onScroll={(event) => syncLineNumbers(event.currentTarget.scrollTop)}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
     </div>

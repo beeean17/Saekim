@@ -10,8 +10,15 @@ export function useScrollSync(
     const second = secondRef.current;
     if (!first || !second || !enabled) return;
 
+    let frame = 0;
     let locked = false;
-    const sync = (source: HTMLElement, target: HTMLElement) => {
+    let pending: { source: HTMLElement; target: HTMLElement } | null = null;
+
+    const flush = () => {
+      frame = 0;
+      if (!pending) return;
+      const { source, target } = pending;
+      pending = null;
       if (locked) return;
       const maxSource = source.scrollHeight - source.clientHeight;
       const maxTarget = target.scrollHeight - target.clientHeight;
@@ -22,6 +29,12 @@ export function useScrollSync(
         locked = false;
       });
     };
+
+    const sync = (source: HTMLElement, target: HTMLElement) => {
+      pending = { source, target };
+      if (frame) return;
+      frame = window.requestAnimationFrame(flush);
+    };
     const syncFirst = () => sync(first, second);
     const syncSecond = () => sync(second, first);
 
@@ -30,6 +43,7 @@ export function useScrollSync(
     sync(first, second);
 
     return () => {
+      if (frame) window.cancelAnimationFrame(frame);
       first.removeEventListener('scroll', syncFirst);
       second.removeEventListener('scroll', syncSecond);
     };
