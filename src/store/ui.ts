@@ -3,6 +3,29 @@ import { persist } from 'zustand/middleware';
 import type { UISession } from '../types/session';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
+const DEFAULT_SIDEBAR_WIDTH = 248;
+const DEFAULT_EDITOR_WIDTH = 560;
+const SPLIT_HANDLE_WIDTH = 12;
+const MIN_EDITOR_WIDTH = 280;
+const MAX_EDITOR_WIDTH = 920;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getInitialEditorWidth(): number {
+  if (typeof window === 'undefined') return DEFAULT_EDITOR_WIDTH;
+  const availableWidth = window.innerWidth - DEFAULT_SIDEBAR_WIDTH - SPLIT_HANDLE_WIDTH;
+  const halfWidth = Math.round(availableWidth / 2);
+  return clamp(halfWidth, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH);
+}
+
+function restoreEditorWidth(ui: UISession): number {
+  if (ui.editorWidth === undefined) return getInitialEditorWidth();
+  if (ui.editorWidth === DEFAULT_EDITOR_WIDTH && ui.splitRatio === 0.5) return getInitialEditorWidth();
+  return ui.editorWidth;
+}
+
 interface UIState {
   sidebarMode: SidebarMode;
   toolbarExpanded: boolean;
@@ -33,9 +56,9 @@ export const useUIStore = create<UIState>()(
       sidebarMode: 'expanded',
       toolbarExpanded: true,
       viewMode: 'split',
-      sidebarWidth: 248,
+      sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       splitRatio: 0.5,
-      editorWidth: 560,
+      editorWidth: getInitialEditorWidth(),
       syncScroll: true,
       findOpen: false,
       settingsOpen: false,
@@ -48,15 +71,15 @@ export const useUIStore = create<UIState>()(
           toolbarExpanded: !state.toolbarExpanded,
         })),
       setViewMode: (mode) => set({ viewMode: mode }),
-      setSidebarWidth: (width) => set({ sidebarWidth: Math.min(420, Math.max(180, width)) }),
-      setSplitRatio: (ratio) => set({ splitRatio: Math.min(0.75, Math.max(0.25, ratio)) }),
-      setEditorWidth: (width) => set({ editorWidth: Math.min(920, Math.max(280, width)) }),
+      setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
+      setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
+      setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
       toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
       openFind: () => set({ findOpen: true }),
       closeFind: () => set({ findOpen: false }),
       toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
       closeSettings: () => set({ settingsOpen: false }),
-      restoreUI: (ui) => set({ ...ui, editorWidth: ui.editorWidth ?? 560, findOpen: false, settingsOpen: false }),
+      restoreUI: (ui) => set({ ...ui, editorWidth: restoreEditorWidth(ui), findOpen: false, settingsOpen: false }),
     }),
     {
       name: 'saekim-ui',
