@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Backend } from '../lib/backend';
 import type { WorkspaceSession } from '../types/session';
-import type { FileTreeNode, OpenFile } from '../types/workspace';
+import type { FileTreeNode, OpenFile, RecentFile } from '../types/workspace';
 
 const starterContent = `# Saekim 마크다운 에디터
 
@@ -29,6 +29,7 @@ flowchart LR
 `;
 
 const now = Date.now();
+const maxRecentFiles = 24;
 
 const initialTree: FileTreeNode[] = [
   {
@@ -78,6 +79,7 @@ interface WorkspaceState {
   rootPath: string | null;
   tree: FileTreeNode[];
   openFiles: OpenFile[];
+  recentFiles: RecentFile[];
   activeFileId: string | null;
   history: { back: string[]; forward: string[]; current: string | null };
   openFolder: () => Promise<void>;
@@ -99,6 +101,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   rootPath: '~/Documents/notes',
   tree: initialTree,
   openFiles: [initialFile],
+  recentFiles: [toRecentFile(initialFile, now)],
   activeFileId: initialFile.id,
   history: { back: [], forward: [], current: initialFile.path },
   openFolder: async () => {
@@ -213,6 +216,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!file) return;
     const savedPath = await Backend.saveFile(file.path.startsWith('~') ? null : file.path, file.content);
     if (!savedPath) return;
+    const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
         candidate.id === file.id
@@ -220,10 +224,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ...candidate,
               id: savedPath,
               path: savedPath,
-              name: fileNameFromPath(savedPath),
+              name: savedFile.name,
               savedContent: candidate.content,
             }
           : candidate,
+      ),
+      recentFiles: touchRecentFile(
+        current.recentFiles.filter((recent) => recent.path !== file.path),
+        savedFile,
       ),
       activeFileId: current.activeFileId === file.id ? savedPath : current.activeFileId,
       history: {
@@ -239,6 +247,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!file) return;
     const savedPath = await Backend.saveFileAs(file.content, file.name);
     if (!savedPath) return;
+    const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
         candidate.id === file.id
@@ -246,10 +255,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ...candidate,
               id: savedPath,
               path: savedPath,
-              name: fileNameFromPath(savedPath),
+              name: savedFile.name,
               savedContent: candidate.content,
             }
           : candidate,
+      ),
+      recentFiles: touchRecentFile(
+        current.recentFiles.filter((recent) => recent.path !== file.path),
+        savedFile,
       ),
       activeFileId: savedPath,
       history: {
@@ -279,6 +292,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (!file) return {};
 
       return {
+        recentFiles: touchRecentFile(state.recentFiles, file),
         activeFileId: file.id,
         history: {
           back: state.history.back.slice(0, -1),
@@ -296,6 +310,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (!file) return {};
 
       return {
+        recentFiles: touchRecentFile(state.recentFiles, file),
         activeFileId: file.id,
         history: {
           back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
@@ -309,6 +324,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       rootPath: workspace.rootPath,
       tree: workspace.tree.length > 0 ? workspace.tree : initialTree,
       openFiles: workspace.openFiles.length > 0 ? workspace.openFiles : [initialFile],
+      recentFiles:
+        workspace.recentFiles && workspace.recentFiles.length > 0
+          ? workspace.recentFiles
+          : (workspace.openFiles.length > 0 ? workspace.openFiles : [initialFile]).map((file) => toRecentFile(file)),
       activeFileId: workspace.activeFileId ?? workspace.openFiles[0]?.id ?? initialFile.id,
     }),
 }));
@@ -332,6 +351,19 @@ function toOpenFile(path: string, name: string, content: string): OpenFile {
     encoding: 'UTF-8',
     eol,
   };
+}
+
+function toRecentFile(file: Pick<OpenFile, 'path' | 'name'>, openedAt = Date.now()): RecentFile {
+  return {
+    path: file.path,
+    name: file.name,
+    openedAt,
+  };
+}
+
+function touchRecentFile(recentFiles: RecentFile[], file: Pick<OpenFile, 'path' | 'name'>): RecentFile[] {
+  const nextFile = toRecentFile(file);
+  return [nextFile, ...recentFiles.filter((recent) => recent.path !== file.path)].slice(0, maxRecentFiles);
 }
 
 function fileNameFromPath(path: string): string {
@@ -371,10 +403,11 @@ function updateTreeFolder(nodes: FileTreeNode[], path: string, patch: Partial<Fi
 function upsertOpenFile(
   state: WorkspaceState,
   file: OpenFile,
-): Pick<WorkspaceState, 'openFiles' | 'activeFileId' | 'history'> {
+): Pick<WorkspaceState, 'openFiles' | 'recentFiles' | 'activeFileId' | 'history'> {
   const exists = state.openFiles.some((candidate) => candidate.id === file.id);
   return {
     openFiles: exists ? state.openFiles.map((candidate) => (candidate.id === file.id ? file : candidate)) : [...state.openFiles, file],
+    recentFiles: touchRecentFile(state.recentFiles, file),
     activeFileId: file.id,
     history: {
       back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
@@ -387,9 +420,10 @@ function upsertOpenFile(
 function activateOpenFile(
   state: WorkspaceState,
   file: OpenFile,
-): Pick<WorkspaceState, 'activeFileId' | 'history'> {
+): Pick<WorkspaceState, 'recentFiles' | 'activeFileId' | 'history'> {
   if (state.activeFileId === file.id) {
     return {
+      recentFiles: touchRecentFile(state.recentFiles, file),
       activeFileId: file.id,
       history: {
         ...state.history,
@@ -399,6 +433,7 @@ function activateOpenFile(
   }
 
   return {
+    recentFiles: touchRecentFile(state.recentFiles, file),
     activeFileId: file.id,
     history: {
       back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
