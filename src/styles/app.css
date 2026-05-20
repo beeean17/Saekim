@@ -1096,6 +1096,18 @@
   border-radius: 50%;
 }
 
+.statusbar .pdf-export-status.exporting {
+  color: var(--accent);
+}
+
+.statusbar .pdf-export-status.done {
+  color: var(--success);
+}
+
+.statusbar .pdf-export-status.error {
+  color: var(--danger);
+}
+
 .statusbar .right {
   display: flex;
   align-items: center;

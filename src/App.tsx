@@ -33,6 +33,7 @@ export function App() {
   const editorWidth = useUIStore((state) => state.editorWidth);
   const setSidebarWidth = useUIStore((state) => state.setSidebarWidth);
   const setEditorWidth = useUIStore((state) => state.setEditorWidth);
+  const setPdfExportStatus = useUIStore((state) => state.setPdfExportStatus);
 
   const shortcuts = useMemo(
     () => ({
@@ -41,7 +42,20 @@ export function App() {
       onOpenFolder: () => void openFolder(),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
-      onExportPdf: () => void exportPreviewToPdf({ suggestedName: activeFile?.name }),
+      onExportPdf: () => {
+        void (async () => {
+          try {
+            setPdfExportStatus('exporting');
+            const exported = await exportPreviewToPdf({ suggestedName: activeFile?.name });
+            setPdfExportStatus(exported ? 'done' : 'idle');
+            if (exported) window.setTimeout(() => setPdfExportStatus('idle'), 3000);
+          } catch (error) {
+            console.error('PDF export failed:', error);
+            setPdfExportStatus('error');
+            window.setTimeout(() => setPdfExportStatus('idle'), 4000);
+          }
+        })();
+      },
       onFind: openFind,
       onClose: () => {
         if (!activeFile) return;
@@ -49,7 +63,7 @@ export function App() {
         closeFile(activeFile.id);
       },
     }),
-    [activeFile, closeFile, createFile, openFile, openFolder, openFind, saveActive, saveActiveAs],
+    [activeFile, closeFile, createFile, openFile, openFolder, openFind, saveActive, saveActiveAs, setPdfExportStatus],
   );
 
   useShortcuts(shortcuts);
