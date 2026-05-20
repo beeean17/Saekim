@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import type { SettingsSession } from '../types/session';
 import type { ThemeName } from '../types/workspace';
 
+const defaultFontSize = 13.5;
+const defaultEditorFontFamily = 'Pretendard Variable';
+const editorLineHeight = 1.75;
+
 interface SettingsState {
   theme: ThemeName;
   fontSize: number;
@@ -13,15 +17,19 @@ interface SettingsState {
 }
 
 function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
+  if (typeof document === 'undefined') return;
+
   document.documentElement.style.setProperty('--editor-font-size', `${fontSize}px`);
-  document.documentElement.style.setProperty('--editor-line-height-size', `${fontSize * 1.75}px`);
+  document.documentElement.style.setProperty('--editor-line-height-size', `${fontSize * editorLineHeight}px`);
   document.documentElement.style.setProperty('--editor-font-family', editorFontFamily);
 }
 
+applyEditorSettings(defaultFontSize, defaultEditorFontFamily);
+
 export const useSettingsStore = create<SettingsState>()((set) => ({
   theme: 'default',
-  fontSize: 13.5,
-  editorFontFamily: 'Pretendard Variable',
+  fontSize: defaultFontSize,
+  editorFontFamily: defaultEditorFontFamily,
   setTheme: (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
     set({ theme });
