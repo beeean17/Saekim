@@ -5,6 +5,7 @@ import { AppShell } from './components/shell/AppShell';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { useNativeMenuCommands } from './hooks/useNativeMenuCommands';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
+import { useResponsiveSplitWidth } from './hooks/useResponsiveSplitWidth';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
@@ -49,6 +50,7 @@ export function App() {
   useShortcuts(shortcuts);
   useNativeMenuCommands(shortcuts);
   useScrollSync(editorRef, previewRef, syncScroll && viewMode === 'split');
+  useResponsiveSplitWidth(bodyRef, viewMode, sidebarMode, sidebarWidth, editorWidth);
   useWindowSizeConstraints(viewMode, sidebarMode, sidebarWidth);
   useSessionPersistence();
 
@@ -75,16 +77,18 @@ export function App() {
     event.preventDefault();
     const app = body.closest<HTMLElement>('.app');
     const rect = body.getBoundingClientRect();
-    const handleWidth = 12;
+    const sidebarHandleWidth = sidebarMode === 'collapsed' ? 0 : 6;
+    const splitHandleWidth = 6;
     const activeSidebarWidth = sidebarMode === 'collapsed' ? 56 : sidebarWidth;
-    const maxEditorWidth = Math.max(280, rect.width - activeSidebarWidth - handleWidth - 280);
+    const maxEditorWidth = Math.max(280, rect.width - activeSidebarWidth - sidebarHandleWidth - splitHandleWidth - 280);
     let nextWidth = clamp(editorWidth, 280, maxEditorWidth);
 
     beginHorizontalDrag({
       onMove: (clientX) => {
-        const rawWidth = clientX - rect.left - activeSidebarWidth - handleWidth / 2;
+        const rawWidth = clientX - rect.left - activeSidebarWidth - sidebarHandleWidth - splitHandleWidth / 2;
         nextWidth = clamp(rawWidth, 280, maxEditorWidth);
         app?.style.setProperty('--editor-w', `${nextWidth}px`);
+        app?.style.setProperty('--effective-editor-w', `${nextWidth}px`);
       },
       onEnd: () => setEditorWidth(nextWidth),
     });

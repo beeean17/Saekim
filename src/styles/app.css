@@ -250,7 +250,7 @@
   grid-template-columns:
     var(--sidebar-w)
     var(--pane-resizer-w)
-    minmax(var(--pane-min-w), min(var(--editor-w), calc(100% - var(--sidebar-w) - var(--pane-resizer-w) - var(--pane-resizer-w) - var(--pane-min-w))))
+    minmax(var(--pane-min-w), var(--effective-editor-w, var(--editor-w)))
     var(--pane-resizer-w)
     minmax(var(--pane-min-w), 1fr);
   background: var(--bg-app);
@@ -261,7 +261,7 @@
   grid-template-columns:
     var(--sidebar-w-collapsed)
     0
-    minmax(var(--pane-min-w), min(var(--editor-w), calc(100% - var(--sidebar-w-collapsed) - var(--pane-resizer-w) - var(--pane-min-w))))
+    minmax(var(--pane-min-w), var(--effective-editor-w, var(--editor-w)))
     var(--pane-resizer-w)
     minmax(var(--pane-min-w), 1fr);
 }
@@ -1054,7 +1054,7 @@
     grid-template-columns:
       var(--sidebar-w-collapsed)
       0
-      minmax(var(--pane-min-w), min(var(--editor-w), calc(100% - var(--sidebar-w-collapsed) - var(--pane-resizer-w) - var(--pane-min-w))))
+      minmax(var(--pane-min-w), var(--effective-editor-w, var(--editor-w)))
       var(--pane-resizer-w)
       minmax(var(--pane-min-w), 1fr);
   }
