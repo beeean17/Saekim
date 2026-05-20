@@ -193,16 +193,32 @@
 }
 
 .pdf-export-root .katex,
-.pdf-export-root .katex * {
+.pdf-export-root .katex .base,
+.pdf-export-root .katex .mord,
+.pdf-export-root .katex .mop,
+.pdf-export-root .katex .mbin,
+.pdf-export-root .katex .mrel,
+.pdf-export-root .katex .mopen,
+.pdf-export-root .katex .mclose,
+.pdf-export-root .katex .mpunct,
+.pdf-export-root .katex .minner,
+.pdf-export-root .katex .mfrac,
+.pdf-export-root .katex .msupsub,
+.pdf-export-root .katex .mspace,
+.pdf-export-root .katex .accent-body,
+.pdf-export-root .katex .sqrt > .root {
   color: #111827 !important;
-  border-color: #111827 !important;
 }
 
 .pdf-export-root .katex .frac-line,
-.pdf-export-root .katex .rule,
 .pdf-export-root .katex .sqrt-line {
   border-color: #111827 !important;
-  background: #111827 !important;
+}
+
+.pdf-export-root .katex svg,
+.pdf-export-root .katex svg path {
+  fill: #111827 !important;
+  stroke: #111827 !important;
 }
 
 .pdf-export-root .mermaid-block svg {
