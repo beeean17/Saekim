@@ -881,7 +881,7 @@
   grid-template-columns: 48px 1fr;
   overflow: hidden;
   background: var(--bg-surface);
-  font-family: var(--editor-font-family, var(--font-mono));
+  font-family: var(--editor-font-family, var(--font-ui));
   font-size: var(--editor-font-size, 13.5px);
   line-height: 1.75;
 }
@@ -914,7 +914,7 @@
   overflow: auto;
   color: var(--text-primary);
   background: var(--bg-surface);
-  font-family: var(--editor-font-family, var(--font-mono));
+  font-family: var(--editor-font-family, var(--font-ui));
   font-size: var(--editor-font-size, 13.5px);
   line-height: 1.75;
   white-space: pre;

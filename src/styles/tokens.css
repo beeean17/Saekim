@@ -19,6 +19,7 @@
   --warning: #d97706;
   --danger: #dc2626;
   --font-ui: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
+  --editor-font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
   --radius-sm: 4px;
   --radius: 6px;
