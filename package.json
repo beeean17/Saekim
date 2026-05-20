@@ -15,15 +15,16 @@
     "tauri:build:dmg": "tauri build --bundles dmg"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-sans-kr": "^5.2.8",
     "@tauri-apps/api": "^2.5.0",
     "katex": "^0.16.22",
     "markdown-it": "^14.1.0",
     "markdown-it-katex": "^2.0.3",
     "mermaid": "^11.6.0",
-    "shiki": "^3.4.0",
-    "zustand": "^5.0.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "shiki": "^3.4.0",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",
