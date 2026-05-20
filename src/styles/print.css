@@ -143,11 +143,6 @@
   border: 0;
 }
 
-.pdf-export-root .shiki span {
-  color: #1f2937 !important;
-  background: transparent !important;
-}
-
 .pdf-export-root table {
   width: 100%;
   margin: 16px 0;

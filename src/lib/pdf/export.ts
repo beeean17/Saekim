@@ -45,6 +45,7 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
 
   try {
     prepareKatexForCanvas(exportRoot);
+    await renderCodeBlocksForPdf(exportRoot);
     await renderMermaidForPdf(exportRoot);
     await waitForTemplateAssets(exportRoot);
     applyBlockPageBreaks(exportRoot);
@@ -74,6 +75,36 @@ function createPdfTemplate(preview: HTMLElement, title: string): HTMLElement {
 
 function prepareKatexForCanvas(root: HTMLElement): void {
   root.querySelectorAll('.katex-mathml').forEach((node) => node.remove());
+}
+
+async function renderCodeBlocksForPdf(root: HTMLElement): Promise<void> {
+  const blocks = Array.from(root.querySelectorAll<HTMLElement>('pre[data-lang]'));
+  if (blocks.length === 0) return;
+
+  const { codeToHtml } = await import('shiki');
+  await Promise.all(
+    blocks.map(async (block) => {
+      const lang = block.dataset.lang;
+      if (!lang) return;
+
+      try {
+        const highlighted = await codeToHtml(block.textContent ?? '', {
+          lang,
+          theme: 'github-light',
+        });
+        const template = document.createElement('template');
+        template.innerHTML = highlighted.trim();
+        const highlightedPre = template.content.firstElementChild;
+        if (highlightedPre instanceof HTMLElement) {
+          highlightedPre.dataset.lang = lang;
+          block.replaceWith(highlightedPre);
+        }
+      } catch {
+        block.classList.remove('shiki');
+        block.removeAttribute('style');
+      }
+    }),
+  );
 }
 
 async function renderMermaidForPdf(root: HTMLElement): Promise<void> {
