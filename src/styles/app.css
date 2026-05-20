@@ -937,22 +937,20 @@
 }
 
 .line-number-list > span {
-  display: flex;
+  display: block;
   height: var(--editor-row-height);
-  align-items: center;
-  justify-content: flex-end;
+  height: 1lh;
   padding-right: 4px;
+  line-height: var(--editor-line-height);
 }
 
 .line-number-text {
-  display: inline-flex;
+  display: inline-block;
   min-width: 1.35em;
-  height: 1.28em;
-  align-items: center;
-  justify-content: center;
   padding: 0 3px;
   border-radius: var(--radius-sm);
-  line-height: 1.28;
+  line-height: inherit;
+  text-align: center;
 }
 
 .line-number-list > span.active .line-number-text {
