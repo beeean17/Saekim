@@ -8,11 +8,13 @@ use tauri::Emitter;
 const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
 const MENU_EXPORT_PDF: &str = "export-pdf";
+const MENU_NEW_FILE: &str = "new-file";
 const MENU_OPEN_FILE: &str = "open-file";
 const MENU_OPEN_FOLDER: &str = "open-folder";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
+const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 
@@ -28,6 +30,7 @@ pub fn run() {
                 MENU_SAVE => Some(EVENT_SAVE),
                 MENU_SAVE_AS => Some(EVENT_SAVE_AS),
                 MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
+                MENU_NEW_FILE => Some(EVENT_NEW_FILE),
                 MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
                 MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
                 _ => None,
@@ -72,6 +75,7 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     };
 
     let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+KeyS"))?;
+    let new_file = MenuItem::with_id(app, MENU_NEW_FILE, "New File", true, Some("CmdOrCtrl+KeyN"))?;
     let open_file = MenuItem::with_id(
         app,
         MENU_OPEN_FILE,
@@ -121,6 +125,8 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         "File",
         true,
         &[
+            &new_file,
+            &PredefinedMenuItem::separator(app)?,
             &open_file,
             &open_folder,
             &PredefinedMenuItem::separator(app)?,

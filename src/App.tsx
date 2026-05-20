@@ -19,6 +19,7 @@ export function App() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const openFile = useWorkspaceStore((state) => state.openFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
+  const createFile = useWorkspaceStore((state) => state.createFile);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
   const closeFile = useWorkspaceStore((state) => state.closeFile);
@@ -34,6 +35,7 @@ export function App() {
 
   const shortcuts = useMemo(
     () => ({
+      onNewFile: () => void createFile(),
       onOpen: () => void openFile(),
       onOpenFolder: () => void openFolder(),
       onSave: () => void saveActive(),
@@ -46,7 +48,7 @@ export function App() {
         closeFile(activeFile.id);
       },
     }),
-    [activeFile, closeFile, openFile, openFolder, openFind, saveActive, saveActiveAs],
+    [activeFile, closeFile, createFile, openFile, openFolder, openFind, saveActive, saveActiveAs],
   );
 
   useShortcuts(shortcuts);
