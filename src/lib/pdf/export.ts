@@ -2,9 +2,11 @@ import { pickPdfExportPath, writePdfExport } from '../tauri/fs';
 import { isTauriRuntime } from '../tauri/invoke';
 
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
+const PAGE_SPACER_CLASS = 'pdf-page-spacer';
 const A4_WIDTH_PX = 794;
 const A4_WIDTH_PT = 595.28;
 const A4_HEIGHT_PT = 841.89;
+const A4_HEIGHT_PX = (A4_WIDTH_PX * A4_HEIGHT_PT) / A4_WIDTH_PT;
 
 interface PdfExportOptions {
   suggestedName?: string;
@@ -25,6 +27,7 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
 
   try {
     await waitForTemplateAssets(exportRoot);
+    applyBlockPageBreaks(exportRoot);
     const pdfBytes = await renderTemplateToPdf(exportRoot);
     await savePdfBytes(pdfBytes, suggestedName, targetPath);
   } finally {
@@ -40,7 +43,6 @@ function createPdfTemplate(preview: HTMLElement, title: string): HTMLElement {
   exportRoot.setAttribute('aria-hidden', 'true');
   exportRoot.innerHTML = `
     <header class="pdf-cover">
-      <p class="pdf-kicker">Saekim Markdown Export</p>
       <h1>${escapeHtml(title)}</h1>
     </header>
     <main class="pdf-content">${preview.innerHTML}</main>
@@ -120,6 +122,32 @@ async function waitForTemplateAssets(root: HTMLElement): Promise<void> {
 
   await Promise.all([fontsReady, ...images]);
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
+function applyBlockPageBreaks(root: HTMLElement): void {
+  root.querySelectorAll(`.${PAGE_SPACER_CLASS}`).forEach((node) => node.remove());
+
+  const avoidBlocks = Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'table, img, svg, pre, blockquote, .shiki, .mermaid-block, .katex-display',
+    ),
+  ).filter((element) => !element.closest(`.${PAGE_SPACER_CLASS}`));
+
+  for (const block of avoidBlocks) {
+    const height = block.offsetHeight;
+    if (height <= 0 || height >= A4_HEIGHT_PX * 0.86) continue;
+
+    const top = block.offsetTop;
+    const bottom = top + height;
+    const pageBottom = (Math.floor(top / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
+
+    if (bottom <= pageBottom) continue;
+
+    const spacer = document.createElement('div');
+    spacer.className = PAGE_SPACER_CLASS;
+    spacer.style.height = `${pageBottom - top}px`;
+    block.before(spacer);
+  }
 }
 
 function getDocumentTitle(preview: HTMLElement, suggestedName?: string): string {
