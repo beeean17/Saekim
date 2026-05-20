@@ -15,7 +15,7 @@ const viewModes: Array<{ id: ViewMode; label: string }> = [
   { id: 'preview', label: '보기' },
 ];
 
-const fontFamilies = ['Pretendard Variable', 'Pretendard', 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'ui-monospace'];
+const fontFamilies = ['Pretendard Variable', 'Pretendard', 'IBM Plex Sans KR', 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'ui-monospace'];
 
 export function SettingsPanel() {
   const panelRef = useRef<HTMLDivElement | null>(null);
