@@ -113,8 +113,8 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
           <ToolButton icon="redo" tooltip="다시 실행" onClick={() => textareaRef.current?.focus()} />
         </div>
         <div className="tool-group">
-          <ToolButton icon="mermaid" special="mermaid" tooltip="Mermaid 다이어그램" onClick={() => insertMarkdown(textareaRef.current, '```mermaid\\nflowchart LR\\n  A --> B\\n', '\\n```')} />
-          <ToolButton icon="katex" special="katex" tooltip="KaTeX 수식" onClick={() => wrapSelection(textareaRef.current, '$', '$')} />
+          <ToolButton label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램" onClick={() => insertMarkdown(textareaRef.current, '```mermaid\\nflowchart LR\\n  A --> B\\n', '\\n```')} />
+          <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식" onClick={() => wrapSelection(textareaRef.current, '$', '$')} />
         </div>
         <div className="tool-spacer" />
         <ToolButton icon="search" tooltip="문서 내 탐색" onClick={openFind} />
@@ -163,16 +163,18 @@ function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTex
 }
 
 interface ToolButtonProps {
-  icon: Parameters<typeof Icon>[0]['name'];
+  icon?: Parameters<typeof Icon>[0]['name'];
+  label?: string;
   tooltip: string;
   special?: 'mermaid' | 'katex';
   onClick: () => void;
 }
 
-function ToolButton({ icon, tooltip, special, onClick }: ToolButtonProps) {
+function ToolButton({ icon, label, tooltip, special, onClick }: ToolButtonProps) {
   return (
     <button className="tool-btn" data-special={special} title={tooltip} aria-label={tooltip} type="button" onClick={onClick}>
-      <Icon name={icon} />
+      {icon ? <Icon name={icon} /> : null}
+      {label ? <span className="label">{label}</span> : null}
     </button>
   );
 }
