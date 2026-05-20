@@ -2,12 +2,16 @@ import { useEffect } from 'react';
 import { isTauriRuntime } from '../lib/tauri/invoke';
 
 interface NativeMenuHandlers {
+  onOpen: () => void;
+  onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
   onExportPdf: () => void;
 }
 
 const menuEvents = {
+  openFile: 'saekim-menu-open-file',
+  openFolder: 'saekim-menu-open-folder',
   save: 'saekim-menu-save',
   saveAs: 'saekim-menu-save-as',
   exportPdf: 'saekim-menu-export-pdf',
@@ -23,6 +27,8 @@ export function useNativeMenuCommands(handlers: NativeMenuHandlers): void {
     void import('@tauri-apps/api/event')
       .then(async ({ listen }) => {
         const registrations = await Promise.all([
+          listen(menuEvents.openFile, handlers.onOpen),
+          listen(menuEvents.openFolder, handlers.onOpenFolder),
           listen(menuEvents.save, handlers.onSave),
           listen(menuEvents.saveAs, handlers.onSaveAs),
           listen(menuEvents.exportPdf, handlers.onExportPdf),

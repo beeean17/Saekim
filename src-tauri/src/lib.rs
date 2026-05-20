@@ -8,9 +8,13 @@ use tauri::Emitter;
 const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
 const MENU_EXPORT_PDF: &str = "export-pdf";
+const MENU_OPEN_FILE: &str = "open-file";
+const MENU_OPEN_FOLDER: &str = "open-folder";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
+const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
+const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,6 +28,8 @@ pub fn run() {
                 MENU_SAVE => Some(EVENT_SAVE),
                 MENU_SAVE_AS => Some(EVENT_SAVE_AS),
                 MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
+                MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
+                MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
                 _ => None,
             };
 
@@ -66,6 +72,20 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     };
 
     let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+KeyS"))?;
+    let open_file = MenuItem::with_id(
+        app,
+        MENU_OPEN_FILE,
+        "Open File...",
+        true,
+        Some("CmdOrCtrl+KeyO"),
+    )?;
+    let open_folder = MenuItem::with_id(
+        app,
+        MENU_OPEN_FOLDER,
+        "Open Folder...",
+        true,
+        Some("CmdOrCtrl+Shift+KeyO"),
+    )?;
     let save_as = MenuItem::with_id(
         app,
         MENU_SAVE_AS,
@@ -101,6 +121,9 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         "File",
         true,
         &[
+            &open_file,
+            &open_folder,
+            &PredefinedMenuItem::separator(app)?,
             &save,
             &save_as,
             &PredefinedMenuItem::separator(app)?,
