@@ -97,7 +97,9 @@ pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<String>> {
             .file()
             .add_filter(
                 "Images",
-                &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"],
+                &[
+                    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif",
+                ],
             )
             .blocking_pick_file()
     })
@@ -280,8 +282,9 @@ pub fn write_pdf_export(path: String, bytes: Vec<u8>) -> CommandResult<String> {
 }
 
 fn read_file_payload(path: PathBuf) -> Result<OpenFilePayload, String> {
-    let content =
-        fs::read_to_string(&path).map_err(|error| format!("failed to read file: {error}"))?;
+    let bytes = fs::read(&path).map_err(|error| format!("failed to read file: {error}"))?;
+    let content = String::from_utf8(bytes)
+        .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
     let name = path
         .file_name()
         .and_then(|value| value.to_str())

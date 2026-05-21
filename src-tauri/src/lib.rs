@@ -78,7 +78,11 @@ pub fn run() {
         if let tauri::RunEvent::Opened { urls } = event {
             let paths = urls
                 .into_iter()
-                .filter_map(|url| url.to_file_path().ok())
+                .filter_map(|url| {
+                    url.to_file_path().ok().or_else(|| {
+                        (url.scheme() == "file").then(|| PathBuf::from(percent_decode(url.path())))
+                    })
+                })
                 .filter(|path| is_supported_document_path(path))
                 .map(|path| path.to_string_lossy().to_string())
                 .collect();
@@ -86,6 +90,38 @@ pub fn run() {
             queue_open_files(app, paths);
         }
     });
+}
+
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let high = hex_value(bytes[index + 1]);
+            let low = hex_value(bytes[index + 2]);
+            if let (Some(high), Some(low)) = (high, low) {
+                decoded.push((high << 4) | low);
+                index += 3;
+                continue;
+            }
+        }
+
+        decoded.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn startup_document_args() -> Vec<String> {

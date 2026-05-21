@@ -120,7 +120,13 @@ fn descriptor_path(descriptor: *mut AnyObject) -> Option<String> {
 
     let file_url: *mut AnyObject = unsafe { msg_send![descriptor, fileURLValue] };
     if !file_url.is_null() {
-        let path: *mut AnyObject = unsafe { msg_send![file_url, path] };
+        let file_path_url: *mut AnyObject = unsafe { msg_send![file_url, filePathURL] };
+        let path_source = if file_path_url.is_null() {
+            file_url
+        } else {
+            file_path_url
+        };
+        let path: *mut AnyObject = unsafe { msg_send![path_source, path] };
         if let Some(path) = nsstring_to_string(path) {
             return Some(path);
         }
