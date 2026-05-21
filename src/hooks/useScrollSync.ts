@@ -156,11 +156,14 @@ export function useScrollSync(
 
     let frame = 0;
     let releaseFrame = 0;
+    let selectionFrame = 0;
     let suppressed: HTMLElement | null = null;
     let pending: { source: HTMLElement; target: HTMLElement } | null = null;
     let firstUserScrollUntil = 0;
     let secondUserScrollUntil = 0;
     let previewAnchors = getSourceLineElements(second);
+    let lastSelectionStart = first instanceof HTMLTextAreaElement ? first.selectionStart : -1;
+    let lastSelectionEnd = first instanceof HTMLTextAreaElement ? first.selectionEnd : -1;
 
     const markFirstUserScroll = () => {
       firstUserScrollUntil = performance.now() + 250;
@@ -283,6 +286,19 @@ export function useScrollSync(
       if (!['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) return;
       sync(first, second);
     };
+    const syncSelectionChange = () => {
+      if (!(first instanceof HTMLTextAreaElement) || document.activeElement !== first) return;
+      if (first.selectionStart === lastSelectionStart && first.selectionEnd === lastSelectionEnd) return;
+
+      lastSelectionStart = first.selectionStart;
+      lastSelectionEnd = first.selectionEnd;
+      if (selectionFrame) return;
+
+      selectionFrame = window.requestAnimationFrame(() => {
+        selectionFrame = 0;
+        sync(first, second);
+      });
+    };
     const syncAfterPreviewRender = () => {
       refreshPreviewAnchors();
       syncFirstIfFocused();
@@ -299,6 +315,7 @@ export function useScrollSync(
     first.addEventListener('input', syncFirst);
     first.addEventListener('keyup', syncCursorNavigation);
     first.addEventListener('mouseup', syncFirstIfFocused);
+    document.addEventListener('selectionchange', syncSelectionChange);
     second.addEventListener('wheel', markSecondUserScroll, { passive: true });
     second.addEventListener('touchmove', markSecondUserScroll, { passive: true });
     second.addEventListener('pointerdown', markSecondUserScroll, { passive: true });
@@ -309,6 +326,7 @@ export function useScrollSync(
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       if (releaseFrame) window.cancelAnimationFrame(releaseFrame);
+      if (selectionFrame) window.cancelAnimationFrame(selectionFrame);
       first.removeEventListener('wheel', markFirstUserScroll);
       first.removeEventListener('touchmove', markFirstUserScroll);
       first.removeEventListener('pointerdown', markFirstPointerScroll);
@@ -316,6 +334,7 @@ export function useScrollSync(
       first.removeEventListener('input', syncFirst);
       first.removeEventListener('keyup', syncCursorNavigation);
       first.removeEventListener('mouseup', syncFirstIfFocused);
+      document.removeEventListener('selectionchange', syncSelectionChange);
       second.removeEventListener('wheel', markSecondUserScroll);
       second.removeEventListener('touchmove', markSecondUserScroll);
       second.removeEventListener('pointerdown', markSecondUserScroll);
