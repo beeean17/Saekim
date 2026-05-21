@@ -9,6 +9,13 @@ type CursorLineAnchor = {
   viewportRatio: number;
 };
 
+type SourceLineAnchor = {
+  line: number;
+  endLine: number;
+  top: number;
+  bottom: number;
+};
+
 function isFocusedTextAreaAtDocumentEnd(element: HTMLElement): boolean {
   if (!(element instanceof HTMLTextAreaElement) || document.activeElement !== element) return false;
 
@@ -69,28 +76,45 @@ function getCursorLineAnchor(textarea: HTMLTextAreaElement): CursorLineAnchor {
   return { line, lineCount, viewportRatio };
 }
 
-function getSourceLineElements(preview: HTMLElement): Array<{ line: number; top: number }> {
+function getSourceLineElements(preview: HTMLElement): SourceLineAnchor[] {
   const previewRect = preview.getBoundingClientRect();
-  const anchors: Array<{ line: number; top: number }> = [];
-  const seen = new Set<number>();
+  const anchors: SourceLineAnchor[] = [];
 
   preview.querySelectorAll<HTMLElement>('[data-source-line]').forEach((element) => {
     const sourceLine = Number.parseInt(element.dataset.sourceLine ?? '', 10);
-    if (!Number.isFinite(sourceLine) || seen.has(sourceLine)) return;
+    if (!Number.isFinite(sourceLine)) return;
 
-    seen.add(sourceLine);
+    const sourceEndLine = Number.parseInt(element.dataset.sourceEndLine ?? '', 10);
+    const rect = element.getBoundingClientRect();
+    const top = rect.top - previewRect.top + preview.scrollTop;
     anchors.push({
       line: sourceLine,
-      top: element.getBoundingClientRect().top - previewRect.top + preview.scrollTop,
+      endLine: Number.isFinite(sourceEndLine) ? Math.max(sourceLine, sourceEndLine) : sourceLine,
+      top,
+      bottom: top + rect.height,
     });
   });
 
-  return anchors.sort((first, second) => first.line - second.line);
+  return anchors.sort((first, second) => first.line - second.line || first.endLine - second.endLine || first.top - second.top);
 }
 
 function getPreviewTopForLine(preview: HTMLElement, line: number, lineCount: number): number | null {
   const anchors = getSourceLineElements(preview);
   if (anchors.length === 0) return null;
+
+  const containing = anchors
+    .filter((anchor) => line >= anchor.line && line <= anchor.endLine)
+    .sort((first, second) => {
+      const firstSpan = first.endLine - first.line;
+      const secondSpan = second.endLine - second.line;
+      return firstSpan - secondSpan || first.bottom - first.top - (second.bottom - second.top);
+    })[0];
+
+  if (containing) {
+    const span = containing.endLine - containing.line;
+    const ratio = span > 0 ? clamp((line - containing.line) / span, 0, 1) : 0;
+    return containing.top + (containing.bottom - containing.top) * ratio;
+  }
 
   const firstAnchor = anchors[0];
   if (line <= firstAnchor.line) {
@@ -109,11 +133,11 @@ function getPreviewTopForLine(preview: HTMLElement, line: number, lineCount: num
   }
 
   const lastAnchor = anchors[anchors.length - 1];
-  if (line <= lastAnchor.line) return lastAnchor.top;
+  if (line <= lastAnchor.endLine) return lastAnchor.bottom;
 
-  const trailingLines = Math.max(1, lineCount - lastAnchor.line);
-  const trailingRatio = clamp((line - lastAnchor.line) / trailingLines, 0, 1);
-  return lastAnchor.top + (preview.scrollHeight - lastAnchor.top) * trailingRatio;
+  const trailingLines = Math.max(1, lineCount - lastAnchor.endLine);
+  const trailingRatio = clamp((line - lastAnchor.endLine) / trailingLines, 0, 1);
+  return lastAnchor.bottom + (preview.scrollHeight - lastAnchor.bottom) * trailingRatio;
 }
 
 export function useScrollSync(
@@ -138,6 +162,14 @@ export function useScrollSync(
     };
     const markSecondUserScroll = () => {
       secondUserScrollUntil = performance.now() + 250;
+    };
+    const markFirstKeyboardScroll = (event: KeyboardEvent) => {
+      if (!['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) return;
+      markFirstUserScroll();
+    };
+    const markFirstPointerScroll = (event: PointerEvent) => {
+      if (event.offsetX < first.clientWidth && event.offsetY < first.clientHeight) return;
+      markFirstUserScroll();
     };
 
     const isUserScroll = (element: HTMLElement) => {
@@ -232,7 +264,10 @@ export function useScrollSync(
       if (frame) return;
       frame = window.requestAnimationFrame(flush);
     };
-    const syncFirst = () => sync(first, second);
+    const syncFirst = () => {
+      if (document.activeElement === first && !isUserScroll(first)) return;
+      sync(first, second);
+    };
     const syncSecond = () => sync(second, first);
     const syncFirstIfFocused = () => {
       if (document.activeElement !== first) return;
@@ -244,15 +279,14 @@ export function useScrollSync(
       sync(first, second);
     };
 
-    const mutationObserver = new MutationObserver(syncFirstIfFocused);
     const resizeObserver = new ResizeObserver(syncFirstIfFocused);
-    mutationObserver.observe(second, { childList: true });
     resizeObserver.observe(second);
+    second.addEventListener('saekim-preview-rendered', syncFirstIfFocused);
 
     first.addEventListener('wheel', markFirstUserScroll, { passive: true });
     first.addEventListener('touchmove', markFirstUserScroll, { passive: true });
-    first.addEventListener('pointerdown', markFirstUserScroll, { passive: true });
-    first.addEventListener('keydown', markFirstUserScroll);
+    first.addEventListener('pointerdown', markFirstPointerScroll, { passive: true });
+    first.addEventListener('keydown', markFirstKeyboardScroll);
     first.addEventListener('keyup', syncCursorNavigation);
     first.addEventListener('mouseup', syncFirstIfFocused);
     second.addEventListener('wheel', markSecondUserScroll, { passive: true });
@@ -267,8 +301,8 @@ export function useScrollSync(
       if (releaseFrame) window.cancelAnimationFrame(releaseFrame);
       first.removeEventListener('wheel', markFirstUserScroll);
       first.removeEventListener('touchmove', markFirstUserScroll);
-      first.removeEventListener('pointerdown', markFirstUserScroll);
-      first.removeEventListener('keydown', markFirstUserScroll);
+      first.removeEventListener('pointerdown', markFirstPointerScroll);
+      first.removeEventListener('keydown', markFirstKeyboardScroll);
       first.removeEventListener('keyup', syncCursorNavigation);
       first.removeEventListener('mouseup', syncFirstIfFocused);
       second.removeEventListener('wheel', markSecondUserScroll);
@@ -277,8 +311,8 @@ export function useScrollSync(
       second.removeEventListener('keydown', markSecondUserScroll);
       first.removeEventListener('scroll', syncFirst);
       second.removeEventListener('scroll', syncSecond);
-      mutationObserver.disconnect();
       resizeObserver.disconnect();
+      second.removeEventListener('saekim-preview-rendered', syncFirstIfFocused);
     };
   }, [enabled, firstRef, secondRef]);
 }
