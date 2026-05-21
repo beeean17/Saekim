@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
+import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
@@ -16,6 +17,7 @@ export function Sidebar() {
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const closeFile = useWorkspaceStore((state) => state.closeFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const visibleTree = useMemo(() => filterTree(tree, fileSearchQuery), [fileSearchQuery, tree]);
@@ -23,7 +25,9 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
-        <div className="sidebar-title">탐색기</div>
+        <button className="brand-mark sidebar-toggle" title="탐색기 접기/펼치기" type="button" onClick={toggleSidebar}>
+          <Icon name="sidebar" />
+        </button>
         <SidebarActions
           onCreateFile={() => void createFile()}
           onOpenFolder={() => void openFolder()}

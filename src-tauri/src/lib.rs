@@ -49,6 +49,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::file::open_file_dialog,
             commands::file::open_folder_dialog,
+            commands::file::pick_image_path,
             commands::file::pick_pdf_export_path,
             commands::file::import_pdf,
             commands::file::read_file,
@@ -60,7 +61,9 @@ pub fn run() {
             commands::file::write_pdf_export,
             commands::session::load_session,
             commands::session::save_session,
-            commands::window::set_window_min_size
+            commands::window::open_external_url,
+            commands::window::set_window_min_size,
+            commands::window::start_window_drag
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Saekim");

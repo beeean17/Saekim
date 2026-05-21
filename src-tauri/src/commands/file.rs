@@ -91,6 +91,31 @@ pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>>
 }
 
 #[tauri::command]
+pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<String>> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter(
+                "Images",
+                &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"],
+            )
+            .blocking_pick_file()
+    })
+    .await;
+
+    match selected {
+        Ok(Some(path)) => ok(Some(
+            path.into_path()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        )),
+        Ok(None) => ok(None),
+        Err(error) => fail(format!("failed to pick image path: {error}")),
+    }
+}
+
+#[tauri::command]
 pub fn import_pdf(path: String) -> CommandResult<OpenFilePayload> {
     let file_name = Path::new(&path)
         .file_name()

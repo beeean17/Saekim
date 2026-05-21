@@ -32,6 +32,7 @@ type IconName =
   | 'quote'
   | 'table'
   | 'divider'
+  | 'lineBreak'
   | 'image'
   | 'footnote'
   | 'mermaid'
@@ -227,6 +228,13 @@ const paths: Record<IconName, JSX.Element> = {
     </>
   ),
   divider: <line x1="3" y1="12" x2="21" y2="12" />,
+  lineBreak: (
+    <>
+      <path d="M4 6h11a5 5 0 0 1 0 10H8" />
+      <polyline points="11 13 8 16 11 19" />
+      <line x1="4" y1="10" x2="10" y2="10" />
+    </>
+  ),
   image: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="2" />

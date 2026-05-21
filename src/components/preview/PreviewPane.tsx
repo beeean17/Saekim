@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../lib/markdown/renderer';
+import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -46,6 +47,29 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
 
   useLayoutEffect(() => {
     notifyPreviewRendered(localRef.current);
+  }, [html]);
+
+  useEffect(() => {
+    const root = localRef.current;
+    if (!root) return;
+
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor) return;
+
+      const rawHref = anchor.getAttribute('href') ?? '';
+      if (!rawHref || rawHref.startsWith('#')) return;
+      if (!isExternalUrl(anchor.href)) return;
+
+      event.preventDefault();
+      void openExternalUrl(anchor.href);
+    };
+
+    root.addEventListener('click', onClick);
+    return () => root.removeEventListener('click', onClick);
   }, [html]);
 
   useEffect(() => {
