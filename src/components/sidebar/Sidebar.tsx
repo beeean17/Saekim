@@ -89,7 +89,7 @@ function SidebarViewSwitch({ mode, onChange }: { mode: SidebarViewMode; onChange
   return (
     <div className="sidebar-view-switch" role="tablist" aria-label="사이드바 보기">
       <button className={mode === 'files' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'files'} onClick={() => onChange('files')}>
-        폴더
+        워크스페이스
       </button>
       <button className={mode === 'recent' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'recent'} onClick={() => onChange('recent')}>
         최근
