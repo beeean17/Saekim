@@ -33,6 +33,15 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   const theme = useSettingsStore((state) => state.theme);
   const [html, setHtml] = useState('');
 
+  const notifyRendered = () => {
+    const root = localRef.current;
+    if (!root) return;
+
+    window.requestAnimationFrame(() => {
+      root.dispatchEvent(new CustomEvent('saekim-preview-rendered', { bubbles: true }));
+    });
+  };
+
   useEffect(() => {
     let alive = true;
     const mode = theme === 'dark' || theme === 'nord' ? 'dark' : 'light';
@@ -60,12 +69,16 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
         securityLevel: 'strict',
       });
 
-      blocks.forEach((block, index) => {
-        const source = decodeURIComponent(block.dataset.source || '');
-        const id = `mermaid-${Date.now()}-${index}`;
-        void mermaid.render(id, source).then(({ svg }) => {
-          if (alive) block.innerHTML = svg;
-        });
+      void Promise.all(
+        blocks.map((block, index) => {
+          const source = decodeURIComponent(block.dataset.source || '');
+          const id = `mermaid-${Date.now()}-${index}`;
+          return mermaid.render(id, source).then(({ svg }) => {
+            if (alive) block.innerHTML = svg;
+          });
+        }),
+      ).then(() => {
+        if (alive) notifyRendered();
       });
     });
 
@@ -73,6 +86,10 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
       alive = false;
     };
   }, [html, theme]);
+
+  useEffect(() => {
+    notifyRendered();
+  }, [html]);
 
   return (
     <div
