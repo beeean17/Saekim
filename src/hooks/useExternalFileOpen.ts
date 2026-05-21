@@ -4,9 +4,9 @@ import { isTauriRuntime } from '../lib/tauri/invoke';
 
 const externalOpenEvent = 'saekim-open-external-files';
 
-export function useExternalFileOpen(openFile: (path: string) => Promise<void>): void {
+export function useExternalFileOpen(openFile: (path: string) => Promise<void>, enabled: boolean): void {
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    if (!isTauriRuntime() || !enabled) return;
 
     let disposed = false;
     let unlisten: (() => void) | null = null;
@@ -43,5 +43,5 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>): 
       disposed = true;
       unlisten?.();
     };
-  }, [openFile]);
+  }, [enabled, openFile]);
 }

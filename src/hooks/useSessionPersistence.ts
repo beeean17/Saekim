@@ -63,7 +63,7 @@ function clearLegacyLocalStorage(): void {
   }
 }
 
-export function useSessionPersistence(): void {
+export function useSessionPersistence(): boolean {
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<number | null>(null);
 
@@ -176,4 +176,6 @@ export function useSessionPersistence(): void {
     tree,
     viewMode,
   ]);
+
+  return loaded;
 }
