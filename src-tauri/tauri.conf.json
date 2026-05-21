@@ -48,11 +48,19 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["md", "markdown"],
-        "contentTypes": ["net.daringfireball.markdown", "public.plain-text"],
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "contentTypes": ["net.daringfireball.markdown"],
         "name": "Markdown Document",
         "description": "Markdown document",
         "mimeType": "text/markdown",
+        "role": "Editor"
+      },
+      {
+        "ext": ["txt"],
+        "contentTypes": ["public.plain-text"],
+        "name": "Text Document",
+        "description": "Plain text document",
+        "mimeType": "text/plain",
         "role": "Editor"
       }
     ]

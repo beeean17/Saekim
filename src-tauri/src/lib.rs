@@ -27,7 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
-            queue_open_files(app.handle(), startup_markdown_args());
+            queue_open_files(app.handle(), startup_document_args());
             Ok(())
         })
         .menu(build_menu)
@@ -75,7 +75,7 @@ pub fn run() {
             let paths = urls
                 .into_iter()
                 .filter_map(|url| url.to_file_path().ok())
-                .filter(is_markdown_path)
+                .filter(|path| is_supported_document_path(path))
                 .map(|path| path.to_string_lossy().to_string())
                 .collect();
 
@@ -84,19 +84,24 @@ pub fn run() {
     });
 }
 
-fn startup_markdown_args() -> Vec<String> {
+fn startup_document_args() -> Vec<String> {
     std::env::args_os()
         .skip(1)
         .map(PathBuf::from)
-        .filter(is_markdown_path)
+        .filter(|path| is_supported_document_path(path))
         .map(|path| path.to_string_lossy().to_string())
         .collect()
 }
 
-fn is_markdown_path(path: &PathBuf) -> bool {
+fn is_supported_document_path(path: &PathBuf) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
-        .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "md" | "markdown"))
+        .map(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "md" | "markdown" | "mdown" | "mkd" | "txt"
+            )
+        })
         .unwrap_or(false)
 }
 
