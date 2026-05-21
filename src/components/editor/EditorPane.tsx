@@ -116,6 +116,9 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
   return (
     <>
       <div className="toolbar">
+        <div className="toolbar-line-indicator" title="줄 번호" aria-label="줄 번호">
+          Ln
+        </div>
         <div className="tool-group">
           <ToolButton label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램 문법 찾기" onClick={() => setHelperMode('mermaid')} />
           <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식 문법 찾기" onClick={() => setHelperMode('katex')} />
@@ -452,9 +455,6 @@ function EditorContent({
   return (
     <div className="editor-content" ref={editorContentRef}>
       <div className="line-numbers">
-        <div className="line-number-label" aria-hidden="true">
-          Ln
-        </div>
         <div className="line-number-list" ref={lineNumberListRef}>
           {Array.from({ length: lineCount }, (_, index) => {
             const line = index + 1;

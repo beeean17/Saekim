@@ -773,6 +773,22 @@
   padding: 0 1px;
 }
 
+.toolbar-line-indicator {
+  display: inline-flex;
+  width: 61px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 2px;
+  color: var(--text-faint);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
 .tool-group + .tool-group {
   margin-left: 2px;
   padding-left: 4px;
@@ -1178,7 +1194,6 @@
 }
 
 .line-numbers {
-  position: relative;
   overflow: hidden;
   color: var(--text-faint);
   border-right: 1px solid var(--border);
@@ -1188,20 +1203,6 @@
   text-align: right;
   user-select: none;
   font-variant-numeric: tabular-nums;
-}
-
-.line-number-label {
-  position: absolute;
-  top: 4px;
-  right: 14px;
-  z-index: 1;
-  color: var(--text-faint);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 12px;
-  letter-spacing: 0;
-  pointer-events: none;
 }
 
 .line-number-list {
