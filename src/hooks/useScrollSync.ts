@@ -43,6 +43,36 @@ export function useScrollSync(
       return distanceToBottom <= bottomSyncThreshold || isFocusedTextAreaAtDocumentEnd(source);
     };
 
+    const releaseSuppression = (target: HTMLElement) => {
+      suppressed = target;
+      if (releaseFrame) window.cancelAnimationFrame(releaseFrame);
+      releaseFrame = window.requestAnimationFrame(() => {
+        releaseFrame = window.requestAnimationFrame(() => {
+          releaseFrame = 0;
+          suppressed = null;
+        });
+      });
+    };
+
+    const pinTargetToBottom = (source: HTMLElement, target: HTMLElement) => {
+      if (!isFocusedTextAreaAtDocumentEnd(source)) return false;
+
+      const maxTarget = target.scrollHeight - target.clientHeight;
+      if (maxTarget <= 0) return true;
+
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+        frame = 0;
+        pending = null;
+      }
+
+      if (Math.abs(target.scrollTop - maxTarget) >= 0.5) {
+        target.scrollTop = maxTarget;
+      }
+      releaseSuppression(target);
+      return true;
+    };
+
     const flush = () => {
       frame = 0;
       if (!pending) return;
@@ -58,15 +88,8 @@ export function useScrollSync(
           : (source.scrollTop / maxSource) * maxTarget;
       if (Math.abs(target.scrollTop - nextScrollTop) < 0.5) return;
 
-      suppressed = target;
       target.scrollTop = nextScrollTop;
-      if (releaseFrame) window.cancelAnimationFrame(releaseFrame);
-      releaseFrame = window.requestAnimationFrame(() => {
-        releaseFrame = window.requestAnimationFrame(() => {
-          releaseFrame = 0;
-          suppressed = null;
-        });
-      });
+      releaseSuppression(target);
     };
 
     const sync = (source: HTMLElement, target: HTMLElement) => {
@@ -79,7 +102,9 @@ export function useScrollSync(
     const syncFirst = () => sync(first, second);
     const syncSecond = () => sync(second, first);
     const syncFirstIfFocused = () => {
-      if (document.activeElement === first) sync(first, second);
+      if (document.activeElement !== first) return;
+      if (pinTargetToBottom(first, second)) return;
+      sync(first, second);
     };
 
     const mutationObserver = new MutationObserver(syncFirstIfFocused);
