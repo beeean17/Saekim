@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import katex from 'katex';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { Backend } from '../../lib/backend';
+import { getFileTypeLabel } from '../../lib/fileType';
 import { katexHelperItems, mermaidHelperItems, type KatexHelperItem, type MermaidHelperItem } from '../../lib/markdown/helperCatalog';
 import { useSettingsStore } from '../../store/settings';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -144,16 +145,6 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
       ) : null}
     </>
   );
-}
-
-function getFileTypeLabel(name?: string, path?: string): string {
-  const value = name || path || '';
-  const fileName = value.split(/[\\/]/).pop() ?? value;
-  const extension = fileName.includes('.') ? fileName.split('.').pop()?.trim().toLowerCase() : '';
-
-  if (!extension) return 'txt';
-  if (extension === 'markdown' || extension === 'mdown' || extension === 'mkd') return 'md';
-  return extension;
 }
 
 function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {

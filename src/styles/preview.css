@@ -158,6 +158,20 @@
   border: 0;
 }
 
+.preview-content .plain-text-preview {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font-editor);
+  font-size: var(--preview-font-size, 15px);
+  line-height: 1.7;
+}
+
 .preview-content .shiki .line {
   display: block;
   padding: 0 16px 0 52px;
