@@ -2,6 +2,8 @@ import { RefObject, useEffect } from 'react';
 
 const bottomSyncThreshold = 48;
 const programmaticGuardMs = 140;
+const inputSelectionQuietMs = 140;
+const inputScrollQuietMs = 100;
 const whitespaceCharCodes = new Set([9, 10, 13, 32]);
 
 type ScrollPanel = 'editor' | 'preview';
@@ -225,6 +227,7 @@ export function useScrollSync(
     let programmaticTarget: HTMLElement | null = null;
     let lastProgrammaticTarget: HTMLElement | null = null;
     let programmaticUntil = 0;
+    let lastInputAt = 0;
 
     const refreshPreviewAnchors = () => {
       previewAnchors = collectPreviewAnchors(preview);
@@ -317,8 +320,26 @@ export function useScrollSync(
       frame = window.requestAnimationFrame(flush);
     };
 
+    const cancelPendingSync = () => {
+      pending = null;
+      if (!frame) return;
+      window.cancelAnimationFrame(frame);
+      frame = 0;
+    };
+
+    const syncNow = (sourcePanel: ScrollPanel, preferCaret = false) => {
+      activeScroller = sourcePanel;
+      cancelPendingSync();
+      if (sourcePanel === 'editor') {
+        syncEditorToPreview(preferCaret);
+      } else {
+        syncPreviewToEditor();
+      }
+    };
+
     const handleEditorScroll = () => {
       if (isProgrammaticScroll(editor)) return;
+      if (document.activeElement === editor && performance.now() - lastInputAt < inputScrollQuietMs) return;
       scheduleSync('editor');
     };
 
@@ -328,28 +349,40 @@ export function useScrollSync(
     };
 
     const handleEditorInput = () => {
-      scheduleSync('editor', true);
+      lastInputAt = performance.now();
+      activeScroller = 'editor';
+      cancelPendingSync();
     };
 
     const handleSelectionChange = () => {
       if (document.activeElement !== editor) return;
+      if (performance.now() - lastInputAt < inputSelectionQuietMs) return;
       scheduleSync('editor', true);
     };
 
     const handlePreviewRendered = () => {
       refreshPreviewAnchors();
       if (document.activeElement === editor) {
-        scheduleSync('editor', true);
+        syncNow('editor', true);
         return;
       }
+      if (activeScroller === 'preview') {
+        syncNow('preview');
+        return;
+      }
+      syncNow('editor');
+    };
+
+    const handlePreviewResize = () => {
+      refreshPreviewAnchors();
       if (activeScroller === 'preview') {
         scheduleSync('preview');
         return;
       }
-      scheduleSync('editor');
+      scheduleSync('editor', document.activeElement === editor);
     };
 
-    const resizeObserver = new ResizeObserver(handlePreviewRendered);
+    const resizeObserver = new ResizeObserver(handlePreviewResize);
     resizeObserver.observe(preview);
     preview.addEventListener('saekim-preview-rendered', handlePreviewRendered);
     editor.addEventListener('scroll', handleEditorScroll, { passive: true });
