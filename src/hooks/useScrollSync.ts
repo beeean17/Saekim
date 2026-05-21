@@ -252,7 +252,13 @@ export function useScrollSync(
       if (!pending) return;
       const { source, target } = pending;
       pending = null;
-      if (source === first && (pinTargetToBottom(source, target) || syncTargetToCursorLine(source, target))) return;
+      if (
+        source === first &&
+        !isUserScroll(source) &&
+        (pinTargetToBottom(source, target) || syncTargetToCursorLine(source, target))
+      ) {
+        return;
+      }
 
       const maxSource = source.scrollHeight - source.clientHeight;
       const maxTarget = target.scrollHeight - target.clientHeight;
