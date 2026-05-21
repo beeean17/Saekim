@@ -108,16 +108,18 @@ function FindBar({
 }
 
 function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
+  const activeFile = useWorkspaceStore(selectActiveFile);
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
   const openFind = useUIStore((state) => state.openFind);
   const [helperMode, setHelperMode] = useState<HelperMode | null>(null);
+  const fileType = useMemo(() => getFileTypeLabel(activeFile?.name, activeFile?.path), [activeFile?.name, activeFile?.path]);
 
   return (
     <>
       <div className="toolbar">
-        <div className="toolbar-line-indicator" title="줄 번호" aria-label="줄 번호">
-          Ln
+        <div className="toolbar-line-indicator" title={`현재 파일 형식: ${fileType}`} aria-label={`현재 파일 형식: ${fileType}`}>
+          {fileType}
         </div>
         <div className="tool-group">
           <ToolButton label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램 문법 찾기" onClick={() => setHelperMode('mermaid')} />
@@ -142,6 +144,16 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
       ) : null}
     </>
   );
+}
+
+function getFileTypeLabel(name?: string, path?: string): string {
+  const value = name || path || '';
+  const fileName = value.split(/[\\/]/).pop() ?? value;
+  const extension = fileName.includes('.') ? fileName.split('.').pop()?.trim().toLowerCase() : '';
+
+  if (!extension) return 'txt';
+  if (extension === 'markdown' || extension === 'mdown' || extension === 'mkd') return 'md';
+  return extension;
 }
 
 function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
