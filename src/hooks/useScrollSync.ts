@@ -2,6 +2,13 @@ import { RefObject, useEffect } from 'react';
 
 const bottomSyncThreshold = 48;
 
+function isFocusedTextAreaAtDocumentEnd(element: HTMLElement): boolean {
+  if (!(element instanceof HTMLTextAreaElement) || document.activeElement !== element) return false;
+
+  const cursorEnd = Math.max(element.selectionStart, element.selectionEnd);
+  return element.value.slice(cursorEnd).trim().length === 0;
+}
+
 export function useScrollSync(
   firstRef: RefObject<HTMLElement>,
   secondRef: RefObject<HTMLElement>,
@@ -31,6 +38,11 @@ export function useScrollSync(
       return element === first ? now <= firstUserScrollUntil : now <= secondUserScrollUntil;
     };
 
+    const shouldPinTargetToBottom = (source: HTMLElement, maxSource: number) => {
+      const distanceToBottom = maxSource - source.scrollTop;
+      return distanceToBottom <= bottomSyncThreshold || isFocusedTextAreaAtDocumentEnd(source);
+    };
+
     const flush = () => {
       frame = 0;
       if (!pending) return;
@@ -40,9 +52,8 @@ export function useScrollSync(
       const maxTarget = target.scrollHeight - target.clientHeight;
       if (maxSource <= 0 || maxTarget <= 0) return;
 
-      const distanceToBottom = maxSource - source.scrollTop;
       const nextScrollTop =
-        distanceToBottom <= bottomSyncThreshold
+        shouldPinTargetToBottom(source, maxSource)
           ? maxTarget
           : (source.scrollTop / maxSource) * maxTarget;
       if (Math.abs(target.scrollTop - nextScrollTop) < 0.5) return;
@@ -67,11 +78,20 @@ export function useScrollSync(
     };
     const syncFirst = () => sync(first, second);
     const syncSecond = () => sync(second, first);
+    const syncFirstIfFocused = () => {
+      if (document.activeElement === first) sync(first, second);
+    };
+
+    const mutationObserver = new MutationObserver(syncFirstIfFocused);
+    const resizeObserver = new ResizeObserver(syncFirstIfFocused);
+    mutationObserver.observe(second, { childList: true, subtree: true });
+    resizeObserver.observe(second);
 
     first.addEventListener('wheel', markFirstUserScroll, { passive: true });
     first.addEventListener('touchmove', markFirstUserScroll, { passive: true });
     first.addEventListener('pointerdown', markFirstUserScroll, { passive: true });
     first.addEventListener('keydown', markFirstUserScroll);
+    first.addEventListener('input', syncFirstIfFocused);
     second.addEventListener('wheel', markSecondUserScroll, { passive: true });
     second.addEventListener('touchmove', markSecondUserScroll, { passive: true });
     second.addEventListener('pointerdown', markSecondUserScroll, { passive: true });
@@ -86,12 +106,15 @@ export function useScrollSync(
       first.removeEventListener('touchmove', markFirstUserScroll);
       first.removeEventListener('pointerdown', markFirstUserScroll);
       first.removeEventListener('keydown', markFirstUserScroll);
+      first.removeEventListener('input', syncFirstIfFocused);
       second.removeEventListener('wheel', markSecondUserScroll);
       second.removeEventListener('touchmove', markSecondUserScroll);
       second.removeEventListener('pointerdown', markSecondUserScroll);
       second.removeEventListener('keydown', markSecondUserScroll);
       first.removeEventListener('scroll', syncFirst);
       second.removeEventListener('scroll', syncSecond);
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
     };
   }, [enabled, firstRef, secondRef]);
 }
