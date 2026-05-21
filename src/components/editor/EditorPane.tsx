@@ -117,10 +117,6 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
     <>
       <div className="toolbar">
         <div className="tool-group">
-          <ToolButton icon="undo" tooltip="실행 취소" onClick={() => textareaRef.current?.focus()} />
-          <ToolButton icon="redo" tooltip="다시 실행" onClick={() => textareaRef.current?.focus()} />
-        </div>
-        <div className="tool-group">
           <ToolButton label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램 문법 찾기" onClick={() => setHelperMode('mermaid')} />
           <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식 문법 찾기" onClick={() => setHelperMode('katex')} />
         </div>
@@ -456,6 +452,9 @@ function EditorContent({
   return (
     <div className="editor-content" ref={editorContentRef}>
       <div className="line-numbers">
+        <div className="line-number-label" aria-hidden="true">
+          Ln
+        </div>
         <div className="line-number-list" ref={lineNumberListRef}>
           {Array.from({ length: lineCount }, (_, index) => {
             const line = index + 1;
@@ -539,13 +538,11 @@ function insertCodeBlock(textarea: HTMLTextAreaElement | null): void {
   const selected = value.slice(start, end);
   const before = '```\n';
   const after = selected && !selected.endsWith('\n') ? '\n```' : '```';
-  const next = `${value.slice(0, start)}${before}${selected}${after}${value.slice(end)}`;
+  const replacement = `${before}${selected}${after}`;
   const selectionStart = start + before.length;
   const selectionEnd = selectionStart + selected.length;
 
-  setTextareaValue(textarea, next);
-  dispatchTextareaInput(textarea);
-  textarea.focus();
+  replaceSelectionUndoably(textarea, replacement);
   textarea.selectionStart = selectionStart;
   textarea.selectionEnd = selectionEnd;
 }
@@ -579,13 +576,8 @@ function escapeMarkdownDestination(path: string): string {
 function insertTextAtSelection(textarea: HTMLTextAreaElement | null, snippet: string): void {
   if (!textarea) return;
   const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const value = textarea.value;
-  const next = `${value.slice(0, start)}${snippet}${value.slice(end)}`;
 
-  setTextareaValue(textarea, next);
-  dispatchTextareaInput(textarea);
-  textarea.focus();
+  replaceSelectionUndoably(textarea, snippet);
   textarea.selectionStart = start + snippet.length;
   textarea.selectionEnd = start + snippet.length;
 }
@@ -595,13 +587,31 @@ function wrapSelection(textarea: HTMLTextAreaElement | null, before: string, aft
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const value = textarea.value;
-  const next = `${value.slice(0, start)}${before}${value.slice(start, end)}${after}${value.slice(end)}`;
+  const selected = value.slice(start, end);
 
-  setTextareaValue(textarea, next);
-  dispatchTextareaInput(textarea);
-  textarea.focus();
+  replaceSelectionUndoably(textarea, `${before}${selected}${after}`);
   textarea.selectionStart = start + before.length;
   textarea.selectionEnd = end + before.length;
+}
+
+function replaceSelectionUndoably(textarea: HTMLTextAreaElement, replacement: string): void {
+  textarea.focus();
+
+  try {
+    if (document.execCommand('insertText', false, replacement)) {
+      dispatchTextareaInput(textarea);
+      return;
+    }
+  } catch {
+    // Fallback below keeps non-browser test/runtime environments working.
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const value = textarea.value;
+  const next = `${value.slice(0, start)}${replacement}${value.slice(end)}`;
+  setTextareaValue(textarea, next);
+  dispatchTextareaInput(textarea);
 }
 
 function setTextareaValue(textarea: HTMLTextAreaElement, value: string): void {
