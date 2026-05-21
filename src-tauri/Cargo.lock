@@ -2821,6 +2821,7 @@ name = "saekim"
 version = "3.0.0"
 dependencies = [
  "dirs",
+ "objc2",
  "serde",
  "serde_json",
  "tauri",

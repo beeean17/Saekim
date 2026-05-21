@@ -1,5 +1,7 @@
 mod app_state;
 mod commands;
+#[cfg(target_os = "macos")]
+mod macos_open_documents;
 
 use app_state::AppState;
 use std::path::PathBuf;
@@ -27,6 +29,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            macos_open_documents::install(app.handle());
             queue_open_files(app.handle(), startup_document_args());
             Ok(())
         })
