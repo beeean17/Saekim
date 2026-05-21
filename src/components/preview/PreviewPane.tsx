@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
@@ -31,6 +31,8 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   const localRef = useRef<HTMLDivElement | null>(null);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const theme = useSettingsStore((state) => state.theme);
+  const deferredContent = useDeferredValue(activeFile?.content ?? '');
+  const renderVersionRef = useRef(0);
   const [html, setHtml] = useState('');
 
   const notifyRendered = () => {
@@ -43,15 +45,13 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   };
 
   useEffect(() => {
-    let alive = true;
+    const renderVersion = renderVersionRef.current + 1;
+    renderVersionRef.current = renderVersion;
     const mode = theme === 'dark' || theme === 'nord' ? 'dark' : 'light';
-    void renderMarkdown(activeFile?.content ?? '', mode).then((nextHtml) => {
-      if (alive) setHtml(nextHtml);
+    void renderMarkdown(deferredContent, mode).then((nextHtml) => {
+      if (renderVersionRef.current === renderVersion) setHtml(nextHtml);
     });
-    return () => {
-      alive = false;
-    };
-  }, [activeFile?.content, theme]);
+  }, [deferredContent, theme]);
 
   useEffect(() => {
     const root = localRef.current;
