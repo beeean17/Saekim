@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { isMarkdownFile } from '../../lib/fileType';
+import { escapeHtml } from '../../lib/markdown/escape';
 import { renderMarkdown } from '../../lib/markdown/renderer';
+import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -35,17 +38,49 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
 
   useEffect(() => {
     let alive = true;
+    const content = activeFile?.content ?? '';
+
+    if (!isMarkdownFile(activeFile?.name, activeFile?.path)) {
+      setHtml(`<pre class="plain-text-preview">${escapeHtml(content)}</pre>`);
+      return () => {
+        alive = false;
+      };
+    }
+
     const mode = theme === 'dark' || theme === 'nord' ? 'dark' : 'light';
-    void renderMarkdown(activeFile?.content ?? '', mode).then((nextHtml) => {
+    void renderMarkdown(content, mode).then((nextHtml) => {
       if (alive) setHtml(nextHtml);
     });
     return () => {
       alive = false;
     };
-  }, [activeFile?.content, theme]);
+  }, [activeFile?.content, activeFile?.name, activeFile?.path, theme]);
 
   useLayoutEffect(() => {
     notifyPreviewRendered(localRef.current);
+  }, [html]);
+
+  useEffect(() => {
+    const root = localRef.current;
+    if (!root) return;
+
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor) return;
+
+      const rawHref = anchor.getAttribute('href') ?? '';
+      if (!rawHref || rawHref.startsWith('#')) return;
+      if (!isExternalUrl(anchor.href)) return;
+
+      event.preventDefault();
+      void openExternalUrl(anchor.href);
+    };
+
+    root.addEventListener('click', onClick);
+    return () => root.removeEventListener('click', onClick);
   }, [html]);
 
   useEffect(() => {

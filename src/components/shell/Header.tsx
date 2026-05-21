@@ -1,27 +1,20 @@
+import type { MouseEvent } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 
 export function Header() {
-  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
   const parts = (activeFile?.path || '~/Documents/notes/readme.md').split('/');
 
   return (
-    <header className="header">
-      <div className="brand">
-        <button className="brand-mark" title="탐색기 접기/펼치기" type="button" onClick={toggleSidebar}>
-          <Icon name="sidebar" />
-        </button>
-        <div className="brand-name" data-tauri-drag-region>
-          Saekim
-        </div>
-      </div>
-
-      <div className="breadcrumb" data-tauri-drag-region title={activeFile?.path}>
+    <header className="titlebar" onMouseDown={startTitlebarDrag}>
+      <div className="titlebar-drag" data-tauri-drag-region />
+      <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.path}>
         {parts.map((part, index) => (
           <span className="crumb-wrap" key={`${part}-${index}`}>
             <span className={`crumb ${index === parts.length - 1 ? 'current' : ''}`}>{part}</span>
@@ -31,7 +24,7 @@ export function Header() {
         {dirty ? <span className="dot" title="수정 중" /> : null}
       </div>
 
-      <div className="header-right">
+      <div className="titlebar-right">
         <ViewToggle />
         <IconButton className="header-btn" label="설정" onClick={toggleSettings}>
           <Icon name="settings" />
@@ -39,6 +32,18 @@ export function Header() {
       </div>
     </header>
   );
+}
+
+function startTitlebarDrag(event: MouseEvent<HTMLElement>): void {
+  if (event.button !== 0 || !('__TAURI_INTERNALS__' in window)) return;
+
+  const target = event.target as HTMLElement | null;
+  if (target?.closest('button, input, textarea, select, a, [role="button"]')) return;
+
+  event.preventDefault();
+  void invoke('start_window_drag').catch((error) => {
+    console.warn('Failed to start titlebar drag:', error);
+  });
 }
 
 function ViewToggle() {

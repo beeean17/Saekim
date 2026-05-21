@@ -11,6 +11,11 @@ export async function openFolderDialog(): Promise<string | null> {
   return invokeCommand<string | null>('open_folder_dialog');
 }
 
+export async function pickImagePath(): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  return invokeCommand<string | null>('pick_image_path');
+}
+
 export async function importPdf(path: string): Promise<OpenFilePayload> {
   return invokeCommand<OpenFilePayload>('import_pdf', { path });
 }

@@ -54,7 +54,7 @@ pub async fn open_file_dialog(app: AppHandle) -> CommandResult<Option<OpenFilePa
         let selected = app
             .dialog()
             .file()
-            .add_filter("Markdown", &["md", "markdown", "txt"])
+            .add_filter("Documents", &["md", "markdown", "mdown", "mkd", "txt"])
             .blocking_pick_file();
 
         let Some(path) = selected else {
@@ -87,6 +87,31 @@ pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>>
         )),
         Ok(None) => ok(None),
         Err(error) => fail(format!("failed to open folder dialog: {error}")),
+    }
+}
+
+#[tauri::command]
+pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<String>> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter(
+                "Images",
+                &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"],
+            )
+            .blocking_pick_file()
+    })
+    .await;
+
+    match selected {
+        Ok(Some(path)) => ok(Some(
+            path.into_path()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        )),
+        Ok(None) => ok(None),
+        Err(error) => fail(format!("failed to pick image path: {error}")),
     }
 }
 
@@ -151,7 +176,7 @@ pub async fn save_file(
             _ => app
                 .dialog()
                 .file()
-                .add_filter("Markdown", &["md", "markdown", "txt"])
+                .add_filter("Documents", &["md", "markdown", "mdown", "mkd", "txt"])
                 .set_file_name("untitled.md")
                 .blocking_save_file()
                 .map(|path| path.into_path().unwrap_or_default()),
@@ -185,7 +210,7 @@ pub async fn save_file_as(
         let selected = app
             .dialog()
             .file()
-            .add_filter("Markdown", &["md", "markdown", "txt"])
+            .add_filter("Documents", &["md", "markdown", "mdown", "mkd", "txt"])
             .set_file_name(&suggested_name)
             .blocking_save_file();
 
@@ -419,7 +444,7 @@ fn is_supported_document(path: &Path) -> bool {
             .and_then(|value| value.to_str())
             .map(str::to_lowercase)
             .as_deref(),
-        Some("md" | "markdown" | "txt")
+        Some("md" | "markdown" | "mdown" | "mkd" | "txt")
     )
 }
 

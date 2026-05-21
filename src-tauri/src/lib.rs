@@ -27,7 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
-            queue_open_files(app.handle(), startup_markdown_args());
+            queue_open_files(app.handle(), startup_document_args());
             Ok(())
         })
         .menu(build_menu)
@@ -43,12 +43,15 @@ pub fn run() {
             };
 
             if let Some(event_name) = event_name {
-                let _ = app.emit(event_name, ());
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.emit(event_name, ());
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
             commands::file::open_file_dialog,
             commands::file::open_folder_dialog,
+            commands::file::pick_image_path,
             commands::file::pick_pdf_export_path,
             commands::file::import_pdf,
             commands::file::read_file,
@@ -60,7 +63,9 @@ pub fn run() {
             commands::file::write_pdf_export,
             commands::session::load_session,
             commands::session::save_session,
-            commands::window::set_window_min_size
+            commands::window::open_external_url,
+            commands::window::set_window_min_size,
+            commands::window::start_window_drag
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Saekim");
@@ -70,7 +75,7 @@ pub fn run() {
             let paths = urls
                 .into_iter()
                 .filter_map(|url| url.to_file_path().ok())
-                .filter(is_markdown_path)
+                .filter(|path| is_supported_document_path(path))
                 .map(|path| path.to_string_lossy().to_string())
                 .collect();
 
@@ -79,19 +84,24 @@ pub fn run() {
     });
 }
 
-fn startup_markdown_args() -> Vec<String> {
+fn startup_document_args() -> Vec<String> {
     std::env::args_os()
         .skip(1)
         .map(PathBuf::from)
-        .filter(is_markdown_path)
+        .filter(|path| is_supported_document_path(path))
         .map(|path| path.to_string_lossy().to_string())
         .collect()
 }
 
-fn is_markdown_path(path: &PathBuf) -> bool {
+fn is_supported_document_path(path: &PathBuf) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
-        .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "md" | "markdown"))
+        .map(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "md" | "markdown" | "mdown" | "mkd" | "txt"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -123,35 +133,35 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         ..Default::default()
     };
 
-    let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+KeyS"))?;
-    let new_file = MenuItem::with_id(app, MENU_NEW_FILE, "New File", true, Some("CmdOrCtrl+KeyN"))?;
+    let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+S"))?;
+    let new_file = MenuItem::with_id(app, MENU_NEW_FILE, "New File", true, Some("CmdOrCtrl+N"))?;
     let open_file = MenuItem::with_id(
         app,
         MENU_OPEN_FILE,
         "Open File...",
         true,
-        Some("CmdOrCtrl+KeyO"),
+        Some("CmdOrCtrl+O"),
     )?;
     let open_folder = MenuItem::with_id(
         app,
         MENU_OPEN_FOLDER,
         "Open Folder...",
         true,
-        Some("CmdOrCtrl+Shift+KeyO"),
+        Some("CmdOrCtrl+Shift+O"),
     )?;
     let save_as = MenuItem::with_id(
         app,
         MENU_SAVE_AS,
         "Save As...",
         true,
-        Some("CmdOrCtrl+Shift+KeyS"),
+        Some("CmdOrCtrl+Shift+S"),
     )?;
     let export_pdf = MenuItem::with_id(
         app,
         MENU_EXPORT_PDF,
         "Export PDF",
         true,
-        Some("CmdOrCtrl+KeyP"),
+        Some("CmdOrCtrl+P"),
     )?;
 
     let app_menu = Submenu::with_items(

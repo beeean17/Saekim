@@ -12,6 +12,10 @@ export const browserBackend: BackendAdapter = {
     return null;
   },
 
+  async pickImagePath(): Promise<string | null> {
+    return null;
+  },
+
   async importPdf(_path: string): Promise<OpenFilePayload> {
     throw new Error('PDF import is deferred in Saekim 3.0.0.');
   },

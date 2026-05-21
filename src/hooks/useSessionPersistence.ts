@@ -70,10 +70,12 @@ export function useSessionPersistence(): void {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
+  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
 
   const sidebarMode = useUIStore((state) => state.sidebarMode);
+  const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
@@ -127,10 +129,12 @@ export function useSessionPersistence(): void {
           rootPath,
           tree,
           openFiles,
+          recentFiles,
           activeFileId,
         },
         ui: {
           sidebarMode,
+          sidebarViewMode,
           toolbarExpanded,
           viewMode,
           sidebarWidth,
@@ -160,8 +164,10 @@ export function useSessionPersistence(): void {
     fontSize,
     loaded,
     openFiles,
+    recentFiles,
     rootPath,
     sidebarMode,
+    sidebarViewMode,
     sidebarWidth,
     splitRatio,
     syncScroll,

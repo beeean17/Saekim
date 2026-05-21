@@ -1,10 +1,11 @@
-import { importPdf, openFileDialog, openFolderDialog, readFile, readFolder, readFolderChildren, saveFile, saveFileAs } from '../tauri/fs';
+import { importPdf, openFileDialog, openFolderDialog, pickImagePath, readFile, readFolder, readFolderChildren, saveFile, saveFileAs } from '../tauri/fs';
 import { loadSession, saveSession } from '../tauri/session';
 import type { BackendAdapter } from './types';
 
 export const tauriBackend: BackendAdapter = {
   openFileDialog,
   openFolderDialog,
+  pickImagePath,
   importPdf,
   readFile,
   readFolder,

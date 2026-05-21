@@ -39,7 +39,7 @@ function useNativeWindowChrome(): void {
 
   useEffect(() => {
     const isTauri = '__TAURI_INTERNALS__' in window;
-    document.documentElement.classList.toggle('tauri-titlebar-overlay', isTauri);
+    document.documentElement.classList.toggle('tauri-window-chrome', isTauri);
     if (!isTauri) return;
 
     const titlebarColor = getComputedStyle(document.documentElement)
