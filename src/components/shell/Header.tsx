@@ -16,10 +16,12 @@ export function Header() {
         <button className="brand-mark" title="탐색기 접기/펼치기" type="button" onClick={toggleSidebar}>
           <Icon name="sidebar" />
         </button>
-        <div className="brand-name">Saekim</div>
+        <div className="brand-name" data-tauri-drag-region>
+          Saekim
+        </div>
       </div>
 
-      <div className="breadcrumb" title={activeFile?.path}>
+      <div className="breadcrumb" data-tauri-drag-region title={activeFile?.path}>
         {parts.map((part, index) => (
           <span className="crumb-wrap" key={`${part}-${index}`}>
             <span className={`crumb ${index === parts.length - 1 ? 'current' : ''}`}>{part}</span>

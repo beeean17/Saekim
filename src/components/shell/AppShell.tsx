@@ -1,4 +1,6 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { Header } from './Header';
 import { SettingsPanel } from './SettingsPanel';
@@ -9,6 +11,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  useNativeWindowChrome();
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
@@ -29,4 +32,23 @@ export function AppShell({ children }: AppShellProps) {
       <StatusBar />
     </div>
   );
+}
+
+function useNativeWindowChrome(): void {
+  const theme = useSettingsStore((state) => state.theme);
+
+  useEffect(() => {
+    const isTauri = '__TAURI_INTERNALS__' in window;
+    document.documentElement.classList.toggle('tauri-titlebar-overlay', isTauri);
+    if (!isTauri) return;
+
+    const titlebarColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--bg-surface')
+      .trim();
+    if (!titlebarColor) return;
+
+    void getCurrentWebviewWindow().setBackgroundColor(titlebarColor).catch((error) => {
+      console.warn('Failed to sync native titlebar color:', error);
+    });
+  }, [theme]);
 }

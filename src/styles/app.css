@@ -8,6 +8,10 @@
   background: var(--bg-app);
 }
 
+.tauri-titlebar-overlay .app {
+  grid-template-rows: 76px 1fr 28px;
+}
+
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -16,6 +20,14 @@
   padding: 0 14px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
+}
+
+.tauri-titlebar-overlay .header {
+  padding-top: 28px;
+}
+
+.tauri-titlebar-overlay .settings-popover {
+  top: 82px;
 }
 
 .brand {
