@@ -6,7 +6,12 @@ function isFocusedTextAreaAtDocumentEnd(element: HTMLElement): boolean {
   if (!(element instanceof HTMLTextAreaElement) || document.activeElement !== element) return false;
 
   const cursorEnd = Math.max(element.selectionStart, element.selectionEnd);
-  return element.value.slice(cursorEnd).trim().length === 0;
+  const { value } = element;
+  for (let index = cursorEnd; index < value.length; index += 1) {
+    const char = value.charCodeAt(index);
+    if (char !== 9 && char !== 10 && char !== 13 && char !== 32) return false;
+  }
+  return true;
 }
 
 export function useScrollSync(
@@ -109,14 +114,13 @@ export function useScrollSync(
 
     const mutationObserver = new MutationObserver(syncFirstIfFocused);
     const resizeObserver = new ResizeObserver(syncFirstIfFocused);
-    mutationObserver.observe(second, { childList: true, subtree: true });
+    mutationObserver.observe(second, { childList: true });
     resizeObserver.observe(second);
 
     first.addEventListener('wheel', markFirstUserScroll, { passive: true });
     first.addEventListener('touchmove', markFirstUserScroll, { passive: true });
     first.addEventListener('pointerdown', markFirstUserScroll, { passive: true });
     first.addEventListener('keydown', markFirstUserScroll);
-    first.addEventListener('input', syncFirstIfFocused);
     second.addEventListener('wheel', markSecondUserScroll, { passive: true });
     second.addEventListener('touchmove', markSecondUserScroll, { passive: true });
     second.addEventListener('pointerdown', markSecondUserScroll, { passive: true });
@@ -131,7 +135,6 @@ export function useScrollSync(
       first.removeEventListener('touchmove', markFirstUserScroll);
       first.removeEventListener('pointerdown', markFirstUserScroll);
       first.removeEventListener('keydown', markFirstUserScroll);
-      first.removeEventListener('input', syncFirstIfFocused);
       second.removeEventListener('wheel', markSecondUserScroll);
       second.removeEventListener('touchmove', markSecondUserScroll);
       second.removeEventListener('pointerdown', markSecondUserScroll);
