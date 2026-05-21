@@ -22,10 +22,28 @@ export function Sidebar() {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
   const setSidebarViewMode = useUIStore((state) => state.setSidebarViewMode);
-  const [fileSearchOpen, setFileSearchOpen] = useState(false);
-  const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const visibleTree = useMemo(() => filterTree(tree, fileSearchQuery), [fileSearchQuery, tree]);
-  const visibleRecentFiles = useMemo(() => filterRecentFiles(getRecentEntries(recentFiles, openFiles), fileSearchQuery), [fileSearchQuery, openFiles, recentFiles]);
+  const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
+  const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
+  const [recentSearchOpen, setRecentSearchOpen] = useState(false);
+  const [recentSearchQuery, setRecentSearchQuery] = useState('');
+  const searchOpen = sidebarViewMode === 'files' ? workspaceSearchOpen : recentSearchOpen;
+  const searchQuery = sidebarViewMode === 'files' ? workspaceSearchQuery : recentSearchQuery;
+  const setSearchQuery = sidebarViewMode === 'files' ? setWorkspaceSearchQuery : setRecentSearchQuery;
+  const closeSearch =
+    sidebarViewMode === 'files'
+      ? () => {
+          setWorkspaceSearchQuery('');
+          setWorkspaceSearchOpen(false);
+        }
+      : () => {
+          setRecentSearchQuery('');
+          setRecentSearchOpen(false);
+        };
+  const visibleTree = useMemo(() => filterTree(tree, workspaceSearchQuery), [workspaceSearchQuery, tree]);
+  const visibleRecentFiles = useMemo(
+    () => filterRecentFiles(getRecentEntries(recentFiles, openFiles), recentSearchQuery),
+    [recentSearchQuery, openFiles, recentFiles],
+  );
 
   return (
     <aside className="sidebar">
@@ -34,27 +52,33 @@ export function Sidebar() {
           <Icon name="sidebar" />
         </button>
         <SidebarActions
+          mode={sidebarViewMode}
           onCreateFile={() => void createFile()}
           onOpenFolder={() => void openFolder()}
-          onSearch={() => setFileSearchOpen((open) => !open)}
+          onSearch={() => {
+            if (sidebarViewMode === 'files') {
+              setWorkspaceSearchOpen((open) => !open);
+              return;
+            }
+            setRecentSearchOpen((open) => !open);
+          }}
           onRefresh={() => void refresh()}
         />
         <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onClose={closeFile} onSelect={setActiveFile} />
       </div>
       <SidebarViewSwitch mode={sidebarViewMode} onChange={setSidebarViewMode} />
       {sidebarViewMode === 'files' ? <FolderPath path={rootPath} /> : null}
-      {fileSearchOpen ? (
+      {searchOpen ? (
         <div className="sidebar-search">
           <Icon name="search" />
           <input
             autoFocus
-            value={fileSearchQuery}
-            placeholder={sidebarViewMode === 'files' ? '파일 검색' : '최근 파일 검색'}
-            onChange={(event) => setFileSearchQuery(event.currentTarget.value)}
+            value={searchQuery}
+            placeholder={sidebarViewMode === 'files' ? '워크스페이스에서 찾기' : '최근 파일에서 찾기'}
+            onChange={(event) => setSearchQuery(event.currentTarget.value)}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
-                setFileSearchQuery('');
-                setFileSearchOpen(false);
+                closeSearch();
               }
             }}
           />
@@ -109,16 +133,28 @@ function FolderPath({ path }: { path: string | null }) {
 }
 
 function SidebarActions({
+  mode,
   onCreateFile,
   onOpenFolder,
   onSearch,
   onRefresh,
 }: {
+  mode: SidebarViewMode;
   onCreateFile: () => void;
   onOpenFolder: () => void;
   onSearch: () => void;
   onRefresh: () => void;
 }) {
+  if (mode === 'recent') {
+    return (
+      <div className="sidebar-actions">
+        <IconButton label="최근 파일 검색" onClick={onSearch}>
+          <Icon name="search" />
+        </IconButton>
+      </div>
+    );
+  }
+
   return (
     <div className="sidebar-actions">
       <IconButton label="새 파일" onClick={onCreateFile}>
