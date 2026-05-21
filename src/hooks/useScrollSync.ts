@@ -1,6 +1,7 @@
 import { RefObject, useEffect } from 'react';
 
 const bottomSyncThreshold = 48;
+const bottomLockDuration = 1200;
 const whitespaceCharCodes = new Set([9, 10, 13, 32]);
 
 type CursorLineAnchor = {
@@ -161,6 +162,7 @@ export function useScrollSync(
     let pending: { source: HTMLElement; target: HTMLElement } | null = null;
     let firstUserScrollUntil = 0;
     let secondUserScrollUntil = 0;
+    let previewBottomLockUntil = 0;
     let previewAnchors = getSourceLineElements(second);
     let lastSelectionStart = first instanceof HTMLTextAreaElement ? first.selectionStart : -1;
     let lastSelectionEnd = first instanceof HTMLTextAreaElement ? first.selectionEnd : -1;
@@ -169,6 +171,7 @@ export function useScrollSync(
       firstUserScrollUntil = performance.now() + 250;
     };
     const markSecondUserScroll = () => {
+      previewBottomLockUntil = 0;
       secondUserScrollUntil = performance.now() + 250;
     };
     const markFirstKeyboardScroll = (event: KeyboardEvent) => {
@@ -186,6 +189,10 @@ export function useScrollSync(
     };
     const refreshPreviewAnchors = () => {
       previewAnchors = getSourceLineElements(second);
+    };
+    const isPreviewBottomLocked = () => performance.now() <= previewBottomLockUntil;
+    const lockPreviewToBottom = () => {
+      previewBottomLockUntil = performance.now() + bottomLockDuration;
     };
 
     const shouldPinTargetToBottom = (source: HTMLElement, maxSource: number) => {
@@ -206,6 +213,12 @@ export function useScrollSync(
 
     const pinTargetToBottom = (source: HTMLElement, target: HTMLElement) => {
       if (!isFocusedTextAreaAtDocumentEnd(source)) return false;
+      lockPreviewToBottom();
+      return pinElementToBottom(target);
+    };
+
+    const pinElementToBottom = (target: HTMLElement) => {
+      if (target !== second) return false;
 
       const maxTarget = target.scrollHeight - target.clientHeight;
       if (maxTarget <= 0) return true;
@@ -252,6 +265,7 @@ export function useScrollSync(
       if (!pending) return;
       const { source, target } = pending;
       pending = null;
+      if (source === first && target === second && isPreviewBottomLocked() && pinElementToBottom(target)) return;
       if (
         source === first &&
         !isUserScroll(source) &&
@@ -285,8 +299,12 @@ export function useScrollSync(
     const syncSecond = () => sync(second, first);
     const syncFirstIfFocused = () => {
       if (document.activeElement !== first) return;
-      if (pinTargetToBottom(first, second) || syncTargetToCursorLine(first, second)) return;
+      if ((isPreviewBottomLocked() && pinElementToBottom(second)) || pinTargetToBottom(first, second) || syncTargetToCursorLine(first, second)) return;
       sync(first, second);
+    };
+    const syncInput = () => {
+      if (isFocusedTextAreaAtDocumentEnd(first)) lockPreviewToBottom();
+      syncFirst();
     };
     const syncCursorNavigation = (event: KeyboardEvent) => {
       if (!['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) return;
@@ -318,7 +336,7 @@ export function useScrollSync(
     first.addEventListener('touchmove', markFirstUserScroll, { passive: true });
     first.addEventListener('pointerdown', markFirstPointerScroll, { passive: true });
     first.addEventListener('keydown', markFirstKeyboardScroll);
-    first.addEventListener('input', syncFirst);
+    first.addEventListener('input', syncInput);
     first.addEventListener('keyup', syncCursorNavigation);
     first.addEventListener('mouseup', syncFirstIfFocused);
     document.addEventListener('selectionchange', syncSelectionChange);
@@ -337,7 +355,7 @@ export function useScrollSync(
       first.removeEventListener('touchmove', markFirstUserScroll);
       first.removeEventListener('pointerdown', markFirstPointerScroll);
       first.removeEventListener('keydown', markFirstKeyboardScroll);
-      first.removeEventListener('input', syncFirst);
+      first.removeEventListener('input', syncInput);
       first.removeEventListener('keyup', syncCursorNavigation);
       first.removeEventListener('mouseup', syncFirstIfFocused);
       document.removeEventListener('selectionchange', syncSelectionChange);
