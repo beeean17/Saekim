@@ -387,6 +387,22 @@
   box-shadow: var(--shadow-sm);
 }
 
+.sidebar-folder-path {
+  margin: -1px 12px 7px;
+  padding: 0 2px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-folder-path span {
+  min-width: 0;
+}
+
 .icon-btn {
   display: inline-flex;
   width: 26px;
@@ -650,6 +666,7 @@
 
 .app[data-sidebar="collapsed"] .sidebar-search,
 .app[data-sidebar="collapsed"] .sidebar-view-switch,
+.app[data-sidebar="collapsed"] .sidebar-folder-path,
 .app[data-sidebar="collapsed"] .recent-file-list,
 .app[data-sidebar="collapsed"] .file-tree {
   display: none;

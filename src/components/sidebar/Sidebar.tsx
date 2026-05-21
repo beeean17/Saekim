@@ -7,6 +7,7 @@ import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 
 export function Sidebar() {
+  const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const recentFiles = useWorkspaceStore((state) => state.recentFiles);
@@ -41,6 +42,7 @@ export function Sidebar() {
         <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onClose={closeFile} onSelect={setActiveFile} />
       </div>
       <SidebarViewSwitch mode={sidebarViewMode} onChange={setSidebarViewMode} />
+      {sidebarViewMode === 'files' ? <FolderPath path={rootPath} /> : null}
       {fileSearchOpen ? (
         <div className="sidebar-search">
           <Icon name="search" />
@@ -87,11 +89,21 @@ function SidebarViewSwitch({ mode, onChange }: { mode: SidebarViewMode; onChange
   return (
     <div className="sidebar-view-switch" role="tablist" aria-label="사이드바 보기">
       <button className={mode === 'files' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'files'} onClick={() => onChange('files')}>
-        경로
+        폴더
       </button>
       <button className={mode === 'recent' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'recent'} onClick={() => onChange('recent')}>
         최근
       </button>
+    </div>
+  );
+}
+
+function FolderPath({ path }: { path: string | null }) {
+  const label = path || '열린 폴더 없음';
+
+  return (
+    <div className="sidebar-folder-path" title={label}>
+      <span>{label}</span>
     </div>
   );
 }
