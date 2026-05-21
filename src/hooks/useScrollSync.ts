@@ -1,5 +1,7 @@
 import { RefObject, useEffect } from 'react';
 
+const bottomSyncThreshold = 48;
+
 export function useScrollSync(
   firstRef: RefObject<HTMLElement>,
   secondRef: RefObject<HTMLElement>,
@@ -38,8 +40,11 @@ export function useScrollSync(
       const maxTarget = target.scrollHeight - target.clientHeight;
       if (maxSource <= 0 || maxTarget <= 0) return;
 
-      const ratio = source.scrollTop / maxSource;
-      const nextScrollTop = ratio * maxTarget;
+      const distanceToBottom = maxSource - source.scrollTop;
+      const nextScrollTop =
+        distanceToBottom <= bottomSyncThreshold
+          ? maxTarget
+          : (source.scrollTop / maxSource) * maxTarget;
       if (Math.abs(target.scrollTop - nextScrollTop) < 0.5) return;
 
       suppressed = target;
