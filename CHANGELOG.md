@@ -11,21 +11,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Tauri 기반 3.0.0 런타임 마이그레이션 작업을 진행 중입니다.
-- PDF import 재도입을 위한 `import_pdf(path)` 명령 경계를 예약했습니다.
+- Tauri 2 기반 데스크톱 셸과 React/TypeScript 프론트엔드 구조를 도입했습니다.
+- PyQt/QWebEngine 의존 UI를 대체하는 Tauri command 기반 파일/세션/설정 어댑터를 추가했습니다.
+- 파일 열기, 폴더 열기, 새 파일, 저장, 다른 이름 저장, 닫기 흐름을 네이티브 대화상자와 연결했습니다.
+- macOS와 Windows에서 Markdown 파일 기본 앱으로 등록할 수 있도록 파일 연결 설정을 추가했습니다.
+- `Cmd/Ctrl+O`, `Cmd/Ctrl+N`, `Cmd/Ctrl+S`, `Cmd/Ctrl+P` 단축키를 추가했습니다.
+- 메인 File 메뉴에서 저장과 PDF 내보내기를 실행할 수 있도록 네이티브 메뉴 명령을 연결했습니다.
+- 사이드바, 편집기, 미리보기 영역의 가로 크기 조절 기능을 추가했습니다.
+- 편집기와 미리보기의 스크롤 동기화/해제 기능을 추가했습니다.
+- 문서 내 탐색을 항상 표시되는 툴바로 이동했습니다.
+- 설정 패널과 앱 메타데이터 저장소를 추가하고, 설정/세션/최근 항목 등 사용자 데이터를 OS별 Application Support 경로에 저장하도록 통일했습니다.
+- Pretendard Variable을 기본 UI/문서 폰트로 적용하고, IBM Plex Sans KR 폰트 선택지를 추가했습니다.
+- Markdown 프리뷰와 PDF export에 Mermaid, KaTeX, 표, 이미지, 코드블럭 렌더링을 통합했습니다.
+- 명시된 언어가 있는 코드블럭에 Shiki 기반 문법 하이라이트를 적용했습니다.
+- 코드블럭 언어 라벨, 줄 번호, diff 추가/삭제 줄 스타일을 추가했습니다.
+- PDF export 진행 중/완료 상태를 하단 상태바에 표시하도록 했습니다.
 
 ### Changed
 
+- 앱 UI를 Tauri 기반 macOS 스타일 창, 사이드바, 상단 툴바, 편집/분할/보기 전환 구조로 전면 재구성했습니다.
+- 탐색기의 뒤로/앞으로/현재 경로 입력 영역을 제거해 사이드바와 문서 작업 영역을 단순화했습니다.
+- 보기 분할 버튼을 상단 우측 도구 영역으로 이동하고, 메인 화면의 테마 전환 버튼은 설정 안으로 정리했습니다.
+- 제목, 볼드, 이탤릭, 링크, 코드블럭 버튼을 추가 툴바로 이동하고 메인 툴바는 도구 아이콘 중심으로 정리했습니다.
+- Mermaid와 KaTeX 버튼은 텍스트 라벨을 유지하고, 나머지 도구 버튼은 아이콘 중심 표현으로 통일했습니다.
+- 사이드바가 접힌 상태에서도 전체 파일 목록을 볼 수 있고 세로 영역을 넘으면 스크롤할 수 있도록 변경했습니다.
+- 편집기 줄 번호와 본문 줄 높이를 같은 폰트 크기/line-height 체계로 맞췄습니다.
+- 편집기 본문 선택 상태와 줄 번호 선택 하이라이트가 함께 동기화되도록 변경했습니다.
+- 선택한 문서 폰트가 편집기뿐 아니라 Markdown 미리보기에도 적용되도록 변경했습니다.
 - PDF export는 자동 파일 저장 대신 운영체제 인쇄 대화상자를 통해 PDF로 저장합니다.
+- PDF export는 사용자의 현재 테마와 관계없이 흰 배경의 light 테마 기준 CSS 템플릿을 사용합니다.
+- PDF export 결과에서 상단 `Saekim Markdown Export` 헤더를 제거했습니다.
+- PDF export에서 표, 이미지, 코드블럭처럼 연속성이 중요한 블록은 가능한 한 페이지 중간에서 잘리지 않고 다음 페이지로 넘어가도록 조정했습니다.
+- PDF export에서 본문 텍스트와 코드블럭의 줄 잘림을 줄이도록 print CSS를 조정했습니다.
+- 코드블럭 줄간을 더 조밀하게 조정해 프리뷰와 PDF export 모두 `line-height: 1.08` 기준으로 렌더링합니다.
 - macOS bundle identifier를 `com.beeean17.saekim`으로 정리했습니다.
+
+### Fixed
+
+- 폴더 열기, 파일 열기, 다른 이름 저장에서 네이티브 대화상자 호출 후 무한 로딩이 발생하던 문제를 수정했습니다.
+- 설정 버튼을 눌러도 설정 창이 열리지 않던 문제를 수정했습니다.
+- 설정 창 바깥 영역을 클릭하면 설정 창이 닫히도록 수정했습니다.
+- 편집 화면 전체 보기에서 보기 전환 토글에 접근할 수 없던 문제를 수정했습니다.
+- 창 오른쪽 리사이즈 중 편집기/미리보기 영역이 끊기거나 흰 영역이 남던 레이아웃 문제를 수정했습니다.
+- 좁은 창에서 편집기 또는 미리보기 한쪽이 먼저 사라지던 문제를 수정했습니다.
+- 편집기와 미리보기의 최소 폭이 대칭적으로 줄어들도록 창 리사이즈 동작을 수정했습니다.
+- 패널 드래그 리사이즈와 스크롤 동기화가 낮은 프레임처럼 보이던 문제를 완화했습니다.
+- 스크롤 동기화 중 문서가 자동으로 위로 튀던 문제를 수정했습니다.
+- 줄 번호가 문서 전체 줄 수만큼 표시되지 않거나, 특정 폰트 크기에서 본문 줄과 어긋나던 문제를 수정했습니다.
+- 전체 선택 해제 후 줄 번호 선택 하이라이트가 즉시 풀리지 않던 문제를 수정했습니다.
+- PDF export 시스템 창이 뜨지 않거나 export가 실패하던 문제를 수정했습니다.
+- PDF export에서 Mermaid 다이어그램, KaTeX 수식, 코드블럭이 다크 테마 색상을 따라가 읽기 어려웠던 문제를 수정했습니다.
+- KaTeX 인라인 수식, 블록 수식, 행렬, 다중 수식의 preview/PDF 렌더링 깨짐을 수정했습니다.
+- PDF export에서 Shiki 스타일이 사라지거나 코드블럭 배경/글자색 대비가 맞지 않던 문제를 수정했습니다.
 
 ### Build
 
+- `corepack pnpm tauri:dev` 환경에서 내부 `pnpm` 호출이 실패하지 않도록 Tauri dev hook 실행 방식을 정리했습니다.
 - Tauri macOS 앱 번들 빌드 명령과 DMG 빌드 명령을 분리했습니다.
+- macOS/Windows 배포와 파일 연결 설정을 위한 Tauri 패키징 설정을 정리했습니다.
+- 3.0.0 개발 계획, 브랜치 전략, Tauri 개발 문서를 `private/3.0.0`에 정리했습니다.
 
 ### Deferred
 
 - PDF-to-Markdown import는 3.0.0 MVP에서 제외합니다. 기존 Python/PyMuPDF/pdfplumber 변환 스택은 앱 크기와 시작 시간 목표를 약화시키므로 후속 릴리스에서 별도 sidecar 또는 native 변환기로 재검토합니다.
+- DOCX export, silent PDF auto-save, 전체 네이티브 메뉴 parity, installer signing 자동화는 후속 릴리스에서 다룹니다.
 
 ---
 
@@ -102,6 +151,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
+| 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |
 | 1.2.0 | 2025-12-23 | Resize overlay, Pretendard font, ViewToggle styles, Refresh feature |
 
 

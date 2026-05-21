@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
@@ -44,6 +44,10 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     };
   }, [activeFile?.content, theme]);
 
+  useLayoutEffect(() => {
+    notifyPreviewRendered(localRef.current);
+  }, [html]);
+
   useEffect(() => {
     const root = localRef.current;
     if (!root) return;
@@ -60,12 +64,15 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
         securityLevel: 'strict',
       });
 
-      blocks.forEach((block, index) => {
-        const source = decodeURIComponent(block.dataset.source || '');
-        const id = `mermaid-${Date.now()}-${index}`;
-        void mermaid.render(id, source).then(({ svg }) => {
+      void Promise.all(
+        blocks.map(async (block, index) => {
+          const source = decodeURIComponent(block.dataset.source || '');
+          const id = `mermaid-${Date.now()}-${index}`;
+          const { svg } = await mermaid.render(id, source);
           if (alive) block.innerHTML = svg;
-        });
+        }),
+      ).finally(() => {
+        if (alive) notifyPreviewRendered(root);
       });
     });
 
@@ -84,4 +91,8 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
+}
+
+function notifyPreviewRendered(root: HTMLDivElement | null): void {
+  root?.dispatchEvent(new CustomEvent('saekim-preview-rendered', { bubbles: false }));
 }
