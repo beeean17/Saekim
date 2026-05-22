@@ -30,6 +30,14 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
     }
   }, [openFile]);
 
+  const queuePaths = useCallback(
+    (paths: string[]) => {
+      queuedPathsRef.current.push(...paths);
+      void flushDroppedPaths();
+    },
+    [flushDroppedPaths],
+  );
+
   useEffect(() => {
     enabledRef.current = enabled;
     if (enabled) {
@@ -45,8 +53,7 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
       .then(async ({ getCurrentWebview }) => {
         unlisten = await getCurrentWebview().onDragDropEvent((event) => {
           if (event.payload.type !== 'drop') return;
-          queuedPathsRef.current.push(...event.payload.paths);
-          void flushDroppedPaths();
+          queuePaths(event.payload.paths);
         });
       })
       .catch((error) => {
@@ -56,7 +63,30 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
     return () => {
       unlisten?.();
     };
-  }, [flushDroppedPaths]);
+  }, [queuePaths]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    const preventDefaultDrop = (event: DragEvent) => {
+      event.preventDefault();
+    };
+    const openDroppedFiles = (event: DragEvent) => {
+      event.preventDefault();
+      const paths = droppedFilePaths(event.dataTransfer);
+      if (paths.length > 0) {
+        queuePaths(paths);
+      }
+    };
+
+    window.addEventListener('dragover', preventDefaultDrop);
+    window.addEventListener('drop', openDroppedFiles);
+
+    return () => {
+      window.removeEventListener('dragover', preventDefaultDrop);
+      window.removeEventListener('drop', openDroppedFiles);
+    };
+  }, [queuePaths]);
 }
 
 function isSupportedDocumentPath(path: string): boolean {
@@ -64,4 +94,34 @@ function isSupportedDocumentPath(path: string): boolean {
   const fileName = normalized.split('/').pop() ?? '';
   const extension = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() : '';
   return Boolean(extension && supportedDocumentExtensions.has(extension));
+}
+
+function droppedFilePaths(dataTransfer: DataTransfer | null): string[] {
+  if (!dataTransfer) return [];
+
+  const filePaths = Array.from(dataTransfer.files)
+    .map((file) => (file as File & { path?: string }).path)
+    .filter((path): path is string => Boolean(path));
+
+  if (filePaths.length > 0) {
+    return filePaths;
+  }
+
+  return dataTransfer
+    .getData('text/uri-list')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map(filePathFromUri)
+    .filter((path): path is string => Boolean(path));
+}
+
+function filePathFromUri(uri: string): string | null {
+  try {
+    const url = new URL(uri);
+    if (url.protocol !== 'file:') return null;
+    return decodeURIComponent(url.pathname);
+  } catch {
+    return null;
+  }
 }
