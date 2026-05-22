@@ -79,12 +79,12 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
       }
     };
 
-    window.addEventListener('dragover', preventDefaultDrop);
-    window.addEventListener('drop', openDroppedFiles);
+    window.addEventListener('dragover', preventDefaultDrop, true);
+    window.addEventListener('drop', openDroppedFiles, true);
 
     return () => {
-      window.removeEventListener('dragover', preventDefaultDrop);
-      window.removeEventListener('drop', openDroppedFiles);
+      window.removeEventListener('dragover', preventDefaultDrop, true);
+      window.removeEventListener('drop', openDroppedFiles, true);
     };
   }, [queuePaths]);
 }
