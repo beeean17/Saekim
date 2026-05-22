@@ -4,7 +4,7 @@ mod commands;
 mod macos_open_documents;
 
 use app_state::AppState;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
 
@@ -25,6 +25,7 @@ const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(single_instance_plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
@@ -92,6 +93,27 @@ pub fn run() {
     });
 }
 
+fn single_instance_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    {
+        return tauri_plugin_single_instance::init(|app, args, cwd| {
+            let paths = document_args_from_strings(args, Some(&cwd));
+            queue_open_files(app, paths);
+
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        });
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        tauri::plugin::Builder::new("single-instance-placeholder").build()
+    }
+}
+
 fn percent_decode(value: &str) -> String {
     let bytes = value.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
@@ -127,10 +149,37 @@ fn hex_value(byte: u8) -> Option<u8> {
 fn startup_document_args() -> Vec<String> {
     std::env::args_os()
         .skip(1)
-        .map(PathBuf::from)
-        .filter(|path| is_supported_document_path(path))
-        .map(|path| path.to_string_lossy().to_string())
+        .filter_map(|arg| arg.into_string().ok())
+        .filter_map(|arg| document_path_from_arg(&arg, None))
         .collect()
+}
+
+fn document_args_from_strings(args: Vec<String>, cwd: Option<&str>) -> Vec<String> {
+    args.into_iter()
+        .skip(1)
+        .filter_map(|arg| document_path_from_arg(&arg, cwd))
+        .collect()
+}
+
+fn document_path_from_arg(arg: &str, cwd: Option<&str>) -> Option<String> {
+    if arg.is_empty() || arg.starts_with('-') {
+        return None;
+    }
+
+    let path = if let Ok(url) = url::Url::parse(arg) {
+        url.to_file_path().ok().or_else(|| {
+            (url.scheme() == "file").then(|| PathBuf::from(percent_decode(url.path())))
+        })?
+    } else {
+        let path = PathBuf::from(arg);
+        if path.is_absolute() {
+            path
+        } else {
+            cwd.map(|cwd| Path::new(cwd).join(path))?
+        }
+    };
+
+    is_supported_document_path(&path).then(|| path.to_string_lossy().to_string())
 }
 
 fn is_supported_document_path(path: &PathBuf) -> bool {
