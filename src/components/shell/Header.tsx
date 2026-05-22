@@ -9,18 +9,20 @@ export function Header() {
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
-  const parts = (activeFile?.path || '~/Documents/notes/readme.md').split('/');
+  const parts = activeFile?.path.split('/') ?? [];
 
   return (
     <header className="titlebar" onMouseDown={startTitlebarDrag}>
       <div className="titlebar-drag" data-tauri-drag-region />
       <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.path}>
-        {parts.map((part, index) => (
-          <span className="crumb-wrap" key={`${part}-${index}`}>
-            <span className={`crumb ${index === parts.length - 1 ? 'current' : ''}`}>{part}</span>
-            {index < parts.length - 1 ? <span className="sep">/</span> : null}
-          </span>
-        ))}
+        {activeFile
+          ? parts.map((part, index) => (
+              <span className="crumb-wrap" key={`${part}-${index}`}>
+                <span className={`crumb ${index === parts.length - 1 ? 'current' : ''}`}>{part}</span>
+                {index < parts.length - 1 ? <span className="sep">/</span> : null}
+              </span>
+            ))
+          : null}
         {dirty ? <span className="dot" title="수정 중" /> : null}
       </div>
 
