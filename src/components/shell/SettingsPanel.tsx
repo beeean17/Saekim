@@ -4,7 +4,7 @@ import { useUIStore } from '../../store/ui';
 import type { ThemeName, ViewMode } from '../../types/workspace';
 
 const themes: Array<{ id: ThemeName; label: string }> = [
-  { id: 'default', label: 'Default' },
+  { id: 'default', label: 'Light' },
   { id: 'dark', label: 'Dark' },
   { id: 'nord', label: 'Nord' },
 ];
