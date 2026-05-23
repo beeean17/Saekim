@@ -46,20 +46,44 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
   useEffect(() => {
     if (!isTauriRuntime()) return;
 
-    let unlisten: (() => void) | null = null;
+    let alive = true;
+    const unlisteners: Array<() => void> = [];
+    const addUnlistener = (unlisten: () => void) => {
+      if (alive) {
+        unlisteners.push(unlisten);
+      } else {
+        unlisten();
+      }
+    };
+    const handleNativeDrop = (source: 'webview' | 'window', payload: { type: string; paths?: string[] }) => {
+      logDropEvent(source, payload);
+      if (payload.type !== 'drop' || !payload.paths) return;
+      queuePaths(payload.paths);
+    };
+
     void import('@tauri-apps/api/webview')
       .then(async ({ getCurrentWebview }) => {
-        unlisten = await getCurrentWebview().onDragDropEvent((event) => {
-          if (event.payload.type !== 'drop') return;
-          queuePaths(event.payload.paths);
-        });
+        const unlisten = await getCurrentWebview().onDragDropEvent((event) => handleNativeDrop('webview', event.payload));
+        addUnlistener(unlisten);
       })
       .catch((error) => {
-        console.error('드래그 앤 드롭 이벤트 연결 실패:', error);
+        console.error('WebView 드래그 앤 드롭 이벤트 연결 실패:', error);
+      });
+
+    void import('@tauri-apps/api/window')
+      .then(async ({ getCurrentWindow }) => {
+        const unlisten = await getCurrentWindow().onDragDropEvent((event) => handleNativeDrop('window', event.payload));
+        addUnlistener(unlisten);
+      })
+      .catch((error) => {
+        console.error('Window 드래그 앤 드롭 이벤트 연결 실패:', error);
       });
 
     return () => {
-      unlisten?.();
+      alive = false;
+      for (const unlisten of unlisteners) {
+        unlisten();
+      }
     };
   }, [queuePaths]);
 
@@ -115,4 +139,9 @@ function filePathFromUri(uri: string): string | null {
   } catch {
     return null;
   }
+}
+
+function logDropEvent(source: 'webview' | 'window', payload: { type: string; paths?: string[] }): void {
+  if (!import.meta.env.DEV) return;
+  console.info(`[saekim-drop:${source}]`, payload);
 }
