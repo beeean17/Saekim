@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { isTauriRuntime } from '../lib/tauri/invoke';
 
-const supportedDocumentExtensions = new Set(['md', 'markdown', 'mdown', 'mkd', 'txt']);
-
 export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabled: boolean): void {
   const openingRef = useRef(false);
   const queuedPathsRef = useRef<string[]>([]);
@@ -11,7 +9,7 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
   const flushDroppedPaths = useCallback(async () => {
     if (!isTauriRuntime() || !enabledRef.current || openingRef.current) return;
 
-    const paths = [...new Set(queuedPathsRef.current.filter(isSupportedDocumentPath))];
+    const paths = [...new Set(queuedPathsRef.current)];
     queuedPathsRef.current = [];
     if (paths.length === 0) return;
 
@@ -87,13 +85,6 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
       window.removeEventListener('drop', openDroppedFiles, true);
     };
   }, [queuePaths]);
-}
-
-function isSupportedDocumentPath(path: string): boolean {
-  const normalized = path.replace(/\\/g, '/');
-  const fileName = normalized.split('/').pop() ?? '';
-  const extension = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() : '';
-  return Boolean(extension && supportedDocumentExtensions.has(extension));
 }
 
 function droppedFilePaths(dataTransfer: DataTransfer | null): string[] {
