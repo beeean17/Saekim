@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.1] - Unreleased
+
+### Added
+
+- Markdown 외 텍스트 기반 파일을 열 수 있도록 파일 타입 판정 구조를 확장했습니다.
+- `.html`, `.htm`, `.json`, `.yml`, `.yaml`, `.toml`, `.env` 파일을 3.0.1 우선 지원 대상으로 추가했습니다.
+- 확장자가 알려지지 않은 파일도 UTF-8 텍스트로 판정되면 일반 텍스트 파일로 열 수 있도록 했습니다.
+- 프론트엔드 파일 타입 모델에 `label`, `language`, `previewKind`를 추가해 파일 형식별 렌더링/하이라이트 확장 기반을 마련했습니다.
+- HTML 파일 전용 미리보기 렌더링을 추가했습니다.
+- HTML 미리보기 모드를 선택할 수 있는 `브라우저`/`안전` 토글을 추가했습니다.
+- `브라우저` 모드에서는 sandboxed iframe과 `srcDoc`을 사용해 HTML을 브라우저에 가까운 방식으로 렌더링합니다.
+- `안전` 모드에서는 sanitizer를 거친 HTML 조각을 기존 preview DOM 안에 렌더링합니다.
+
+### Changed
+
+- 파일 열기 큐 진입 조건을 고정 확장자 화이트리스트 중심에서 텍스트 파일 판정 중심으로 변경했습니다.
+- 파일 열기, drag and drop, OS 기본 앱 열기, `Cmd/Ctrl+O`가 동일한 Rust pending open queue를 공유하도록 정리했습니다.
+- HTML preview에서 상대 이미지, 링크, CSS 경로를 현재 HTML 파일 위치 기준으로 해석하도록 보정했습니다.
+- HTML preview 모드 선택값을 세션 설정에 저장하고 다음 실행 시 복원하도록 했습니다.
+
+### Fixed
+
+- 텍스트 파일임에도 확장자가 목록에 없으면 열리지 않던 문제를 완화했습니다.
+- 명확한 바이너리 파일은 텍스트로 잘못 열리지 않도록 확장자와 내용 기반 판정을 추가했습니다.
+- HTML preview에서 `<script>`, iframe/form/input류, inline event handler, 위험한 URL이 실행되거나 삽입되지 않도록 차단했습니다.
+- iframe HTML preview 내부 링크 클릭이 앱 내부 navigation으로 이어지지 않고 외부 브라우저/시스템 열기로 처리되도록 했습니다.
+
+### Build
+
+- 3.0.1 HTML/text 파일 지원 계획 문서를 `private/3.0.1/html_text_file_support_plan.md`에 추가했습니다.
+
+---
+
 ## [3.0.0] - Unreleased
 
 ### Added
@@ -151,6 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.0.1 | Unreleased | Flexible text-file detection, HTML preview rendering, browser/safe HTML preview modes |
 | 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
 | 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |
 | 1.2.0 | 2025-12-23 | Resize overlay, Pretendard font, ViewToggle styles, Refresh feature |
