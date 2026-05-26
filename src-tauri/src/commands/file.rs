@@ -8,7 +8,11 @@ use serde::Serialize;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{app_state::AppState, is_supported_document_path, queue_open_files};
+use crate::{
+    app_state::AppState,
+    is_supported_document_path, queue_open_files,
+    text_file::{is_known_text_document_path, read_text_file, TEXT_DIALOG_EXTENSIONS},
+};
 
 #[derive(Serialize)]
 pub struct CommandResult<T>
@@ -52,11 +56,7 @@ pub struct FileTreeNode {
 pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
     let app_handle = app.clone();
     let selected = tauri::async_runtime::spawn_blocking(move || {
-        let selected = app
-            .dialog()
-            .file()
-            .add_filter("Documents", &["md", "markdown", "mdown", "mkd", "txt"])
-            .blocking_pick_file();
+        let selected = app.dialog().file().blocking_pick_file();
 
         let Some(path) = selected else {
             return Ok(None);
@@ -188,7 +188,7 @@ pub async fn save_file(
             _ => app
                 .dialog()
                 .file()
-                .add_filter("Documents", &["md", "markdown", "mdown", "mkd", "txt"])
+                .add_filter("Text Documents", TEXT_DIALOG_EXTENSIONS)
                 .set_file_name("untitled.md")
                 .blocking_save_file()
                 .map(|path| path.into_path().unwrap_or_default()),
@@ -222,7 +222,7 @@ pub async fn save_file_as(
         let selected = app
             .dialog()
             .file()
-            .add_filter("Documents", &["md", "markdown", "mdown", "mkd", "txt"])
+            .add_filter("Text Documents", TEXT_DIALOG_EXTENSIONS)
             .set_file_name(&suggested_name)
             .blocking_save_file();
 
@@ -292,9 +292,7 @@ pub fn write_pdf_export(path: String, bytes: Vec<u8>) -> CommandResult<String> {
 }
 
 fn read_file_payload(path: PathBuf) -> Result<OpenFilePayload, String> {
-    let bytes = fs::read(&path).map_err(|error| format!("failed to read file: {error}"))?;
-    let content = String::from_utf8(bytes)
-        .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
+    let content = read_text_file(&path)?;
     let name = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -443,22 +441,12 @@ fn should_include_path(path: &Path, is_dir: bool, is_file: bool) -> bool {
             | "Movies"
             | "Music"
             | "Pictures"
-    ) || name.starts_with('.')
+    ) || (name.starts_with('.') && !is_known_text_document_path(path))
     {
         return false;
     }
 
-    is_dir || (is_file && is_supported_document(path))
-}
-
-fn is_supported_document(path: &Path) -> bool {
-    matches!(
-        path.extension()
-            .and_then(|value| value.to_str())
-            .map(str::to_lowercase)
-            .as_deref(),
-        Some("md" | "markdown" | "mdown" | "mkd" | "txt")
-    )
+    is_dir || (is_file && is_known_text_document_path(path))
 }
 
 fn entry_name_lower(entry: &fs::DirEntry) -> String {

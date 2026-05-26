@@ -2,6 +2,7 @@ mod app_state;
 mod commands;
 #[cfg(target_os = "macos")]
 mod macos_open_documents;
+mod text_file;
 
 use app_state::AppState;
 use std::path::{Path, PathBuf};
@@ -211,16 +212,8 @@ fn document_paths_from_pathbufs(paths: Vec<PathBuf>) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn is_supported_document_path(path: &PathBuf) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .map(|extension| {
-            matches!(
-                extension.to_ascii_lowercase().as_str(),
-                "md" | "markdown" | "mdown" | "mkd" | "txt"
-            )
-        })
-        .unwrap_or(false)
+pub(crate) fn is_supported_document_path(path: &Path) -> bool {
+    text_file::is_supported_document_path(path)
 }
 
 pub(crate) fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
