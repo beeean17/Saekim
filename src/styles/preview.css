@@ -172,6 +172,19 @@
   line-height: 1.7;
 }
 
+.preview-content .html-preview {
+  min-height: 100%;
+  overflow-wrap: anywhere;
+}
+
+.preview-content .html-preview > :first-child {
+  margin-top: 0;
+}
+
+.preview-content .html-preview > :last-child {
+  margin-bottom: 0;
+}
+
 .preview-content .shiki .line {
   display: block;
   padding: 0 16px 0 52px;

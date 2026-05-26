@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { isMarkdownFile } from '../../lib/fileType';
+import { getFileTypeInfo } from '../../lib/fileType';
+import { renderHtmlDocument } from '../../lib/html/renderHtml';
 import { escapeHtml } from '../../lib/markdown/escape';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
@@ -39,8 +40,16 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   useEffect(() => {
     let alive = true;
     const content = activeFile?.content ?? '';
+    const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path);
 
-    if (!isMarkdownFile(activeFile?.name, activeFile?.path)) {
+    if (fileType.previewKind === 'html') {
+      setHtml(renderHtmlDocument(content, activeFile?.path));
+      return () => {
+        alive = false;
+      };
+    }
+
+    if (fileType.previewKind !== 'markdown') {
       setHtml(`<pre class="plain-text-preview">${escapeHtml(content)}</pre>`);
       return () => {
         alive = false;
