@@ -44,6 +44,7 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
 
     disposedRef.current = false;
     let unlisten: (() => void) | null = null;
+    let unlistenWindow: (() => void) | null = null;
 
     void import('@tauri-apps/api/event')
       .then(async ({ listen }) => {
@@ -57,9 +58,41 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
         console.error('외부 파일 열기 이벤트 연결 실패:', error);
       });
 
+    void import('@tauri-apps/api/window')
+      .then(async ({ getCurrentWindow }) => {
+        unlistenWindow = await getCurrentWindow().listen<string[]>(externalOpenEvent, (event) => {
+          queuedPathsRef.current.push(...event.payload);
+          void flushQueuedPaths();
+        });
+      })
+      .catch((error) => {
+        console.error('외부 파일 열기 창 이벤트 연결 실패:', error);
+      });
+
+    const flushOnFocus = () => {
+      void flushQueuedPaths();
+    };
+    const flushOnVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void flushQueuedPaths();
+      }
+    };
+
+    window.addEventListener('focus', flushOnFocus);
+    document.addEventListener('visibilitychange', flushOnVisible);
+    const pendingPoll = window.setInterval(() => {
+      if (enabledRef.current) {
+        void flushQueuedPaths();
+      }
+    }, 1500);
+
     return () => {
       disposedRef.current = true;
       unlisten?.();
+      unlistenWindow?.();
+      window.removeEventListener('focus', flushOnFocus);
+      document.removeEventListener('visibilitychange', flushOnVisible);
+      window.clearInterval(pendingPoll);
     };
   }, [flushQueuedPaths]);
 }
