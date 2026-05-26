@@ -162,5 +162,11 @@ fn queue_open_files(paths: Vec<String>) {
         pending.extend(paths.iter().cloned());
     }
 
-    let _ = app.emit(EVENT_OPEN_EXTERNAL_FILES, paths);
+    let _ = app.emit(EVENT_OPEN_EXTERNAL_FILES, paths.clone());
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit(EVENT_OPEN_EXTERNAL_FILES, paths);
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
 }
