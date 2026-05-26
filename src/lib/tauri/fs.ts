@@ -1,9 +1,9 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
-export async function openFileDialog(): Promise<OpenFilePayload | null> {
-  if (!isTauriRuntime()) return null;
-  return invokeCommand<OpenFilePayload | null>('open_file_dialog');
+export async function openFileDialog(): Promise<boolean> {
+  if (!isTauriRuntime()) return false;
+  return invokeCommand<boolean>('open_file_dialog');
 }
 
 export async function openFolderDialog(): Promise<string | null> {

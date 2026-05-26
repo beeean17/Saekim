@@ -4,8 +4,8 @@ import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/w
 const sessionKey = 'saekim-browser-session';
 
 export const browserBackend: BackendAdapter = {
-  async openFileDialog(): Promise<OpenFilePayload | null> {
-    return null;
+  async openFileDialog(): Promise<boolean> {
+    return false;
   },
 
   async openFolderDialog(): Promise<string | null> {

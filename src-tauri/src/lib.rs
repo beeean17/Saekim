@@ -211,7 +211,7 @@ fn document_paths_from_pathbufs(paths: Vec<PathBuf>) -> Vec<String> {
         .collect()
 }
 
-fn is_supported_document_path(path: &PathBuf) -> bool {
+pub(crate) fn is_supported_document_path(path: &PathBuf) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .map(|extension| {
@@ -223,7 +223,7 @@ fn is_supported_document_path(path: &PathBuf) -> bool {
         .unwrap_or(false)
 }
 
-fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
+pub(crate) fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
     if paths.is_empty() {
         return;
     }

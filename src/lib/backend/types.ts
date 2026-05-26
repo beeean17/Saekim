@@ -1,7 +1,7 @@
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
 export interface BackendAdapter {
-  openFileDialog(): Promise<OpenFilePayload | null>;
+  openFileDialog(): Promise<boolean>;
   openFolderDialog(): Promise<string | null>;
   pickImagePath(): Promise<string | null>;
   importPdf(path: string): Promise<OpenFilePayload>;

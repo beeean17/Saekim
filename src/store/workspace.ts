@@ -117,10 +117,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFile: async (path) => {
     if (!path) {
       try {
-        const opened = await Backend.openFileDialog();
-        if (!opened) return;
-        const file = toOpenFile(opened.path, opened.name, opened.content);
-        set((state) => upsertOpenFile(state, file));
+        await Backend.openFileDialog();
       } catch (error) {
         console.error('파일 열기 실패:', error);
       }

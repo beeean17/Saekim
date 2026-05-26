@@ -8,7 +8,7 @@ use serde::Serialize;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
-use crate::app_state::AppState;
+use crate::{app_state::AppState, is_supported_document_path, queue_open_files};
 
 #[derive(Serialize)]
 pub struct CommandResult<T>
@@ -49,7 +49,8 @@ pub struct FileTreeNode {
 }
 
 #[tauri::command]
-pub async fn open_file_dialog(app: AppHandle) -> CommandResult<Option<OpenFilePayload>> {
+pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
+    let app_handle = app.clone();
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let selected = app
             .dialog()
@@ -61,12 +62,21 @@ pub async fn open_file_dialog(app: AppHandle) -> CommandResult<Option<OpenFilePa
             return Ok(None);
         };
 
-        read_file_payload(path.into_path().unwrap_or_default()).map(Some)
+        let path = path.into_path().unwrap_or_default();
+        if !is_supported_document_path(&path) {
+            return Err("unsupported document type".to_string());
+        }
+
+        Ok(Some(path.to_string_lossy().to_string()))
     })
     .await;
 
     match selected {
-        Ok(Ok(payload)) => ok(payload),
+        Ok(Ok(Some(path))) => {
+            queue_open_files(&app_handle, vec![path]);
+            ok(true)
+        }
+        Ok(Ok(None)) => ok(false),
         Ok(Err(error)) => fail(error),
         Err(error) => fail(format!("failed to open file dialog: {error}")),
     }
