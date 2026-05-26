@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HTML 미리보기 모드를 선택할 수 있는 `브라우저`/`안전` 토글을 추가했습니다.
 - `브라우저` 모드에서는 sandboxed iframe과 `srcDoc`을 사용해 HTML을 브라우저에 가까운 방식으로 렌더링합니다.
 - `안전` 모드에서는 sanitizer를 거친 HTML 조각을 기존 preview DOM 안에 렌더링합니다.
+- JSON/YAML/TOML 파일을 접고 펼칠 수 있는 interactive tree preview로 렌더링하도록 추가했습니다.
+- CSV/TSV 파일을 spreadsheet 형태의 table preview로 렌더링하도록 추가했습니다.
+- OpenAPI v3 JSON/YAML 문서를 감지해 API 문서 preview로 렌더링하도록 추가했습니다.
 
 ### Changed
 
@@ -26,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 파일 열기, drag and drop, OS 기본 앱 열기, `Cmd/Ctrl+O`가 동일한 Rust pending open queue를 공유하도록 정리했습니다.
 - HTML preview에서 상대 이미지, 링크, CSS 경로를 현재 HTML 파일 위치 기준으로 해석하도록 보정했습니다.
 - HTML preview 모드 선택값을 세션 설정에 저장하고 다음 실행 시 복원하도록 했습니다.
+- JSON/YAML/TOML/CSV/TSV 파일의 기본 preview를 raw text에서 구조화된 데이터 preview로 변경했습니다.
+- CSV/TSV preview는 대용량 파일에서 첫 1,000개 행만 표시하고 전체 행 수와 truncation 상태를 표시합니다.
 
 ### Fixed
 
@@ -33,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 명확한 바이너리 파일은 텍스트로 잘못 열리지 않도록 확장자와 내용 기반 판정을 추가했습니다.
 - HTML preview에서 `<script>`, iframe/form/input류, inline event handler, 위험한 URL이 실행되거나 삽입되지 않도록 차단했습니다.
 - iframe HTML preview 내부 링크 클릭이 앱 내부 navigation으로 이어지지 않고 외부 브라우저/시스템 열기로 처리되도록 했습니다.
+- 구조화 데이터 파싱 실패 시 preview가 비지 않고 오류 패널과 raw text fallback을 표시하도록 했습니다.
 
 ### Build
 

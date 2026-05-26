@@ -1,4 +1,4 @@
-export type PreviewKind = 'markdown' | 'html' | 'text';
+export type PreviewKind = 'markdown' | 'html' | 'text' | 'structured-data' | 'tabular-data';
 
 export interface FileTypeInfo {
   label: string;
@@ -34,10 +34,10 @@ const extensionMap: Record<string, FileTypeInfo> = {
   log: { label: 'log', language: 'plaintext', previewKind: 'text' },
   html: { label: 'html', language: 'html', previewKind: 'html' },
   htm: { label: 'html', language: 'html', previewKind: 'html' },
-  json: { label: 'json', language: 'json', previewKind: 'text' },
-  yml: { label: 'yaml', language: 'yaml', previewKind: 'text' },
-  yaml: { label: 'yaml', language: 'yaml', previewKind: 'text' },
-  toml: { label: 'toml', language: 'toml', previewKind: 'text' },
+  json: { label: 'json', language: 'json', previewKind: 'structured-data' },
+  yml: { label: 'yaml', language: 'yaml', previewKind: 'structured-data' },
+  yaml: { label: 'yaml', language: 'yaml', previewKind: 'structured-data' },
+  toml: { label: 'toml', language: 'toml', previewKind: 'structured-data' },
   env: { label: 'env', language: 'dotenv', previewKind: 'text' },
   css: { label: 'css', language: 'css', previewKind: 'text' },
   js: { label: 'js', language: 'javascript', previewKind: 'text' },
@@ -45,8 +45,8 @@ const extensionMap: Record<string, FileTypeInfo> = {
   ts: { label: 'ts', language: 'typescript', previewKind: 'text' },
   tsx: { label: 'tsx', language: 'tsx', previewKind: 'text' },
   xml: { label: 'xml', language: 'xml', previewKind: 'text' },
-  csv: { label: 'csv', language: 'csv', previewKind: 'text' },
-  tsv: { label: 'tsv', language: 'tsv', previewKind: 'text' },
+  csv: { label: 'csv', language: 'csv', previewKind: 'tabular-data' },
+  tsv: { label: 'tsv', language: 'tsv', previewKind: 'tabular-data' },
   ini: { label: 'ini', language: 'ini', previewKind: 'text' },
   conf: { label: 'conf', language: 'ini', previewKind: 'text' },
   config: { label: 'config', language: 'ini', previewKind: 'text' },
