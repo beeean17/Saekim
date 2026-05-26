@@ -65,7 +65,7 @@ const allowedTags = new Set([
   'var',
 ]);
 
-const removedTags = new Set([
+const safeRemovedTags = new Set([
   'base',
   'button',
   'canvas',
@@ -88,12 +88,30 @@ const removedTags = new Set([
   'template',
 ]);
 
+const browserRemovedTags = new Set([
+  'base',
+  'button',
+  'embed',
+  'form',
+  'frame',
+  'frameset',
+  'iframe',
+  'input',
+  'noscript',
+  'object',
+  'option',
+  'script',
+  'select',
+  'textarea',
+  'template',
+]);
+
 const globalAttributes = new Set(['aria-label', 'aria-labelledby', 'aria-describedby', 'class', 'dir', 'id', 'lang', 'role', 'title']);
 const tableAttributes = new Set(['align', 'colspan', 'rowspan', 'scope']);
 const imageAttributes = new Set(['alt', 'decoding', 'height', 'loading', 'src', 'width']);
 const anchorAttributes = new Set(['href', 'rel', 'target']);
 
-export function renderHtmlDocument(source: string, ownerPath?: string): string {
+export function renderSafeHtmlDocument(source: string, ownerPath?: string): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(source, 'text/html');
   const root = doc.createElement('div');
@@ -105,6 +123,16 @@ export function renderHtmlDocument(source: string, ownerPath?: string): string {
   return root.outerHTML;
 }
 
+export function renderBrowserHtmlDocument(source: string, ownerPath?: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(source, 'text/html');
+
+  sanitizeBrowserElement(doc.documentElement, ownerPath);
+  ensureBrowserPreviewBaseStyles(doc);
+
+  return `<!doctype html>${doc.documentElement.outerHTML}`;
+}
+
 function sanitizeChildren(parent: Element, ownerPath?: string): void {
   Array.from(parent.children).forEach((child) => sanitizeElement(child, ownerPath));
 }
@@ -112,7 +140,7 @@ function sanitizeChildren(parent: Element, ownerPath?: string): void {
 function sanitizeElement(element: Element, ownerPath?: string): void {
   const tagName = element.tagName.toLowerCase();
 
-  if (removedTags.has(tagName)) {
+  if (safeRemovedTags.has(tagName)) {
     element.remove();
     return;
   }
@@ -125,6 +153,82 @@ function sanitizeElement(element: Element, ownerPath?: string): void {
   }
 
   sanitizeAttributes(element, ownerPath);
+}
+
+function sanitizeBrowserElement(element: Element, ownerPath?: string): void {
+  const tagName = element.tagName.toLowerCase();
+
+  if (browserRemovedTags.has(tagName)) {
+    element.remove();
+    return;
+  }
+
+  Array.from(element.children).forEach((child) => sanitizeBrowserElement(child, ownerPath));
+  sanitizeBrowserAttributes(element, ownerPath);
+}
+
+function sanitizeBrowserAttributes(element: Element, ownerPath?: string): void {
+  const tagName = element.tagName.toLowerCase();
+
+  if (tagName === 'link' && !isAllowedBrowserLink(element)) {
+    element.remove();
+    return;
+  }
+
+  Array.from(element.attributes).forEach((attribute) => {
+    const name = attribute.name.toLowerCase();
+    const value = attribute.value;
+
+    if (name.startsWith('on') || name === 'srcdoc' || name === 'integrity') {
+      element.removeAttribute(attribute.name);
+      return;
+    }
+
+    if (name === 'href') {
+      const href = tagName === 'link' ? sanitizeResourceSource(value, ownerPath) : sanitizeHref(value, ownerPath);
+      if (!href) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      element.setAttribute('href', href);
+      if (tagName === 'a') element.setAttribute('rel', 'noopener noreferrer');
+      return;
+    }
+
+    if (name === 'src' || name === 'poster') {
+      const src = sanitizeResourceSource(value, ownerPath);
+      if (!src) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      element.setAttribute(attribute.name, src);
+      return;
+    }
+
+    if (name === 'srcset') {
+      element.removeAttribute(attribute.name);
+    }
+  });
+}
+
+function ensureBrowserPreviewBaseStyles(doc: Document): void {
+  const style = doc.createElement('style');
+  style.textContent = `
+    html {
+      background: #fff;
+      color: #111827;
+    }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      box-sizing: border-box;
+    }
+    img, video {
+      max-width: 100%;
+      height: auto;
+    }
+  `;
+  doc.head.prepend(style);
 }
 
 function sanitizeAttributes(element: Element, ownerPath?: string): void {
@@ -203,6 +307,18 @@ function sanitizeImageSource(value: string, ownerPath?: string): string | null {
   return isSafeUrl(trimmed, ['http:', 'https:', 'file:', 'asset:']) ? trimmed : null;
 }
 
+function sanitizeResourceSource(value: string, ownerPath?: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (isSafeDataImage(trimmed)) return trimmed;
+
+  const localPath = resolveLocalPath(trimmed, ownerPath);
+  if (localPath) return isTauriRuntime() ? convertFileSrc(localPath) : toFileHref(localPath);
+
+  return isSafeUrl(trimmed, ['http:', 'https:', 'file:', 'asset:']) ? trimmed : null;
+}
+
 function isSafeUrl(value: string, protocols: string[]): boolean {
   try {
     const parsed = new URL(value);
@@ -214,6 +330,11 @@ function isSafeUrl(value: string, protocols: string[]): boolean {
 
 function isSafeDataImage(value: string): boolean {
   return /^data:image\/(?:png|jpe?g|gif|webp|bmp|avif);base64,/i.test(value);
+}
+
+function isAllowedBrowserLink(element: Element): boolean {
+  const rel = element.getAttribute('rel')?.toLowerCase() ?? '';
+  return rel.split(/\s+/).some((value) => ['stylesheet', 'preload', 'preconnect', 'dns-prefetch', 'icon'].includes(value));
 }
 
 function resolveLocalPath(value: string, ownerPath?: string): string | null {

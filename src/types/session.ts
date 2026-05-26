@@ -1,5 +1,7 @@
 import type { FileTreeNode, OpenFile, RecentFile, SidebarMode, SidebarViewMode, ThemeName, ViewMode } from './workspace';
 
+export type HtmlPreviewMode = 'browser' | 'safe';
+
 export interface WorkspaceSession {
   rootPath: string | null;
   tree: FileTreeNode[];
@@ -23,6 +25,7 @@ export interface SettingsSession {
   theme: ThemeName;
   fontSize: number;
   editorFontFamily: string;
+  htmlPreviewMode?: HtmlPreviewMode;
 }
 
 export interface AppSession {

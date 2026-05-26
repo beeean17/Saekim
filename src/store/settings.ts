@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SettingsSession } from '../types/session';
+import type { HtmlPreviewMode, SettingsSession } from '../types/session';
 import type { ThemeName } from '../types/workspace';
 
 export const fontSizeOptions = [
@@ -15,9 +15,11 @@ interface SettingsState {
   theme: ThemeName;
   fontSize: number;
   editorFontFamily: string;
+  htmlPreviewMode: HtmlPreviewMode;
   setTheme: (theme: ThemeName) => void;
   setFontSize: (fontSize: number) => void;
   setEditorFontFamily: (editorFontFamily: string) => void;
+  setHtmlPreviewMode: (htmlPreviewMode: HtmlPreviewMode) => void;
   restoreSettings: (settings: SettingsSession) => void;
 }
 
@@ -42,6 +44,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   theme: 'default',
   fontSize: defaultFontSize,
   editorFontFamily: defaultEditorFontFamily,
+  htmlPreviewMode: 'browser',
   setTheme: (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
     set({ theme });
@@ -59,10 +62,11 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
       return { editorFontFamily };
     });
   },
+  setHtmlPreviewMode: (htmlPreviewMode) => set({ htmlPreviewMode }),
   restoreSettings: (settings) => {
     document.documentElement.setAttribute('data-theme', settings.theme);
     const fontSize = normalizeFontSize(settings.fontSize);
     applyEditorSettings(fontSize, settings.editorFontFamily);
-    set({ ...settings, fontSize });
+    set({ ...settings, fontSize, htmlPreviewMode: settings.htmlPreviewMode ?? 'browser' });
   },
 }));

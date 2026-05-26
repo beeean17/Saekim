@@ -39,6 +39,7 @@ function readLegacyMetadata(): LegacyMetadata {
             theme: settings.theme,
             fontSize: settings.fontSize,
             editorFontFamily: settings.editorFontFamily,
+            htmlPreviewMode: settings.htmlPreviewMode,
           }
         : null,
     ui:
@@ -87,6 +88,7 @@ export function useSessionPersistence(): boolean {
   const theme = useSettingsStore((state) => state.theme);
   const fontSize = useSettingsStore((state) => state.fontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
+  const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const restoreSettings = useSettingsStore((state) => state.restoreSettings);
 
   useEffect(() => {
@@ -146,6 +148,7 @@ export function useSessionPersistence(): boolean {
           theme,
           fontSize,
           editorFontFamily,
+          htmlPreviewMode,
         },
       };
 
@@ -162,6 +165,7 @@ export function useSessionPersistence(): boolean {
     editorFontFamily,
     editorWidth,
     fontSize,
+    htmlPreviewMode,
     loaded,
     openFiles,
     recentFiles,
