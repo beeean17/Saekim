@@ -6,7 +6,7 @@ mod macos_open_documents;
 use app_state::AppState;
 use std::path::{Path, PathBuf};
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{Emitter, Manager};
+use tauri::{DragDropEvent, Emitter, Manager, WebviewEvent, WindowEvent};
 
 const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
@@ -75,21 +75,23 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to build Saekim");
 
-    app.run(|app, event| {
-        if let tauri::RunEvent::Opened { urls } = event {
-            let paths = urls
-                .into_iter()
-                .filter_map(|url| {
-                    url.to_file_path().ok().or_else(|| {
-                        (url.scheme() == "file").then(|| PathBuf::from(percent_decode(url.path())))
-                    })
-                })
-                .filter(|path| is_supported_document_path(path))
-                .map(|path| path.to_string_lossy().to_string())
-                .collect();
-
-            queue_open_files(app, paths);
+    app.run(|app, event| match event {
+        tauri::RunEvent::Opened { urls } => {
+            queue_open_files(app, document_paths_from_urls(urls));
         }
+        tauri::RunEvent::WindowEvent {
+            event: WindowEvent::DragDrop(event),
+            ..
+        } => {
+            queue_open_files(app, document_paths_from_drag_drop_event(event));
+        }
+        tauri::RunEvent::WebviewEvent {
+            event: WebviewEvent::DragDrop(event),
+            ..
+        } => {
+            queue_open_files(app, document_paths_from_drag_drop_event(event));
+        }
+        _ => {}
     });
 }
 
@@ -180,6 +182,33 @@ fn document_path_from_arg(arg: &str, cwd: Option<&str>) -> Option<String> {
     };
 
     is_supported_document_path(&path).then(|| path.to_string_lossy().to_string())
+}
+
+fn document_paths_from_urls(urls: Vec<url::Url>) -> Vec<String> {
+    urls.into_iter()
+        .filter_map(|url| {
+            url.to_file_path().ok().or_else(|| {
+                (url.scheme() == "file").then(|| PathBuf::from(percent_decode(url.path())))
+            })
+        })
+        .filter(|path| is_supported_document_path(path))
+        .map(|path| path.to_string_lossy().to_string())
+        .collect()
+}
+
+fn document_paths_from_drag_drop_event(event: DragDropEvent) -> Vec<String> {
+    match event {
+        DragDropEvent::Drop { paths, .. } => document_paths_from_pathbufs(paths),
+        _ => Vec::new(),
+    }
+}
+
+fn document_paths_from_pathbufs(paths: Vec<PathBuf>) -> Vec<String> {
+    paths
+        .into_iter()
+        .filter(|path| is_supported_document_path(path))
+        .map(|path| path.to_string_lossy().to_string())
+        .collect()
 }
 
 fn is_supported_document_path(path: &PathBuf) -> bool {
