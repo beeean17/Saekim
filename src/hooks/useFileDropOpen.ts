@@ -5,17 +5,19 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
   const openingRef = useRef(false);
   const queuedPathsRef = useRef<string[]>([]);
   const enabledRef = useRef(enabled);
+  const disposedRef = useRef(false);
 
   const flushDroppedPaths = useCallback(async () => {
     if (!isTauriRuntime() || !enabledRef.current || openingRef.current) return;
 
-    const paths = [...new Set(queuedPathsRef.current)];
+    const paths = [...new Set(queuedPathsRef.current.filter(Boolean))];
     queuedPathsRef.current = [];
     if (paths.length === 0) return;
 
     openingRef.current = true;
     try {
       for (const path of paths) {
+        if (disposedRef.current || !enabledRef.current) return;
         await openFile(path);
       }
     } catch (error) {
@@ -46,6 +48,7 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
   useEffect(() => {
     if (!isTauriRuntime()) return;
 
+    disposedRef.current = false;
     let alive = true;
     const unlisteners: Array<() => void> = [];
     const addUnlistener = (unlisten: () => void) => {
@@ -80,6 +83,7 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
       });
 
     return () => {
+      disposedRef.current = true;
       alive = false;
       for (const unlisten of unlisteners) {
         unlisten();
@@ -103,12 +107,31 @@ export function useFileDropOpen(openFile: (path: string) => Promise<void>, enabl
 
     window.addEventListener('dragover', preventDefaultDrop, true);
     window.addEventListener('drop', openDroppedFiles, true);
+    const flushOnFocus = () => {
+      void flushDroppedPaths();
+    };
+    const flushOnVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void flushDroppedPaths();
+      }
+    };
+    const pendingPoll = window.setInterval(() => {
+      if (queuedPathsRef.current.length > 0 && enabledRef.current) {
+        void flushDroppedPaths();
+      }
+    }, 1500);
+
+    window.addEventListener('focus', flushOnFocus);
+    document.addEventListener('visibilitychange', flushOnVisible);
 
     return () => {
       window.removeEventListener('dragover', preventDefaultDrop, true);
       window.removeEventListener('drop', openDroppedFiles, true);
+      window.removeEventListener('focus', flushOnFocus);
+      document.removeEventListener('visibilitychange', flushOnVisible);
+      window.clearInterval(pendingPoll);
     };
-  }, [queuePaths]);
+  }, [flushDroppedPaths, queuePaths]);
 }
 
 function droppedFilePaths(dataTransfer: DataTransfer | null): string[] {
