@@ -16,6 +16,14 @@ export const browserBackend: BackendAdapter = {
     return null;
   },
 
+  async copyImageToAssets(_sourcePath: string, _currentFilePath: string): Promise<string> {
+    throw new Error('Image asset import is only available in the desktop app.');
+  },
+
+  async downloadImageToAssets(_id: string, _imageUrl: string, _currentFilePath: string): Promise<string> {
+    throw new Error('Remote image import is only available in the desktop app.');
+  },
+
   async importPdf(_path: string): Promise<OpenFilePayload> {
     throw new Error('PDF import is deferred in Saekim 3.0.0.');
   },

@@ -16,6 +16,14 @@ export async function pickImagePath(): Promise<string | null> {
   return invokeCommand<string | null>('pick_image_path');
 }
 
+export async function copyImageToAssets(sourcePath: string, currentFilePath: string): Promise<string> {
+  return invokeCommand<string>('copy_image_to_assets', { sourcePath, currentFilePath });
+}
+
+export async function downloadImageToAssets(id: string, imageUrl: string, currentFilePath: string): Promise<string> {
+  return invokeCommand<string>('download_image_to_assets', { id, imageUrl, currentFilePath });
+}
+
 export async function importPdf(path: string): Promise<OpenFilePayload> {
   return invokeCommand<OpenFilePayload>('import_pdf', { path });
 }

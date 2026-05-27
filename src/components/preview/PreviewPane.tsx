@@ -99,7 +99,7 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     }
 
     const mode = theme === 'dark' || theme === 'nord' ? 'dark' : 'light';
-    void renderMarkdown(content, mode).then((nextHtml) => {
+    void renderMarkdown(content, mode, activeFile?.path).then((nextHtml) => {
       if (alive) setHtml(nextHtml);
     });
     return () => {

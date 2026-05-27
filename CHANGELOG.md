@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAPI v3 JSON/YAML 문서를 감지해 API 문서 preview로 렌더링하도록 추가했습니다.
 - 구조화 데이터 preview에 `API`/`Tree`/`Raw`, 표 데이터 preview에 `Table`/`Raw` 모드 전환을 추가했습니다.
 - 구조화 데이터 tree preview에서 객체 key path를 클릭해 복사할 수 있도록 추가했습니다.
+- 이미지 삽입 버튼에 `원본 경로로 연결`과 `문서 assets로 복사` 드롭다운 옵션을 추가했습니다.
+- 브라우저에서 원격 이미지를 편집기에 드래그 앤 드롭하면 현재 문서 옆 `.assets/` 폴더로 다운로드해 상대 경로로 삽입하는 기능을 추가했습니다.
+- 원격 이미지 다운로드 중 Markdown preview의 이미지 위치에 진행률/실패 상태를 표시하도록 추가했습니다.
 
 ### Changed
 
@@ -34,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON/YAML/TOML/CSV/TSV 파일의 기본 preview를 raw text에서 구조화된 데이터 preview로 변경했습니다.
 - CSV/TSV preview는 대용량 파일에서 첫 1,000개 행만 표시하고 전체 행 수와 truncation 상태를 표시합니다.
 - JSON/YAML/TOML/CSV/TSV preview 렌더링은 기존 Markdown/HTML 문자열 렌더링 경로와 분리된 React 컴포넌트 기반 렌더링 경로를 사용하도록 변경했습니다.
+- Markdown preview에서 상대 이미지 경로를 현재 문서 위치 기준으로 해석하도록 변경했습니다.
 
 ### Fixed
 
@@ -43,11 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - iframe HTML preview 내부 링크 클릭이 앱 내부 navigation으로 이어지지 않고 외부 브라우저/시스템 열기로 처리되도록 했습니다.
 - 구조화 데이터 파싱 실패 시 preview가 비지 않고 오류 패널과 raw text fallback을 표시하도록 했습니다.
 - CSV/TSV 파싱 경고가 있을 때 표 preview와 함께 경고 메시지를 표시하도록 했습니다.
+- 원격 이미지 assets 가져오기에서 `http`/`https` 외 URL, 사설망/localhost URL, remote SVG, 비이미지 MIME, 20MB 초과 파일을 차단하도록 했습니다.
+- 원격 이미지 다운로드 실패 시 임시 파일이 남지 않도록 처리했습니다.
 
 ### Build
 
 - 3.0.1 HTML/text 파일 지원 계획 문서를 `private/3.0.1/html_text_file_support_plan.md`에 추가했습니다.
 - 구조화 데이터 preview를 위해 `yaml`, `smol-toml`, `papaparse` 의존성을 추가했습니다.
+- 이미지 assets 가져오기 개발 계획 문서를 `private/3.0.1/image_assets_import_plan.md`에 추가했습니다.
+- 원격 이미지 스트리밍 다운로드를 위해 Rust `reqwest`, `futures-util` 의존성을 추가했습니다.
 
 ---
 
