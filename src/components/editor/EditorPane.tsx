@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import katex from 'katex';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { Backend } from '../../lib/backend';
@@ -203,18 +204,40 @@ function ImageToolButton({
   textareaRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const updateMenuPosition = () => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const rect = root.getBoundingClientRect();
+    const menuWidth = 218;
+    setMenuPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8)),
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
+    updateMenuPosition();
 
     const onPointerDown = (event: PointerEvent) => {
       if (rootRef.current?.contains(event.target as Node)) return;
+      if (menuRef.current?.contains(event.target as Node)) return;
       setOpen(false);
     };
 
     window.addEventListener('pointerdown', onPointerDown);
-    return () => window.removeEventListener('pointerdown', onPointerDown);
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
   }, [open]);
 
   const insert = (mode: ImageInsertMode) => {
@@ -224,11 +247,27 @@ function ImageToolButton({
 
   return (
     <div className="tool-dropdown" ref={rootRef}>
-      <button className={`tool-btn ${open ? 'active' : ''}`} type="button" title="이미지" aria-label="이미지" onClick={() => setOpen((state) => !state)}>
+      <button
+        className={`tool-btn ${open ? 'active' : ''}`}
+        type="button"
+        title="이미지"
+        aria-label="이미지"
+        onClick={() => {
+          updateMenuPosition();
+          setOpen((state) => !state);
+        }}
+      >
         <Icon name="image" />
       </button>
-      {open ? (
-        <div className="tool-menu" role="menu" aria-label="이미지 삽입 방식">
+      {open && menuPosition
+        ? createPortal(
+            <div
+              className="tool-menu"
+              ref={menuRef}
+              role="menu"
+              aria-label="이미지 삽입 방식"
+              style={{ top: menuPosition.top, left: menuPosition.left }}
+            >
           <button type="button" role="menuitem" onClick={() => insert('link')}>
             <span>원본 경로로 연결</span>
             <small>파일을 이동하지 않고 현재 경로를 삽입</small>
@@ -237,8 +276,10 @@ function ImageToolButton({
             <span>문서 assets로 복사</span>
             <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
           </button>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

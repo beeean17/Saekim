@@ -896,14 +896,15 @@
   position: relative;
   z-index: 12;
   height: 36px;
-  overflow: visible;
+  overflow-x: auto;
   padding: 0 10px;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
   animation: slide-down 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.toolbar::-webkit-scrollbar {
+.toolbar::-webkit-scrollbar,
+.toolbar-expanded::-webkit-scrollbar {
   display: none;
 }
 
@@ -1011,9 +1012,7 @@
 }
 
 .tool-menu {
-  position: absolute;
-  top: 33px;
-  left: 0;
+  position: fixed;
   z-index: 60;
   display: grid;
   width: 218px;
