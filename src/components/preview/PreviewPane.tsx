@@ -9,6 +9,7 @@ import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
+import { StructuredDataPreview, TabularDataPreview } from './StructuredDataPreview';
 
 export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -66,10 +67,18 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   const [html, setHtml] = useState('');
   const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path);
   const usesBrowserFrame = fileType.previewKind === 'html' && htmlPreviewMode === 'browser';
+  const usesStructuredPreview = fileType.previewKind === 'structured-data' || fileType.previewKind === 'tabular-data';
 
   useEffect(() => {
     let alive = true;
     const content = activeFile?.content ?? '';
+
+    if (usesStructuredPreview) {
+      setHtml('');
+      return () => {
+        alive = false;
+      };
+    }
 
     if (fileType.previewKind === 'html') {
       setHtml(
@@ -90,17 +99,17 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     }
 
     const mode = theme === 'dark' || theme === 'nord' ? 'dark' : 'light';
-    void renderMarkdown(content, mode).then((nextHtml) => {
+    void renderMarkdown(content, mode, activeFile?.path).then((nextHtml) => {
       if (alive) setHtml(nextHtml);
     });
     return () => {
       alive = false;
     };
-  }, [activeFile?.content, activeFile?.name, activeFile?.path, fileType.previewKind, htmlPreviewMode, theme]);
+  }, [activeFile?.content, activeFile?.name, activeFile?.path, fileType.previewKind, htmlPreviewMode, theme, usesStructuredPreview]);
 
   useLayoutEffect(() => {
     notifyPreviewRendered(localRef.current);
-  }, [html]);
+  }, [activeFile?.content, fileType.previewKind, html]);
 
   useEffect(
     () => () => {
@@ -167,17 +176,14 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   }, [html, theme]);
 
   const className = usesBrowserFrame ? 'preview-content html-preview-browser' : 'preview-content';
+  const setPreviewElement = (element: HTMLDivElement | null) => {
+    localRef.current = element;
+    previewRef.current = element;
+  };
 
-  return (
-    <div
-      className={className}
-      ref={(element) => {
-        localRef.current = element;
-        previewRef.current = element;
-      }}
-      {...(!usesBrowserFrame ? { dangerouslySetInnerHTML: { __html: html } } : {})}
-    >
-      {usesBrowserFrame ? (
+  if (usesBrowserFrame) {
+    return (
+      <div className={className} ref={setPreviewElement}>
         <iframe
           ref={frameRef}
           className="html-preview-frame"
@@ -186,8 +192,32 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
           title="HTML 미리보기"
           onLoad={() => bindHtmlPreviewFrame(frameRef.current, localRef.current, frameCleanupRef)}
         />
-      ) : null}
-    </div>
+      </div>
+    );
+  }
+
+  if (fileType.previewKind === 'structured-data') {
+    return (
+      <div className={className} ref={setPreviewElement}>
+        <StructuredDataPreview content={activeFile?.content ?? ''} fileType={fileType} fileKey={activeFile?.id} />
+      </div>
+    );
+  }
+
+  if (fileType.previewKind === 'tabular-data') {
+    return (
+      <div className={className} ref={setPreviewElement}>
+        <TabularDataPreview content={activeFile?.content ?? ''} fileType={fileType} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={className}
+      ref={setPreviewElement}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 

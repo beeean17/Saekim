@@ -168,12 +168,12 @@ md.renderer.rules.fence = (tokens, idx) => {
 
 let shikiModulePromise: Promise<typeof import('shiki')> | null = null;
 
-export async function renderMarkdown(text: string, theme: 'light' | 'dark' = 'light'): Promise<string> {
+export async function renderMarkdown(text: string, theme: 'light' | 'dark' = 'light', basePath?: string): Promise<string> {
   const footnoteDocument = extractFootnotes(normalizeTaskListShortcuts(text));
   const raw = md.render(footnoteDocument.text);
   const highlighted = await highlightCode(raw, theme);
   const withFootnotes = renderFootnotes(highlighted, footnoteDocument.definitions);
-  return normalizeImageSources(withFootnotes);
+  return normalizeImageSources(withFootnotes, basePath);
 }
 
 async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<string> {
@@ -493,23 +493,97 @@ function footnoteSlug(id: string): string {
   return encodeURIComponent(id).replace(/%/g, '');
 }
 
-function normalizeImageSources(html: string): string {
+function normalizeImageSources(html: string, basePath?: string): string {
   if (!isTauriRuntime()) return html;
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<main>${html}</main>`, 'text/html');
   doc.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
     const src = image.getAttribute('src');
-    if (!src || !isLocalAbsolutePath(src)) return;
-    image.src = convertFileSrc(decodeUrlPath(src));
+    if (!src) return;
+    if (src.startsWith('saekim-pending-image://')) {
+      image.replaceWith(createPendingImageBlock(doc, image.alt));
+      return;
+    }
+    if (src.startsWith('saekim-failed-image://')) {
+      image.replaceWith(createFailedImageBlock(doc, image.alt));
+      return;
+    }
+    if (isLocalAbsolutePath(src)) {
+      image.src = convertFileSrc(decodeUrlPath(src));
+      return;
+    }
+
+    const relativePath = resolveRelativeImagePath(src, basePath);
+    if (relativePath) image.src = convertFileSrc(relativePath);
   });
 
   return doc.querySelector('main')?.innerHTML ?? html;
 }
 
+function createPendingImageBlock(doc: Document, alt: string): HTMLElement {
+  const progress = Number.parseInt(alt.match(/(\d+)%/)?.[1] ?? '', 10);
+  const wrapper = doc.createElement('div');
+  wrapper.className = 'pending-image-block';
+
+  const label = doc.createElement('span');
+  label.textContent = Number.isFinite(progress) ? `이미지 다운로드 중 ${progress}%` : '이미지 다운로드 중';
+
+  const track = doc.createElement('div');
+  track.className = 'pending-image-progress';
+  const bar = doc.createElement('div');
+  bar.style.width = Number.isFinite(progress) ? `${Math.max(0, Math.min(100, progress))}%` : '36%';
+  if (!Number.isFinite(progress)) bar.className = 'indeterminate';
+
+  track.append(bar);
+  wrapper.append(label, track);
+  return wrapper;
+}
+
+function createFailedImageBlock(doc: Document, alt: string): HTMLElement {
+  const wrapper = doc.createElement('div');
+  wrapper.className = 'failed-image-block';
+  const title = doc.createElement('strong');
+  title.textContent = '이미지 다운로드 실패';
+  const message = doc.createElement('span');
+  message.textContent = alt.replace(/^이미지 다운로드 실패:\s*/, '');
+  wrapper.append(title, message);
+  return wrapper;
+}
+
 function isLocalAbsolutePath(src: string): boolean {
   if (/^(?:https?:|data:|asset:|blob:|mailto:|#)/i.test(src)) return false;
   return src.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(src);
+}
+
+function resolveRelativeImagePath(src: string, basePath?: string): string | null {
+  if (!basePath || basePath.startsWith('~') || basePath.startsWith('browser://')) return null;
+  if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(src)) return null;
+
+  const documentDir = basePath.replace(/[\\/][^\\/]*$/, '');
+  if (!documentDir || documentDir === basePath) return null;
+  return normalizeLocalPath(`${documentDir}/${decodeUrlPath(src)}`);
+}
+
+function normalizeLocalPath(path: string): string {
+  const isWindows = /^[a-zA-Z]:[\\/]/.test(path);
+  const prefix = isWindows ? path.slice(0, 2) : path.startsWith('/') ? '/' : '';
+  const rest = isWindows ? path.slice(2) : path;
+  const parts = rest
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((part) => part && part !== '.');
+  const normalized: string[] = [];
+
+  parts.forEach((part) => {
+    if (part === '..') {
+      normalized.pop();
+      return;
+    }
+    normalized.push(part);
+  });
+
+  return isWindows ? `${prefix}/${normalized.join('/')}` : `${prefix}${normalized.join('/')}`;
 }
 
 function decodeUrlPath(src: string): string {

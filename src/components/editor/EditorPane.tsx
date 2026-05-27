@@ -4,13 +4,23 @@ import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { Backend } from '../../lib/backend';
 import { getFileTypeLabel } from '../../lib/fileType';
 import { katexHelperItems, mermaidHelperItems, type KatexHelperItem, type MermaidHelperItem } from '../../lib/markdown/helperCatalog';
+import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { useSettingsStore } from '../../store/settings';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import type { OpenFile } from '../../types/workspace';
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
 
 type HelperMode = 'mermaid' | 'katex';
 type HelperItem = KatexHelperItem | MermaidHelperItem;
+type ImageInsertMode = 'link' | 'copy';
+
+interface ImageDownloadProgressPayload {
+  id: string;
+  status: 'started' | 'progress' | 'completed' | 'failed';
+  progress: number | null;
+  message?: string;
+}
 
 export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -24,6 +34,7 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
       <Toolbar textareaRef={textareaRef} />
       {findOpen ? <FindBar content={activeFile?.content ?? ''} textareaRef={textareaRef} onClose={closeFind} /> : null}
       <EditorContent
+        activeFile={activeFile}
         activeLine={cursor.row}
         value={activeFile?.content ?? ''}
         onChange={(value) => activeFile && updateContent(activeFile.id, value)}
@@ -148,6 +159,8 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
 }
 
 function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
+  const activeFile = useWorkspaceStore(selectActiveFile);
+
   return (
     <div className="toolbar-expanded">
       <div className="tool-group">
@@ -174,10 +187,58 @@ function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTex
         <ToolButton icon="divider" tooltip="구분선" onClick={() => insertMarkdown(textareaRef.current, '---', '')} />
       </div>
       <div className="tool-group">
-        <ToolButton icon="image" tooltip="이미지" onClick={() => void insertSelectedImage(textareaRef.current)} />
+        <ImageToolButton activeFile={activeFile} textareaRef={textareaRef} />
         <ToolButton icon="link" tooltip="링크" onClick={() => wrapSelection(textareaRef.current, '[', '](https://)')} />
         <ToolButton icon="footnote" tooltip="각주" onClick={() => insertMarkdown(textareaRef.current, '[^1]\n\n[^1]: ', '')} />
       </div>
+    </div>
+  );
+}
+
+function ImageToolButton({
+  activeFile,
+  textareaRef,
+}: {
+  activeFile: OpenFile | null;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  const insert = (mode: ImageInsertMode) => {
+    setOpen(false);
+    void insertSelectedImage(textareaRef.current, activeFile, mode);
+  };
+
+  return (
+    <div className="tool-dropdown" ref={rootRef}>
+      <button className={`tool-btn ${open ? 'active' : ''}`} type="button" title="이미지" aria-label="이미지" onClick={() => setOpen((state) => !state)}>
+        <Icon name="image" />
+      </button>
+      {open ? (
+        <div className="tool-menu" role="menu" aria-label="이미지 삽입 방식">
+          <button type="button" role="menuitem" onClick={() => insert('link')}>
+            <span>원본 경로로 연결</span>
+            <small>파일을 이동하지 않고 현재 경로를 삽입</small>
+          </button>
+          <button type="button" role="menuitem" onClick={() => insert('copy')}>
+            <span>문서 assets로 복사</span>
+            <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -372,11 +433,13 @@ function isKatexHelperItem(item: HelperItem): item is KatexHelperItem {
 }
 
 function EditorContent({
+  activeFile,
   value,
   onChange,
   textareaRef,
   activeLine,
 }: {
+  activeFile: OpenFile | null;
   value: string;
   onChange: (value: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
@@ -480,6 +543,15 @@ function EditorContent({
         onSelect={(event) => updateSelectionLines(event.currentTarget)}
         onKeyUp={(event) => updateSelectionLines(event.currentTarget)}
         onMouseUp={(event) => updateSelectionLines(event.currentTarget)}
+        onDragOver={(event) => {
+          if (hasPotentialRemoteImageDrop(event.dataTransfer)) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          const imageUrl = extractRemoteImageUrl(event.dataTransfer);
+          if (!imageUrl) return;
+          event.preventDefault();
+          void insertDroppedRemoteImage(event.currentTarget, activeFile, imageUrl);
+        }}
         onChange={(event) => {
           onChange(event.currentTarget.value);
           updateSelectionLines(event.currentTarget);
@@ -550,8 +622,19 @@ function insertCodeBlock(textarea: HTMLTextAreaElement | null): void {
   textarea.selectionEnd = selectionEnd;
 }
 
-async function insertSelectedImage(textarea: HTMLTextAreaElement | null): Promise<void> {
+async function insertSelectedImage(textarea: HTMLTextAreaElement | null, activeFile: OpenFile | null, mode: ImageInsertMode): Promise<void> {
   if (!textarea) return;
+
+  let currentFilePath = '';
+  if (mode === 'copy') {
+    try {
+      currentFilePath = requireSavedActiveFile(activeFile);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+      textarea.focus();
+      return;
+    }
+  }
 
   const path = await Backend.pickImagePath();
   if (!path) {
@@ -559,7 +642,55 @@ async function insertSelectedImage(textarea: HTMLTextAreaElement | null): Promis
     return;
   }
 
-  insertTextAtSelection(textarea, markdownImageSnippet(path));
+  if (mode === 'link') {
+    insertTextAtSelection(textarea, markdownImageSnippet(path));
+    return;
+  }
+
+  try {
+    const assetPath = await Backend.copyImageToAssets(path, currentFilePath);
+    insertTextAtSelection(textarea, markdownImageSnippet(assetPath));
+  } catch (error) {
+    console.error('이미지 복사 실패:', error);
+    window.alert(error instanceof Error ? error.message : '이미지 복사에 실패했습니다.');
+    textarea.focus();
+  }
+}
+
+async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFile: OpenFile | null, imageUrl: string): Promise<void> {
+  let currentFilePath = '';
+  try {
+    currentFilePath = requireSavedActiveFile(activeFile);
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+    textarea.focus();
+    return;
+  }
+
+  const id = `image-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const pendingMarker = pendingImageSnippet(id, 0);
+  insertTextAtSelection(textarea, pendingMarker);
+
+  let unlisten: (() => void) | null = null;
+  try {
+    if (isTauriRuntime()) {
+      const { listen } = await import('@tauri-apps/api/event');
+      unlisten = await listen<ImageDownloadProgressPayload>('image-download-progress', (event) => {
+        if (event.payload.id !== id || event.payload.status !== 'progress') return;
+        replacePendingImageMarker(textarea, id, pendingImageSnippet(id, event.payload.progress));
+      });
+    }
+
+    const assetPath = await Backend.downloadImageToAssets(id, imageUrl, currentFilePath);
+    replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '이미지 다운로드에 실패했습니다.';
+    console.error('이미지 다운로드 실패:', error);
+    replacePendingImageMarker(textarea, id, failedImageSnippet(id, message));
+  } finally {
+    unlisten?.();
+    textarea.focus();
+  }
 }
 
 function markdownImageSnippet(path: string): string {
@@ -568,12 +699,88 @@ function markdownImageSnippet(path: string): string {
   return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
 }
 
+function pendingImageSnippet(id: string, progress: number | null): string {
+  const label = progress === null ? '이미지 다운로드 중' : `이미지 다운로드 중 ${progress}%`;
+  return `![${label}](saekim-pending-image://${id})`;
+}
+
+function failedImageSnippet(id: string, message: string): string {
+  return `![이미지 다운로드 실패: ${escapeMarkdownAlt(message)}](saekim-failed-image://${id})`;
+}
+
+function requireSavedActiveFile(activeFile: OpenFile | null): string {
+  if (!activeFile || activeFile.path.startsWith('~') || activeFile.path.startsWith('browser://')) {
+    throw new Error('이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+  }
+  return activeFile.path;
+}
+
+function extractRemoteImageUrl(dataTransfer: DataTransfer): string | null {
+  const uri = dataTransfer.getData('text/uri-list').split('\n').find((line) => {
+    const trimmed = line.trim();
+    return trimmed && !trimmed.startsWith('#');
+  });
+  const plain = dataTransfer.getData('text/plain').trim();
+  const html = dataTransfer.getData('text/html');
+  const htmlSrc = html.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1] ?? '';
+
+  return [uri, htmlSrc, plain].map((value) => value?.trim() ?? '').find(isRemoteHttpUrl) ?? null;
+}
+
+function hasPotentialRemoteImageDrop(dataTransfer: DataTransfer): boolean {
+  return ['text/uri-list', 'text/html', 'text/plain'].some((type) => Array.from(dataTransfer.types).includes(type));
+}
+
+function isRemoteHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? 'image';
 }
 
 function escapeMarkdownDestination(path: string): string {
   return path.replace(/\\/g, '/').replace(/>/g, '%3E');
+}
+
+function escapeMarkdownAlt(value: string): string {
+  return value.replace(/]/g, '\\]');
+}
+
+function replacePendingImageMarker(textarea: HTMLTextAreaElement, id: string, replacement: string): void {
+  const markerPattern = new RegExp(`!\\[[^\\]]*\\]\\(saekim-(?:pending|failed)-image://${escapeRegExp(id)}\\)`);
+  const match = textarea.value.match(markerPattern);
+  if (!match || match.index === undefined) return;
+
+  replaceTextRange(textarea, match.index, match.index + match[0].length, replacement);
+}
+
+function replaceTextRange(textarea: HTMLTextAreaElement, start: number, end: number, replacement: string): void {
+  const value = textarea.value;
+  const next = `${value.slice(0, start)}${replacement}${value.slice(end)}`;
+  const selectionStart = textarea.selectionStart;
+  const selectionEnd = textarea.selectionEnd;
+  const delta = replacement.length - (end - start);
+
+  setTextareaValue(textarea, next);
+  textarea.selectionStart = adjustSelectionIndex(selectionStart, start, end, delta);
+  textarea.selectionEnd = adjustSelectionIndex(selectionEnd, start, end, delta);
+  dispatchTextareaInput(textarea);
+}
+
+function adjustSelectionIndex(index: number, start: number, end: number, delta: number): number {
+  if (index <= start) return index;
+  if (index >= end) return index + delta;
+  return start;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function insertTextAtSelection(textarea: HTMLTextAreaElement | null, snippet: string): void {

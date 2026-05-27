@@ -1002,6 +1002,58 @@
   font-weight: 600;
 }
 
+.tool-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tool-menu {
+  position: absolute;
+  top: 33px;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  width: 218px;
+  gap: 2px;
+  padding: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.tool-menu button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 9px;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.tool-menu button:hover {
+  background: var(--bg-elevated);
+}
+
+.tool-menu span {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-menu small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tool-spacer {
   flex: 1;
 }

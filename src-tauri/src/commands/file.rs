@@ -1,11 +1,19 @@
 use std::{
     fs,
+    io::Write,
+    net::IpAddr,
     path::{Path, PathBuf},
-    time::UNIX_EPOCH,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use futures_util::StreamExt;
+use reqwest::{
+    header::{CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
+    redirect::Policy,
+    Client, Url,
+};
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::{
@@ -51,6 +59,19 @@ pub struct FileTreeNode {
     is_open: Option<bool>,
     is_loaded: Option<bool>,
 }
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageDownloadProgressPayload {
+    id: String,
+    status: String,
+    progress: Option<u8>,
+    message: Option<String>,
+}
+
+const IMAGE_DOWNLOAD_PROGRESS_EVENT: &str = "image-download-progress";
+const MAX_REMOTE_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+const MAX_REDIRECTS: usize = 5;
 
 #[tauri::command]
 pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
@@ -124,6 +145,39 @@ pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<String>> {
         )),
         Ok(None) => ok(None),
         Err(error) => fail(format!("failed to pick image path: {error}")),
+    }
+}
+
+#[tauri::command]
+pub fn copy_image_to_assets(
+    source_path: String,
+    current_file_path: String,
+) -> CommandResult<String> {
+    match copy_image_to_assets_impl(PathBuf::from(source_path), PathBuf::from(current_file_path)) {
+        Ok(path) => ok(path),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub async fn download_image_to_assets(
+    app: AppHandle,
+    id: String,
+    image_url: String,
+    current_file_path: String,
+) -> CommandResult<String> {
+    emit_image_progress(&app, &id, "started", Some(0), None);
+    match download_image_to_assets_impl(&app, &id, &image_url, PathBuf::from(current_file_path))
+        .await
+    {
+        Ok(path) => {
+            emit_image_progress(&app, &id, "completed", Some(100), None);
+            ok(path)
+        }
+        Err(error) => {
+            emit_image_progress(&app, &id, "failed", None, Some(error.clone()));
+            fail(error)
+        }
     }
 }
 
@@ -323,6 +377,279 @@ fn read_folder_children_payload(path: PathBuf) -> Result<Vec<FileTreeNode>, Stri
     }
 
     read_tree_children(&path, 0, 0, false)
+}
+
+fn copy_image_to_assets_impl(
+    source_path: PathBuf,
+    current_file_path: PathBuf,
+) -> Result<String, String> {
+    if !source_path.is_file() {
+        return Err("selected image is not a file".to_string());
+    }
+
+    let extension = local_image_extension(&source_path)?;
+    let assets_dir = ensure_assets_dir(&current_file_path)?;
+    let file_name = unique_image_name(&assets_dir, &extension);
+    let target_path = assets_dir.join(file_name);
+    fs::copy(&source_path, &target_path)
+        .map_err(|error| format!("failed to copy image: {error}"))?;
+    relative_asset_path(&target_path, &current_file_path)
+}
+
+async fn download_image_to_assets_impl(
+    app: &AppHandle,
+    id: &str,
+    image_url: &str,
+    current_file_path: PathBuf,
+) -> Result<String, String> {
+    let assets_dir = ensure_assets_dir(&current_file_path)?;
+    let client = Client::builder()
+        .redirect(Policy::none())
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|error| format!("failed to create downloader: {error}"))?;
+    let mut url = parse_safe_http_url(image_url)?;
+    let mut response = None;
+
+    for _ in 0..=MAX_REDIRECTS {
+        let next_response = client
+            .get(url.clone())
+            .send()
+            .await
+            .map_err(|error| format!("failed to download image: {error}"))?;
+
+        if next_response.status().is_redirection() {
+            let location = next_response
+                .headers()
+                .get(LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| "redirect response did not include a location".to_string())?;
+            url = url
+                .join(location)
+                .map_err(|error| format!("invalid redirect location: {error}"))?;
+            validate_http_url(&url)?;
+            continue;
+        }
+
+        response = Some(next_response);
+        break;
+    }
+
+    let response =
+        response.ok_or_else(|| "too many redirects while downloading image".to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("image server returned {}", response.status()));
+    }
+
+    validate_http_url(response.url())?;
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    let extension = remote_image_extension(&content_type)?;
+
+    if let Some(content_length) = response
+        .headers()
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        if content_length > MAX_REMOTE_IMAGE_BYTES {
+            return Err("image is larger than the 20 MB limit".to_string());
+        }
+    }
+
+    let file_name = unique_image_name(&assets_dir, &extension);
+    let target_path = assets_dir.join(file_name);
+    let temp_path = target_path.with_extension(format!("{extension}.download"));
+    let mut file = fs::File::create(&temp_path)
+        .map_err(|error| format!("failed to create image file: {error}"))?;
+    let total_size = response.content_length();
+    let mut downloaded = 0_u64;
+    let mut last_progress = 0_u8;
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|error| format!("failed to read image data: {error}"))?;
+        downloaded += chunk.len() as u64;
+        if downloaded > MAX_REMOTE_IMAGE_BYTES {
+            let _ = fs::remove_file(&temp_path);
+            return Err("image is larger than the 20 MB limit".to_string());
+        }
+
+        file.write_all(&chunk)
+            .map_err(|error| format!("failed to write image file: {error}"))?;
+
+        if let Some(total_size) = total_size {
+            if total_size > 0 {
+                let progress = ((downloaded as f64 / total_size as f64) * 100.0).floor() as u8;
+                let progress = progress.min(99);
+                if progress >= last_progress.saturating_add(5) {
+                    last_progress = progress;
+                    emit_image_progress(app, id, "progress", Some(progress), None);
+                }
+            }
+        } else if downloaded > 0 && last_progress == 0 {
+            last_progress = 1;
+            emit_image_progress(app, id, "progress", None, None);
+        }
+    }
+
+    drop(file);
+    fs::rename(&temp_path, &target_path).map_err(|error| {
+        let _ = fs::remove_file(&temp_path);
+        format!("failed to finalize image file: {error}")
+    })?;
+    relative_asset_path(&target_path, &current_file_path)
+}
+
+fn ensure_assets_dir(current_file_path: &Path) -> Result<PathBuf, String> {
+    if current_file_path.to_string_lossy().starts_with('~') {
+        return Err("save the current document before importing image assets".to_string());
+    }
+
+    let parent = current_file_path
+        .parent()
+        .ok_or_else(|| "current document does not have a parent folder".to_string())?;
+    let assets_dir = parent.join(".assets");
+    fs::create_dir_all(&assets_dir)
+        .map_err(|error| format!("failed to create .assets folder: {error}"))?;
+    Ok(assets_dir)
+}
+
+fn local_image_extension(path: &Path) -> Result<String, String> {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if matches!(
+        extension.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "ico" | "avif"
+    ) {
+        return Ok(if extension == "jpeg" {
+            "jpg".to_string()
+        } else {
+            extension
+        });
+    }
+
+    Err("selected file is not a supported image".to_string())
+}
+
+fn remote_image_extension(content_type: &str) -> Result<String, String> {
+    match content_type {
+        "image/png" => Ok("png".to_string()),
+        "image/jpeg" => Ok("jpg".to_string()),
+        "image/webp" => Ok("webp".to_string()),
+        "image/gif" => Ok("gif".to_string()),
+        "image/avif" => Ok("avif".to_string()),
+        "image/svg+xml" => Err("remote SVG images are blocked by default".to_string()),
+        _ => Err(format!("unsupported remote image type: {content_type}")),
+    }
+}
+
+fn unique_image_name(assets_dir: &Path, extension: &str) -> String {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+
+    for index in 0..1000 {
+        let candidate = if index == 0 {
+            format!("image_{millis}.{extension}")
+        } else {
+            format!("image_{millis}_{index}.{extension}")
+        };
+        if !assets_dir.join(&candidate).exists() {
+            return candidate;
+        }
+    }
+
+    format!("image_{millis}_fallback.{extension}")
+}
+
+fn relative_asset_path(target_path: &Path, current_file_path: &Path) -> Result<String, String> {
+    let parent = current_file_path
+        .parent()
+        .ok_or_else(|| "current document does not have a parent folder".to_string())?;
+    let relative = target_path
+        .strip_prefix(parent)
+        .map_err(|error| format!("failed to create relative image path: {error}"))?;
+    Ok(format!(
+        "./{}",
+        relative.to_string_lossy().replace('\\', "/")
+    ))
+}
+
+fn parse_safe_http_url(value: &str) -> Result<Url, String> {
+    let url = Url::parse(value.trim()).map_err(|error| format!("invalid image URL: {error}"))?;
+    validate_http_url(&url)?;
+    Ok(url)
+}
+
+fn validate_http_url(url: &Url) -> Result<(), String> {
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err("only http and https image URLs are allowed".to_string());
+    }
+
+    let host = url
+        .host_str()
+        .ok_or_else(|| "image URL does not include a host".to_string())?
+        .to_ascii_lowercase();
+    if host == "localhost" || host.ends_with(".localhost") {
+        return Err("local image URLs are not allowed".to_string());
+    }
+
+    if let Ok(address) = host.parse::<IpAddr>() {
+        if is_blocked_ip(address) {
+            return Err("private or local network image URLs are not allowed".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn is_blocked_ip(address: IpAddr) -> bool {
+    match address {
+        IpAddr::V4(address) => {
+            address.is_loopback()
+                || address.is_private()
+                || address.is_link_local()
+                || address.is_broadcast()
+                || address.is_unspecified()
+        }
+        IpAddr::V6(address) => {
+            address.is_loopback()
+                || address.is_unspecified()
+                || address.segments()[0] & 0xfe00 == 0xfc00
+                || address.segments()[0] & 0xffc0 == 0xfe80
+        }
+    }
+}
+
+fn emit_image_progress(
+    app: &AppHandle,
+    id: &str,
+    status: &str,
+    progress: Option<u8>,
+    message: Option<String>,
+) {
+    let _ = app.emit(
+        IMAGE_DOWNLOAD_PROGRESS_EVENT,
+        ImageDownloadProgressPayload {
+            id: id.to_string(),
+            status: status.to_string(),
+            progress,
+            message,
+        },
+    );
 }
 
 fn read_tree_children(
