@@ -245,6 +245,9 @@ function ImageToolButton({
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const [urlValue, setUrlValue] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   const updateMenuPosition = () => {
     const root = rootRef.current;
@@ -278,14 +281,31 @@ function ImageToolButton({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !showUrlInput) return;
+    window.setTimeout(() => {
+      urlInputRef.current?.focus();
+      urlInputRef.current?.select();
+    }, 0);
+  }, [open, showUrlInput]);
+
   const insert = (mode: ImageInsertMode) => {
     setOpen(false);
+    setShowUrlInput(false);
     void insertSelectedImage(textareaRef.current, activeFile, mode);
   };
 
-  const insertFromUrl = () => {
+  const submitUrl = () => {
+    const imageUrl = urlValue.trim();
+    if (!imageUrl) {
+      urlInputRef.current?.focus();
+      return;
+    }
+
     setOpen(false);
-    void insertImageFromUrl(textareaRef.current, activeFile);
+    setShowUrlInput(false);
+    setUrlValue('');
+    void insertImageFromUrl(textareaRef.current, activeFile, imageUrl);
   };
 
   return (
@@ -319,10 +339,35 @@ function ImageToolButton({
             <span>문서 assets로 복사</span>
             <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
           </button>
-          <button type="button" role="menuitem" onClick={insertFromUrl}>
+          <button type="button" role="menuitem" onClick={() => setShowUrlInput((state) => !state)}>
             <span>이미지 URL에서 가져오기</span>
             <small>이미지 주소를 다운로드해 assets에 저장</small>
           </button>
+          {showUrlInput ? (
+            <form
+              className="tool-menu-url-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitUrl();
+              }}
+            >
+              <input
+                ref={urlInputRef}
+                value={urlValue}
+                type="url"
+                placeholder="https://example.com/image.png"
+                spellCheck={false}
+                onChange={(event) => setUrlValue(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setShowUrlInput(false);
+                  }
+                }}
+              />
+              <button type="submit">가져오기</button>
+            </form>
+          ) : null}
             </div>,
             document.body,
           )
@@ -752,16 +797,9 @@ async function insertSelectedImage(textarea: HTMLTextAreaElement | null, activeF
   }
 }
 
-async function insertImageFromUrl(textarea: HTMLTextAreaElement | null, activeFile: OpenFile | null): Promise<void> {
+async function insertImageFromUrl(textarea: HTMLTextAreaElement | null, activeFile: OpenFile | null, imageUrl: string): Promise<void> {
   if (!textarea) return;
 
-  const rawUrl = window.prompt('이미지 URL을 입력하세요.\n검색 결과나 게시글 주소가 아니라 이미지 자체 주소를 사용해야 합니다.');
-  if (rawUrl === null) {
-    textarea.focus();
-    return;
-  }
-
-  const imageUrl = rawUrl.trim();
   if (!isRemoteHttpUrl(imageUrl)) {
     window.alert('http 또는 https 이미지 주소만 가져올 수 있습니다.');
     textarea.focus();

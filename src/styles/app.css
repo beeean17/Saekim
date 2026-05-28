@@ -1055,6 +1055,50 @@
   white-space: nowrap;
 }
 
+.tool-menu-url-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.tool-menu-url-form input {
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  outline: none;
+}
+
+.tool-menu-url-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.tool-menu-url-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--bg-base);
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tool-menu-url-form button:hover {
+  background: var(--accent-hover);
+}
+
 .tool-spacer {
   flex: 1;
 }
