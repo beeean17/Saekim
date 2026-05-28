@@ -33,7 +33,18 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/**", "$PICTURE/**", "$DESKTOP/**", "$DOCUMENT/**", "$DOWNLOAD/**"]
+        "scope": [
+          "$HOME/**",
+          "$HOME/**/.assets/**",
+          "$PICTURE/**",
+          "$PICTURE/**/.assets/**",
+          "$DESKTOP/**",
+          "$DESKTOP/**/.assets/**",
+          "$DOCUMENT/**",
+          "$DOCUMENT/**/.assets/**",
+          "$DOWNLOAD/**",
+          "$DOWNLOAD/**/.assets/**"
+        ]
       }
     }
   },
