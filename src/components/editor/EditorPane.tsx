@@ -31,6 +31,7 @@ interface ImageDownloadProgressPayload {
 export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
   const activeFile = useWorkspaceStore(selectActiveFile);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
+  const refresh = useWorkspaceStore((state) => state.refresh);
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef.current);
   const findOpen = useUIStore((state) => state.findOpen);
   const closeFind = useUIStore((state) => state.closeFind);
@@ -54,7 +55,7 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
       event.stopPropagation();
       textarea.focus();
       if (droppedImage) {
-        void insertDroppedImage(textarea, activeFile, droppedImage);
+        void insertDroppedImage(textarea, activeFile, droppedImage).then(() => void refresh());
       } else {
         insertDroppedImageHelp(textarea);
       }
@@ -66,7 +67,7 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
       window.removeEventListener('dragover', onDragOver);
       window.removeEventListener('drop', onDrop);
     };
-  }, [activeFile, textareaRef]);
+  }, [activeFile, refresh, textareaRef]);
 
   return (
     <section className="editor-pane">
@@ -241,6 +242,7 @@ function ImageToolButton({
   activeFile: OpenFile | null;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
 }) {
+  const refresh = useWorkspaceStore((state) => state.refresh);
   const [open, setOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -280,7 +282,9 @@ function ImageToolButton({
 
   const insert = (mode: ImageInsertMode) => {
     setOpen(false);
-    void insertSelectedImage(textareaRef.current, activeFile, mode);
+    void insertSelectedImage(textareaRef.current, activeFile, mode).then(() => {
+      if (mode === 'copy') void refresh();
+    });
   };
 
   return (
@@ -528,6 +532,7 @@ function EditorContent({
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
   const editorContentRef = useRef<HTMLDivElement | null>(null);
   const lineNumberListRef = useRef<HTMLDivElement | null>(null);
+  const refresh = useWorkspaceStore((state) => state.refresh);
   const scrollFrameRef = useRef(0);
   const latestScrollTopRef = useRef(0);
   const [selectionLines, setSelectionLines] = useState<{ start: number; end: number } | null>(null);
@@ -633,10 +638,18 @@ function EditorContent({
           event.preventDefault();
           event.stopPropagation();
           if (droppedImage) {
-            void insertDroppedImage(event.currentTarget, activeFile, droppedImage);
+            void insertDroppedImage(event.currentTarget, activeFile, droppedImage).then(() => void refresh());
           } else {
             insertDroppedImageHelp(event.currentTarget);
           }
+        }}
+        onPaste={(event) => {
+          const imageFile = getClipboardImageFile(event.clipboardData);
+          if (!imageFile) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+          void insertPastedImageFile(event.currentTarget, activeFile, imageFile).then(() => void refresh());
         }}
         onChange={(event) => {
           onChange(event.currentTarget.value);
@@ -789,6 +802,25 @@ async function insertDroppedImage(textarea: HTMLTextAreaElement, activeFile: Ope
 }
 
 async function insertDroppedImageFile(textarea: HTMLTextAreaElement, activeFile: OpenFile | null, file: File): Promise<void> {
+  await insertImageFileFromBytes(textarea, activeFile, file, {
+    fileName: file.name || null,
+    selectAltAfterInsert: false,
+  });
+}
+
+async function insertPastedImageFile(textarea: HTMLTextAreaElement, activeFile: OpenFile | null, file: File): Promise<void> {
+  await insertImageFileFromBytes(textarea, activeFile, file, {
+    fileName: clipboardImageFileName(file),
+    selectAltAfterInsert: true,
+  });
+}
+
+async function insertImageFileFromBytes(
+  textarea: HTMLTextAreaElement,
+  activeFile: OpenFile | null,
+  file: File,
+  options: { fileName: string | null; selectAltAfterInsert: boolean },
+): Promise<void> {
   let currentFilePath = '';
   try {
     currentFilePath = requireSavedActiveFile(activeFile);
@@ -809,8 +841,12 @@ async function insertDroppedImageFile(textarea: HTMLTextAreaElement, activeFile:
 
   try {
     const bytes = await fileToByteArray(file);
-    const assetPath = await Backend.importImageBytesToAssets(bytes, file.name || null, file.type || null, currentFilePath);
-    replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
+    const assetPath = await Backend.importImageBytesToAssets(bytes, options.fileName, file.type || null, currentFilePath);
+    if (options.selectAltAfterInsert) {
+      replacePendingImageMarkerWithSelectedAlt(textarea, id, assetPath);
+    } else {
+      replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : '이미지 가져오기에 실패했습니다.';
     console.error('이미지 가져오기 실패:', error);
@@ -830,9 +866,9 @@ function insertDroppedImageHelp(textarea: HTMLTextAreaElement): void {
   );
 }
 
-function markdownImageSnippet(path: string): string {
+function markdownImageSnippet(path: string, altText?: string): string {
   const name = fileNameFromPath(path);
-  const alt = name.replace(/\.[^.]+$/, '') || '이미지';
+  const alt = altText ?? (name.replace(/\.[^.]+$/, '') || '이미지');
   return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
 }
 
@@ -888,6 +924,17 @@ function extractDroppedImageFile(dataTransfer: DataTransfer): File | null {
   return null;
 }
 
+function getClipboardImageFile(clipboardData: DataTransfer): File | null {
+  const items = Array.from(clipboardData.items);
+  for (const item of items) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+    const file = item.getAsFile();
+    if (file && isImageFile(file)) return file;
+  }
+
+  return Array.from(clipboardData.files).find((file) => isImageFile(file)) ?? null;
+}
+
 function hasPotentialImageDrop(dataTransfer: DataTransfer): boolean {
   const types = Array.from(dataTransfer.types);
   if (['text/uri-list', 'text/html'].some((type) => types.includes(type))) return true;
@@ -901,6 +948,48 @@ function isImageFile(file: File): boolean {
 async function fileToByteArray(file: File): Promise<number[]> {
   const buffer = await file.arrayBuffer();
   return Array.from(new Uint8Array(buffer));
+}
+
+function clipboardImageFileName(file: File): string {
+  if (file.name && file.name.trim()) return file.name;
+
+  return `clipboard-image-${formatClipboardTimestamp(new Date())}.${imageExtensionFromMime(file.type)}`;
+}
+
+function formatClipboardTimestamp(date: Date): string {
+  const pad = (value: number) => value.toString().padStart(2, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    '-',
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join('');
+}
+
+function imageExtensionFromMime(mimeType: string): string {
+  switch (mimeType.toLowerCase()) {
+    case 'image/jpeg':
+      return 'jpg';
+    case 'image/webp':
+      return 'webp';
+    case 'image/gif':
+      return 'gif';
+    case 'image/avif':
+      return 'avif';
+    case 'image/svg+xml':
+      return 'svg';
+    case 'image/bmp':
+      return 'bmp';
+    case 'image/x-icon':
+    case 'image/vnd.microsoft.icon':
+      return 'ico';
+    case 'image/png':
+    default:
+      return 'png';
+  }
 }
 
 function isRemoteHttpUrl(value: string): boolean {
@@ -930,6 +1019,20 @@ function replacePendingImageMarker(textarea: HTMLTextAreaElement, id: string, re
   if (!match || match.index === undefined) return;
 
   replaceTextRange(textarea, match.index, match.index + match[0].length, replacement);
+}
+
+function replacePendingImageMarkerWithSelectedAlt(textarea: HTMLTextAreaElement, id: string, assetPath: string): void {
+  const markerPattern = new RegExp(`!\\[[^\\]]*\\]\\(saekim-(?:pending|failed)-image://${escapeRegExp(id)}\\)`);
+  const match = textarea.value.match(markerPattern);
+  if (!match || match.index === undefined) return;
+
+  const altText = 'image';
+  const replacement = markdownImageSnippet(assetPath, altText);
+  const start = match.index;
+  replaceTextRange(textarea, start, start + match[0].length, replacement);
+  textarea.focus();
+  textarea.selectionStart = start + 2;
+  textarea.selectionEnd = start + 2 + altText.length;
 }
 
 function replaceTextRange(textarea: HTMLTextAreaElement, start: number, end: number, replacement: string): void {
