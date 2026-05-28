@@ -584,6 +584,18 @@
   border-radius: var(--radius-sm);
 }
 
+.preview-content img.image-load-failed {
+  min-width: min(100%, 360px);
+  min-height: 120px;
+  padding: 20px;
+  object-fit: scale-down;
+  background:
+    linear-gradient(135deg, transparent 0 48%, var(--danger) 49% 51%, transparent 52%),
+    linear-gradient(45deg, transparent 0 48%, var(--danger) 49% 51%, transparent 52%),
+    var(--bg-elevated);
+  border: 1px solid var(--danger);
+}
+
 .pending-image-block,
 .failed-image-block {
   display: grid;

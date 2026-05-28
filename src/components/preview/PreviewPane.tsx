@@ -146,6 +146,39 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     const root = localRef.current;
     if (!root) return;
 
+    const images = Array.from(root.querySelectorAll<HTMLImageElement>('img'));
+    if (images.length === 0) return;
+
+    const onLoad = (event: Event) => {
+      if (event.currentTarget instanceof HTMLImageElement) {
+        event.currentTarget.classList.remove('image-load-failed');
+      }
+      notifyPreviewRendered(root);
+    };
+    const onError = (event: Event) => {
+      if (event.currentTarget instanceof HTMLImageElement) {
+        event.currentTarget.classList.add('image-load-failed');
+      }
+      notifyPreviewRendered(root);
+    };
+
+    images.forEach((image) => {
+      image.addEventListener('load', onLoad);
+      image.addEventListener('error', onError);
+    });
+
+    return () => {
+      images.forEach((image) => {
+        image.removeEventListener('load', onLoad);
+        image.removeEventListener('error', onError);
+      });
+    };
+  }, [html]);
+
+  useEffect(() => {
+    const root = localRef.current;
+    if (!root) return;
+
     const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
     if (blocks.length === 0) return;
     let alive = true;

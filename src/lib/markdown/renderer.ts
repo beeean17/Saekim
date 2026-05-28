@@ -494,8 +494,6 @@ function footnoteSlug(id: string): string {
 }
 
 function normalizeImageSources(html: string, basePath?: string): string {
-  if (!isTauriRuntime()) return html;
-
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<main>${html}</main>`, 'text/html');
   doc.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
@@ -509,13 +507,14 @@ function normalizeImageSources(html: string, basePath?: string): string {
       image.replaceWith(createFailedImageBlock(doc, image.alt));
       return;
     }
-    if (isLocalAbsolutePath(src)) {
-      image.src = convertFileSrc(decodeUrlPath(src));
-      return;
-    }
 
-    const relativePath = resolveRelativeImagePath(src, basePath);
-    if (relativePath) image.src = convertFileSrc(relativePath);
+    const localPath = localImagePathFromSrc(src, basePath);
+    if (!localPath) return;
+
+    image.setAttribute('data-original-src', src);
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.src = localPathToImageSrc(localPath);
   });
 
   return doc.querySelector('main')?.innerHTML ?? html;
@@ -556,6 +555,12 @@ function isLocalAbsolutePath(src: string): boolean {
   return src.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(src);
 }
 
+function localImagePathFromSrc(src: string, basePath?: string): string | null {
+  if (isFileUrl(src)) return fileUrlToPath(src);
+  if (isLocalAbsolutePath(src)) return decodeUrlPath(src);
+  return resolveRelativeImagePath(src, basePath);
+}
+
 function resolveRelativeImagePath(src: string, basePath?: string): string | null {
   if (!basePath || basePath.startsWith('~') || basePath.startsWith('browser://')) return null;
   if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(src)) return null;
@@ -563,6 +568,29 @@ function resolveRelativeImagePath(src: string, basePath?: string): string | null
   const documentDir = basePath.replace(/[\\/][^\\/]*$/, '');
   if (!documentDir || documentDir === basePath) return null;
   return normalizeLocalPath(`${documentDir}/${decodeUrlPath(src)}`);
+}
+
+function localPathToImageSrc(path: string): string {
+  return isTauriRuntime() ? convertFileSrc(path) : toFileHref(path);
+}
+
+function isFileUrl(src: string): boolean {
+  return /^file:\/\//i.test(src);
+}
+
+function fileUrlToPath(src: string): string | null {
+  try {
+    const url = new URL(src);
+    return decodeURIComponent(url.pathname);
+  } catch {
+    return null;
+  }
+}
+
+function toFileHref(path: string): string {
+  const normalized = normalizeLocalPath(path);
+  if (/^[a-zA-Z]:\//.test(normalized)) return `file:///${encodeURI(normalized)}`;
+  return `file://${encodeURI(normalized)}`;
 }
 
 function normalizeLocalPath(path: string): string {
