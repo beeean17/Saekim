@@ -1018,6 +1018,12 @@ fn should_include_path(path: &Path, is_dir: bool, is_file: bool) -> bool {
         return false;
     };
 
+    let is_assets_dir = is_dir && name == ".assets";
+    let is_image_asset = is_file
+        && is_inside_assets_dir(path)
+        && is_supported_image_asset_path(path)
+        && !is_temp_download_path(path);
+
     if matches!(
         name,
         ".git"
@@ -1031,12 +1037,17 @@ fn should_include_path(path: &Path, is_dir: bool, is_file: bool) -> bool {
             | "Movies"
             | "Music"
             | "Pictures"
-    ) || (name.starts_with('.') && !is_known_text_document_path(path))
+    ) || (name.starts_with('.') && !is_known_text_document_path(path) && !is_assets_dir)
     {
         return false;
     }
 
-    is_dir || (is_file && is_known_text_document_path(path))
+    is_dir || (is_file && (is_known_text_document_path(path) || is_image_asset))
+}
+
+fn is_inside_assets_dir(path: &Path) -> bool {
+    path.components()
+        .any(|component| component.as_os_str().to_str() == Some(".assets"))
 }
 
 fn entry_name_lower(entry: &fs::DirEntry) -> String {

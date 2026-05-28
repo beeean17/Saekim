@@ -553,6 +553,10 @@
   color: var(--accent);
 }
 
+.file.asset-file .ic {
+  color: var(--text-muted);
+}
+
 .file .name {
   flex: 1;
   min-width: 0;

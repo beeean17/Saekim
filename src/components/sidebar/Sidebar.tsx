@@ -363,11 +363,27 @@ function FileTreeNodeView({
   const active = node.path === activePath;
   const openFile = openFiles.find((file) => file.path === node.path);
   const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
+  const imageAsset = isWorkspaceImageAsset(node.path);
   return (
-    <button className={`file ${active ? 'current' : ''}`} type="button" onClick={() => onOpen(node.path)}>
-      <Icon name="file" />
+    <button
+      className={`file ${active ? 'current' : ''} ${imageAsset ? 'asset-file' : ''}`}
+      title={imageAsset ? node.path : undefined}
+      type="button"
+      onClick={() => {
+        if (!imageAsset) onOpen(node.path);
+      }}
+    >
+      <Icon name={imageAsset ? 'image' : 'file'} />
       <span className="name">{node.name}</span>
       {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(node.modifiedAt)}</span>}
     </button>
+  );
+}
+
+function isWorkspaceImageAsset(path: string): boolean {
+  const normalized = path.replace(/\\/g, '/').toLowerCase();
+  return (
+    normalized.includes('/.assets/') &&
+    /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/.test(normalized)
   );
 }
