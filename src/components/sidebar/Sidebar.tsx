@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { useEffect, useMemo, useState } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
+import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile, RecentFile, SidebarViewMode } from '../../types/workspace';
@@ -26,6 +28,7 @@ export function Sidebar() {
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [recentSearchOpen, setRecentSearchOpen] = useState(false);
   const [recentSearchQuery, setRecentSearchQuery] = useState('');
+  const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
   const searchOpen = sidebarViewMode === 'files' ? workspaceSearchOpen : recentSearchOpen;
   const searchQuery = sidebarViewMode === 'files' ? workspaceSearchQuery : recentSearchQuery;
   const setSearchQuery = sidebarViewMode === 'files' ? setWorkspaceSearchQuery : setRecentSearchQuery;
@@ -94,6 +97,7 @@ export function Sidebar() {
               openFiles={openFiles}
               onToggle={toggleFolder}
               onOpen={(path) => void openFile(path)}
+              onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
             />
           ))}
         </div>
@@ -105,6 +109,7 @@ export function Sidebar() {
           onOpen={(path) => void openFile(path)}
         />
       )}
+      {imagePreview ? <ImagePreviewModal image={imagePreview} onClose={() => setImagePreview(null)} /> : null}
     </aside>
   );
 }
@@ -324,12 +329,14 @@ function FileTreeNodeView({
   openFiles,
   onToggle,
   onOpen,
+  onPreviewImage,
 }: {
   node: FileTreeNode;
   activePath: string | null;
   openFiles: OpenFile[];
   onToggle: (path: string) => Promise<void>;
   onOpen: (path: string) => void;
+  onPreviewImage: (node: FileTreeNode) => void;
 }) {
   if (node.type === 'folder') {
     return (
@@ -352,6 +359,7 @@ function FileTreeNodeView({
                 openFiles={openFiles}
                 onToggle={onToggle}
                 onOpen={onOpen}
+                onPreviewImage={onPreviewImage}
               />
             ))}
           </div>
@@ -370,7 +378,11 @@ function FileTreeNodeView({
       title={imageAsset ? node.path : undefined}
       type="button"
       onClick={() => {
-        if (!imageAsset) onOpen(node.path);
+        if (imageAsset) {
+          onPreviewImage(node);
+          return;
+        }
+        onOpen(node.path);
       }}
     >
       <Icon name={imageAsset ? 'image' : 'file'} />
@@ -380,10 +392,52 @@ function FileTreeNodeView({
   );
 }
 
+function ImagePreviewModal({
+  image,
+  onClose,
+}: {
+  image: { path: string; name: string };
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="image-preview-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="image-preview-modal" role="dialog" aria-modal="true" aria-label={`${image.name} 미리보기`} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="image-preview-head">
+          <div>
+            <strong>{image.name}</strong>
+            <span>{image.path}</span>
+          </div>
+          <button type="button" title="닫기" onClick={onClose}>
+            x
+          </button>
+        </div>
+        <div className="image-preview-body">
+          <img alt={image.name} src={localImagePreviewSrc(image.path)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function isWorkspaceImageAsset(path: string): boolean {
   const normalized = path.replace(/\\/g, '/').toLowerCase();
   return (
     normalized.includes('/.assets/') &&
     /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/.test(normalized)
   );
+}
+
+function localImagePreviewSrc(path: string): string {
+  if (isTauriRuntime()) return convertFileSrc(path);
+  const normalized = path.replace(/\\/g, '/');
+  return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : encodeURI(normalized);
 }

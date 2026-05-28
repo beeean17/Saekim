@@ -127,6 +127,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const existing = get().openFiles.find((file) => file.path === path);
     if (existing) {
       set((state) => activateOpenFile(state, existing));
+      const folderPatch = await workspaceFolderPatchForFile(existing.path);
+      if (folderPatch && get().activeFileId === existing.id) set(folderPatch);
       return;
     }
 
@@ -141,6 +143,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const opened = await Backend.readFile(path);
       const file = toOpenFile(opened.path, opened.name, opened.content);
       set((state) => upsertOpenFile(state, file));
+      const folderPatch = await workspaceFolderPatchForFile(opened.path);
+      if (folderPatch && get().activeFileId === file.id) set(folderPatch);
     } catch (error) {
       console.error('파일 읽기 실패:', error);
     }
@@ -152,7 +156,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
       const file = toOpenFile(savedPath, fileNameFromPath(savedPath), '');
       set((state) => upsertOpenFile(state, file));
-      await get().refresh();
+      const folderPatch = await workspaceFolderPatchForFile(savedPath);
+      if (folderPatch) set(folderPatch);
+      else await get().refresh();
     } catch (error) {
       console.error('새 파일 생성 실패:', error);
     }
@@ -177,12 +183,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tree: updateTreeFolder(state.tree, path, { isOpen: !node.isOpen }),
     }));
   },
-  setActiveFile: (id) =>
-    set((state) => {
-      const file = state.openFiles.find((candidate) => candidate.id === id);
-      return file ? activateOpenFile(state, file) : {};
-    }),
-  closeFile: (id) =>
+  setActiveFile: (id) => {
+    const file = get().openFiles.find((candidate) => candidate.id === id);
+    if (!file) return;
+
+    set((state) => activateOpenFile(state, file));
+    void workspaceFolderPatchForFile(file.path).then((folderPatch) => {
+      const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
+      if (folderPatch && activeFile?.path === file.path) set(folderPatch);
+    });
+  },
+  closeFile: (id) => {
+    let nextActivePath: string | null = null;
     set((state) => {
       const closedIndex = state.openFiles.findIndex((file) => file.id === id);
       const closedFile = state.openFiles[closedIndex];
@@ -191,6 +203,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         state.activeFileId === id ? openFiles[Math.max(0, Math.min(closedIndex, openFiles.length - 1))] ?? null : null;
       const activeFileId = nextActiveFile?.id ?? (state.activeFileId === id ? null : state.activeFileId);
       const closedPath = closedFile?.path;
+      nextActivePath = nextActiveFile?.path ?? null;
 
       return {
         openFiles,
@@ -201,7 +214,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           current: nextActiveFile?.path ?? (state.history.current === closedPath ? null : state.history.current),
         },
       };
-    }),
+    });
+
+    nextActivePath &&
+      void workspaceFolderPatchForFile(nextActivePath).then((folderPatch) => {
+        const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
+        if (folderPatch && activeFile?.path === nextActivePath) set(folderPatch);
+      });
+  },
   updateContent: (id, text) =>
     set((state) => ({
       openFiles: state.openFiles.map((file) => (file.id === id ? { ...file, content: text } : file)),
@@ -236,7 +256,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         current: current.history.current === file.path ? savedPath : current.history.current,
       },
     }));
-    await get().refresh();
+    const folderPatch = await workspaceFolderPatchForFile(savedPath);
+    if (folderPatch) set(folderPatch);
+    else await get().refresh();
   },
   saveActiveAs: async () => {
     const state = get();
@@ -268,7 +290,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         current: savedPath,
       },
     }));
-    await get().refresh();
+    const folderPatch = await workspaceFolderPatchForFile(savedPath);
+    if (folderPatch) set(folderPatch);
+    else await get().refresh();
   },
   refresh: async () => {
     const { rootPath } = get();
@@ -358,6 +382,28 @@ function toRecentFile(file: Pick<OpenFile, 'path' | 'name'>): RecentFile {
 
 function fileNameFromPath(path: string): string {
   return path.split('/').pop() || 'untitled.md';
+}
+
+async function workspaceFolderPatchForFile(path: string): Promise<Pick<WorkspaceState, 'rootPath' | 'tree'> | null> {
+  const folderPath = parentFolderFromFilePath(path);
+  if (!folderPath) return null;
+
+  try {
+    const folder = await Backend.readFolder(folderPath);
+    return { rootPath: folder.rootPath, tree: folder.tree };
+  } catch (error) {
+    console.error('워크스페이스 경로 동기화 실패:', error);
+    return null;
+  }
+}
+
+function parentFolderFromFilePath(path: string): string | null {
+  if (isPlaceholderPath(path)) return null;
+
+  const normalized = path.replace(/\\/g, '/');
+  const index = normalized.lastIndexOf('/');
+  if (index <= 0) return null;
+  return normalized.slice(0, index);
 }
 
 function isPlaceholderPath(path: string): boolean {
