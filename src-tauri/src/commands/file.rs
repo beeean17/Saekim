@@ -389,8 +389,13 @@ fn copy_image_to_assets_impl(
 
     let extension = local_image_extension(&source_path)?;
     let assets_dir = ensure_assets_dir(&current_file_path)?;
-    let file_name = unique_image_name(&assets_dir, &extension);
-    let target_path = assets_dir.join(file_name);
+    if let Some(existing_path) = find_existing_asset_with_same_content(&assets_dir, &source_path)? {
+        return relative_asset_path(&existing_path, &current_file_path);
+    }
+
+    let base_name = image_base_name_from_path(&source_path);
+    let target_path =
+        unique_asset_path_for_content(&assets_dir, &base_name, &extension, &source_path)?;
     fs::copy(&source_path, &target_path)
         .map_err(|error| format!("failed to copy image: {error}"))?;
     relative_asset_path(&target_path, &current_file_path)
@@ -465,9 +470,8 @@ async fn download_image_to_assets_impl(
         }
     }
 
-    let file_name = unique_image_name(&assets_dir, &extension);
-    let target_path = assets_dir.join(file_name);
-    let temp_path = target_path.with_extension(format!("{extension}.download"));
+    let base_name = image_base_name_from_url(response.url());
+    let temp_path = unique_temp_image_path(&assets_dir, &extension);
     let mut file = fs::File::create(&temp_path)
         .map_err(|error| format!("failed to create image file: {error}"))?;
     let total_size = response.content_length();
@@ -502,6 +506,13 @@ async fn download_image_to_assets_impl(
     }
 
     drop(file);
+    if let Some(existing_path) = find_existing_asset_with_same_content(&assets_dir, &temp_path)? {
+        let _ = fs::remove_file(&temp_path);
+        return relative_asset_path(&existing_path, &current_file_path);
+    }
+
+    let target_path =
+        unique_asset_path_for_content(&assets_dir, &base_name, &extension, &temp_path)?;
     fs::rename(&temp_path, &target_path).map_err(|error| {
         let _ = fs::remove_file(&temp_path);
         format!("failed to finalize image file: {error}")
@@ -555,7 +566,7 @@ fn remote_image_extension(content_type: &str) -> Result<String, String> {
     }
 }
 
-fn unique_image_name(assets_dir: &Path, extension: &str) -> String {
+fn unique_temp_image_path(assets_dir: &Path, extension: &str) -> PathBuf {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
@@ -563,16 +574,192 @@ fn unique_image_name(assets_dir: &Path, extension: &str) -> String {
 
     for index in 0..1000 {
         let candidate = if index == 0 {
-            format!("image_{millis}.{extension}")
+            format!(".image_import_{millis}.{extension}.download")
         } else {
-            format!("image_{millis}_{index}.{extension}")
+            format!(".image_import_{millis}_{index}.{extension}.download")
         };
-        if !assets_dir.join(&candidate).exists() {
-            return candidate;
+        let path = assets_dir.join(candidate);
+        if !path.exists() {
+            return path;
         }
     }
 
-    format!("image_{millis}_fallback.{extension}")
+    assets_dir.join(format!(
+        ".image_import_{millis}_fallback.{extension}.download"
+    ))
+}
+
+fn unique_asset_path_for_content(
+    assets_dir: &Path,
+    base_name: &str,
+    extension: &str,
+    content_path: &Path,
+) -> Result<PathBuf, String> {
+    let base_name = sanitize_asset_stem(base_name);
+    let primary = assets_dir.join(format!("{base_name}.{extension}"));
+    if !primary.exists() {
+        return Ok(primary);
+    }
+
+    if files_have_same_content(&primary, content_path)? {
+        return Ok(primary);
+    }
+
+    let fingerprint = short_file_fingerprint(content_path)?;
+    for index in 0..1000 {
+        let candidate = if index == 0 {
+            assets_dir.join(format!("{base_name}-{fingerprint}.{extension}"))
+        } else {
+            assets_dir.join(format!("{base_name}-{fingerprint}-{index}.{extension}"))
+        };
+
+        if !candidate.exists() || files_have_same_content(&candidate, content_path)? {
+            return Ok(candidate);
+        }
+    }
+
+    Err("failed to create a unique image asset name".to_string())
+}
+
+fn find_existing_asset_with_same_content(
+    assets_dir: &Path,
+    content_path: &Path,
+) -> Result<Option<PathBuf>, String> {
+    let entries = fs::read_dir(assets_dir)
+        .map_err(|error| format!("failed to scan .assets folder: {error}"))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("failed to read .assets entry: {error}"))?;
+        let path = entry.path();
+        if !path.is_file() || is_temp_download_path(&path) || !is_supported_image_asset_path(&path)
+        {
+            continue;
+        }
+
+        if files_have_same_content(&path, content_path)? {
+            return Ok(Some(path));
+        }
+    }
+
+    Ok(None)
+}
+
+fn files_have_same_content(left: &Path, right: &Path) -> Result<bool, String> {
+    let left_metadata =
+        fs::metadata(left).map_err(|error| format!("failed to read image metadata: {error}"))?;
+    let right_metadata =
+        fs::metadata(right).map_err(|error| format!("failed to read image metadata: {error}"))?;
+    if left_metadata.len() != right_metadata.len() {
+        return Ok(false);
+    }
+
+    let left_bytes = fs::read(left).map_err(|error| format!("failed to read image: {error}"))?;
+    let right_bytes = fs::read(right).map_err(|error| format!("failed to read image: {error}"))?;
+    Ok(left_bytes == right_bytes)
+}
+
+fn short_file_fingerprint(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|error| format!("failed to fingerprint image: {error}"))?;
+    let hash = bytes.iter().fold(0xcbf29ce484222325_u64, |hash, byte| {
+        hash.wrapping_mul(0x100000001b3) ^ u64::from(*byte)
+    });
+    Ok(format!("{hash:016x}")[..8].to_string())
+}
+
+fn image_base_name_from_path(path: &Path) -> String {
+    path.file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("image")
+        .to_string()
+}
+
+fn image_base_name_from_url(url: &Url) -> String {
+    url.path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .and_then(|segment| {
+            let decoded = percent_decode(segment);
+            Path::new(&decoded)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .map(|value| value.to_string())
+        })
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "image".to_string())
+}
+
+fn sanitize_asset_stem(value: &str) -> String {
+    let sanitized: String = value
+        .trim()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else if ch.is_whitespace() {
+                '-'
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    let sanitized = sanitized
+        .trim_matches(|ch| matches!(ch, '-' | '_' | '.'))
+        .to_string();
+    if sanitized.is_empty() {
+        "image".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn is_temp_download_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|name| name.starts_with(".image_import_") && name.ends_with(".download"))
+}
+
+fn is_supported_image_asset_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .map(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "ico" | "avif"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut output = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let (Some(high), Some(low)) =
+                (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
+            {
+                output.push((high << 4) | low);
+                index += 3;
+                continue;
+            }
+        }
+
+        output.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8_lossy(&output).to_string()
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn relative_asset_path(target_path: &Path, current_file_path: &Path) -> Result<String, String> {
