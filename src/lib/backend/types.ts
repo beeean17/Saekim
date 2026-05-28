@@ -5,6 +5,7 @@ export interface BackendAdapter {
   openFolderDialog(): Promise<string | null>;
   pickImagePath(): Promise<string | null>;
   copyImageToAssets(sourcePath: string, currentFilePath: string): Promise<string>;
+  importImageBytesToAssets(bytes: number[], fileName: string | null, mimeType: string | null, currentFilePath: string): Promise<string>;
   downloadImageToAssets(id: string, imageUrl: string, currentFilePath: string): Promise<string>;
   importPdf(path: string): Promise<OpenFilePayload>;
   readFile(path: string): Promise<OpenFilePayload>;

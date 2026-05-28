@@ -59,6 +59,7 @@ pub fn run() {
             commands::file::open_folder_dialog,
             commands::file::pick_image_path,
             commands::file::copy_image_to_assets,
+            commands::file::import_image_bytes_to_assets,
             commands::file::download_image_to_assets,
             commands::file::pick_pdf_export_path,
             commands::file::import_pdf,

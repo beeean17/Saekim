@@ -20,6 +20,10 @@ export async function copyImageToAssets(sourcePath: string, currentFilePath: str
   return invokeCommand<string>('copy_image_to_assets', { sourcePath, currentFilePath });
 }
 
+export async function importImageBytesToAssets(bytes: number[], fileName: string | null, mimeType: string | null, currentFilePath: string): Promise<string> {
+  return invokeCommand<string>('import_image_bytes_to_assets', { bytes, fileName, mimeType, currentFilePath });
+}
+
 export async function downloadImageToAssets(id: string, imageUrl: string, currentFilePath: string): Promise<string> {
   return invokeCommand<string>('download_image_to_assets', { id, imageUrl, currentFilePath });
 }

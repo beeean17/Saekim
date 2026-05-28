@@ -15,6 +15,11 @@ import { Icon } from '../primitives/Icon';
 type HelperMode = 'mermaid' | 'katex';
 type HelperItem = KatexHelperItem | MermaidHelperItem;
 type ImageInsertMode = 'link' | 'copy';
+type DroppedImage =
+  | { type: 'remote'; url: string }
+  | { type: 'file'; file: File };
+
+const MAX_DROPPED_IMAGE_BYTES = 20 * 1024 * 1024;
 
 interface ImageDownloadProgressPayload {
   id: string;
@@ -29,6 +34,35 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef.current);
   const findOpen = useUIStore((state) => state.findOpen);
   const closeFind = useUIStore((state) => state.closeFind);
+
+  useEffect(() => {
+    const onDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer || !hasPotentialImageDrop(event.dataTransfer)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    };
+
+    const onDrop = (event: DragEvent) => {
+      if (event.defaultPrevented || !event.dataTransfer) return;
+      const droppedImage = getDroppedImage(event.dataTransfer);
+      if (!droppedImage) return;
+
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      textarea.focus();
+      void insertDroppedImage(textarea, activeFile, droppedImage);
+    };
+
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, [activeFile, textareaRef]);
 
   return (
     <section className="editor-pane">
@@ -585,13 +619,16 @@ function EditorContent({
         onKeyUp={(event) => updateSelectionLines(event.currentTarget)}
         onMouseUp={(event) => updateSelectionLines(event.currentTarget)}
         onDragOver={(event) => {
-          if (hasPotentialRemoteImageDrop(event.dataTransfer)) event.preventDefault();
+          if (!hasPotentialImageDrop(event.dataTransfer)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
         }}
         onDrop={(event) => {
-          const imageUrl = extractRemoteImageUrl(event.dataTransfer);
-          if (!imageUrl) return;
+          const droppedImage = getDroppedImage(event.dataTransfer);
+          if (!droppedImage) return;
           event.preventDefault();
-          void insertDroppedRemoteImage(event.currentTarget, activeFile, imageUrl);
+          event.stopPropagation();
+          void insertDroppedImage(event.currentTarget, activeFile, droppedImage);
         }}
         onChange={(event) => {
           onChange(event.currentTarget.value);
@@ -734,6 +771,47 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
   }
 }
 
+async function insertDroppedImage(textarea: HTMLTextAreaElement, activeFile: OpenFile | null, droppedImage: DroppedImage): Promise<void> {
+  if (droppedImage.type === 'remote') {
+    await insertDroppedRemoteImage(textarea, activeFile, droppedImage.url);
+    return;
+  }
+
+  await insertDroppedImageFile(textarea, activeFile, droppedImage.file);
+}
+
+async function insertDroppedImageFile(textarea: HTMLTextAreaElement, activeFile: OpenFile | null, file: File): Promise<void> {
+  let currentFilePath = '';
+  try {
+    currentFilePath = requireSavedActiveFile(activeFile);
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+    textarea.focus();
+    return;
+  }
+
+  if (file.size > MAX_DROPPED_IMAGE_BYTES) {
+    window.alert('이미지는 20MB 이하만 가져올 수 있습니다.');
+    textarea.focus();
+    return;
+  }
+
+  const id = `image-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  insertTextAtSelection(textarea, pendingImageSnippet(id, null));
+
+  try {
+    const bytes = await fileToByteArray(file);
+    const assetPath = await Backend.importImageBytesToAssets(bytes, file.name || null, file.type || null, currentFilePath);
+    replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '이미지 가져오기에 실패했습니다.';
+    console.error('이미지 가져오기 실패:', error);
+    replacePendingImageMarker(textarea, id, failedImageSnippet(id, message));
+  } finally {
+    textarea.focus();
+  }
+}
+
 function markdownImageSnippet(path: string): string {
   const name = fileNameFromPath(path);
   const alt = name.replace(/\.[^.]+$/, '') || '이미지';
@@ -764,12 +842,47 @@ function extractRemoteImageUrl(dataTransfer: DataTransfer): string | null {
   const plain = dataTransfer.getData('text/plain').trim();
   const html = dataTransfer.getData('text/html');
   const htmlSrc = html.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1] ?? '';
+  const cssUrl = html.match(/url\(["']?([^"')]+)["']?\)/i)?.[1] ?? '';
 
-  return [uri, htmlSrc, plain].map((value) => value?.trim() ?? '').find(isRemoteHttpUrl) ?? null;
+  return [uri, htmlSrc, cssUrl, plain].map((value) => value?.trim() ?? '').find(isRemoteHttpUrl) ?? null;
 }
 
-function hasPotentialRemoteImageDrop(dataTransfer: DataTransfer): boolean {
-  return ['text/uri-list', 'text/html', 'text/plain'].some((type) => Array.from(dataTransfer.types).includes(type));
+function getDroppedImage(dataTransfer: DataTransfer): DroppedImage | null {
+  const imageUrl = extractRemoteImageUrl(dataTransfer);
+  if (imageUrl) return { type: 'remote', url: imageUrl };
+
+  const imageFile = extractDroppedImageFile(dataTransfer);
+  return imageFile ? { type: 'file', file: imageFile } : null;
+}
+
+function extractDroppedImageFile(dataTransfer: DataTransfer): File | null {
+  const files = Array.from(dataTransfer.files);
+  const imageFile = files.find((file) => isImageFile(file));
+  if (imageFile) return imageFile;
+
+  const items = Array.from(dataTransfer.items);
+  for (const item of items) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+    const file = item.getAsFile();
+    if (file && isImageFile(file)) return file;
+  }
+
+  return null;
+}
+
+function hasPotentialImageDrop(dataTransfer: DataTransfer): boolean {
+  const types = Array.from(dataTransfer.types);
+  if (['text/uri-list', 'text/html'].some((type) => types.includes(type))) return true;
+  return Array.from(dataTransfer.items).some((item) => item.kind === 'file' && item.type.startsWith('image/'));
+}
+
+function isImageFile(file: File): boolean {
+  return file.type.startsWith('image/') || /\.(?:png|jpe?g|gif|webp|bmp|ico|avif)$/i.test(file.name);
+}
+
+async function fileToByteArray(file: File): Promise<number[]> {
+  const buffer = await file.arrayBuffer();
+  return Array.from(new Uint8Array(buffer));
 }
 
 function isRemoteHttpUrl(value: string): boolean {

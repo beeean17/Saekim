@@ -1,6 +1,7 @@
 import {
   copyImageToAssets,
   downloadImageToAssets,
+  importImageBytesToAssets,
   importPdf,
   openFileDialog,
   openFolderDialog,
@@ -19,6 +20,7 @@ export const tauriBackend: BackendAdapter = {
   openFolderDialog,
   pickImagePath,
   copyImageToAssets,
+  importImageBytesToAssets,
   downloadImageToAssets,
   importPdf,
   readFile,

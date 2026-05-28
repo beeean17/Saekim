@@ -160,6 +160,24 @@ pub fn copy_image_to_assets(
 }
 
 #[tauri::command]
+pub fn import_image_bytes_to_assets(
+    bytes: Vec<u8>,
+    file_name: Option<String>,
+    mime_type: Option<String>,
+    current_file_path: String,
+) -> CommandResult<String> {
+    match import_image_bytes_to_assets_impl(
+        bytes,
+        file_name,
+        mime_type,
+        PathBuf::from(current_file_path),
+    ) {
+        Ok(path) => ok(path),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
 pub async fn download_image_to_assets(
     app: AppHandle,
     id: String,
@@ -401,6 +419,42 @@ fn copy_image_to_assets_impl(
     relative_asset_path(&target_path, &current_file_path)
 }
 
+fn import_image_bytes_to_assets_impl(
+    bytes: Vec<u8>,
+    file_name: Option<String>,
+    mime_type: Option<String>,
+    current_file_path: PathBuf,
+) -> Result<String, String> {
+    if bytes.is_empty() {
+        return Err("dropped image is empty".to_string());
+    }
+    if bytes.len() as u64 > MAX_REMOTE_IMAGE_BYTES {
+        return Err("image is larger than the 20 MB limit".to_string());
+    }
+
+    let extension = dropped_image_extension(file_name.as_deref(), mime_type.as_deref())?;
+    let assets_dir = ensure_assets_dir(&current_file_path)?;
+    let temp_path = unique_temp_image_path(&assets_dir, &extension);
+    fs::write(&temp_path, bytes).map_err(|error| format!("failed to write image file: {error}"))?;
+
+    if let Some(existing_path) = find_existing_asset_with_same_content(&assets_dir, &temp_path)? {
+        let _ = fs::remove_file(&temp_path);
+        return relative_asset_path(&existing_path, &current_file_path);
+    }
+
+    let base_name = file_name
+        .as_deref()
+        .map(|name| image_base_name_from_path(Path::new(name)))
+        .unwrap_or_else(|| "image".to_string());
+    let target_path =
+        unique_asset_path_for_content(&assets_dir, &base_name, &extension, &temp_path)?;
+    fs::rename(&temp_path, &target_path).map_err(|error| {
+        let _ = fs::remove_file(&temp_path);
+        format!("failed to finalize image file: {error}")
+    })?;
+    relative_asset_path(&target_path, &current_file_path)
+}
+
 async fn download_image_to_assets_impl(
     app: &AppHandle,
     id: &str,
@@ -564,6 +618,28 @@ fn remote_image_extension(content_type: &str) -> Result<String, String> {
         "image/svg+xml" => Err("remote SVG images are blocked by default".to_string()),
         _ => Err(format!("unsupported remote image type: {content_type}")),
     }
+}
+
+fn dropped_image_extension(
+    file_name: Option<&str>,
+    mime_type: Option<&str>,
+) -> Result<String, String> {
+    let mime_type = mime_type
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    if !mime_type.is_empty() {
+        return remote_image_extension(&mime_type);
+    }
+
+    file_name
+        .map(Path::new)
+        .map(local_image_extension)
+        .transpose()?
+        .ok_or_else(|| "dropped image does not include a supported type".to_string())
 }
 
 fn unique_temp_image_path(assets_dir: &Path, extension: &str) -> PathBuf {

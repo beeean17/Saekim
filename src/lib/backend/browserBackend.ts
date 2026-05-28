@@ -20,6 +20,10 @@ export const browserBackend: BackendAdapter = {
     throw new Error('Image asset import is only available in the desktop app.');
   },
 
+  async importImageBytesToAssets(_bytes: number[], _fileName: string | null, _mimeType: string | null, _currentFilePath: string): Promise<string> {
+    throw new Error('Dropped image import is only available in the desktop app.');
+  },
+
   async downloadImageToAssets(_id: string, _imageUrl: string, _currentFilePath: string): Promise<string> {
     throw new Error('Remote image import is only available in the desktop app.');
   },
