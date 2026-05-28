@@ -44,8 +44,8 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
 
     const onDrop = (event: DragEvent) => {
       if (event.defaultPrevented || !event.dataTransfer) return;
+      if (!hasPotentialImageDrop(event.dataTransfer)) return;
       const droppedImage = getDroppedImage(event.dataTransfer);
-      if (!droppedImage) return;
 
       const textarea = textareaRef.current;
       if (!textarea) return;
@@ -53,7 +53,11 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
       event.preventDefault();
       event.stopPropagation();
       textarea.focus();
-      void insertDroppedImage(textarea, activeFile, droppedImage);
+      if (droppedImage) {
+        void insertDroppedImage(textarea, activeFile, droppedImage);
+      } else {
+        insertDroppedImageHelp(textarea);
+      }
     };
 
     window.addEventListener('dragover', onDragOver);
@@ -279,6 +283,11 @@ function ImageToolButton({
     void insertSelectedImage(textareaRef.current, activeFile, mode);
   };
 
+  const insertFromUrl = () => {
+    setOpen(false);
+    void insertImageFromUrl(textareaRef.current, activeFile);
+  };
+
   return (
     <div className="tool-dropdown" ref={rootRef}>
       <button
@@ -309,6 +318,10 @@ function ImageToolButton({
           <button type="button" role="menuitem" onClick={() => insert('copy')}>
             <span>문서 assets로 복사</span>
             <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
+          </button>
+          <button type="button" role="menuitem" onClick={insertFromUrl}>
+            <span>이미지 URL에서 가져오기</span>
+            <small>이미지 주소를 다운로드해 assets에 저장</small>
           </button>
             </div>,
             document.body,
@@ -624,11 +637,15 @@ function EditorContent({
           event.dataTransfer.dropEffect = 'copy';
         }}
         onDrop={(event) => {
+          if (!hasPotentialImageDrop(event.dataTransfer)) return;
           const droppedImage = getDroppedImage(event.dataTransfer);
-          if (!droppedImage) return;
           event.preventDefault();
           event.stopPropagation();
-          void insertDroppedImage(event.currentTarget, activeFile, droppedImage);
+          if (droppedImage) {
+            void insertDroppedImage(event.currentTarget, activeFile, droppedImage);
+          } else {
+            insertDroppedImageHelp(event.currentTarget);
+          }
         }}
         onChange={(event) => {
           onChange(event.currentTarget.value);
@@ -735,6 +752,25 @@ async function insertSelectedImage(textarea: HTMLTextAreaElement | null, activeF
   }
 }
 
+async function insertImageFromUrl(textarea: HTMLTextAreaElement | null, activeFile: OpenFile | null): Promise<void> {
+  if (!textarea) return;
+
+  const rawUrl = window.prompt('이미지 URL을 입력하세요.\n검색 결과나 게시글 주소가 아니라 이미지 자체 주소를 사용해야 합니다.');
+  if (rawUrl === null) {
+    textarea.focus();
+    return;
+  }
+
+  const imageUrl = rawUrl.trim();
+  if (!isRemoteHttpUrl(imageUrl)) {
+    window.alert('http 또는 https 이미지 주소만 가져올 수 있습니다.');
+    textarea.focus();
+    return;
+  }
+
+  await insertDroppedRemoteImage(textarea, activeFile, imageUrl);
+}
+
 async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFile: OpenFile | null, imageUrl: string): Promise<void> {
   let currentFilePath = '';
   try {
@@ -810,6 +846,16 @@ async function insertDroppedImageFile(textarea: HTMLTextAreaElement, activeFile:
   } finally {
     textarea.focus();
   }
+}
+
+function insertDroppedImageHelp(textarea: HTMLTextAreaElement): void {
+  insertTextAtSelection(
+    textarea,
+    failedImageSnippet(
+      `help-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      '이미지 주소를 찾지 못했습니다. 검색 결과나 게시글 링크는 이미지로 가져올 수 없습니다. 이미지 우클릭 후 이미지 주소 복사를 사용하거나, 이미지 버튼의 URL 가져오기를 사용하세요.',
+    ),
+  );
 }
 
 function markdownImageSnippet(path: string): string {
