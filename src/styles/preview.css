@@ -651,12 +651,17 @@
 .preview-layout-tools {
   position: absolute;
   top: 6px;
-  right: 6px;
+  right: auto;
+  left: 6px;
   z-index: 2;
   display: inline-flex;
+  flex-wrap: nowrap;
   gap: 2px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
   padding: 3px;
   opacity: 0;
+  pointer-events: none;
   background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -664,25 +669,25 @@
   transition: opacity 0.12s ease;
 }
 
-.preview-layout-block[data-selected="true"] > .preview-layout-tools,
-.preview-layout-tools:hover,
-.preview-layout-tools:focus-within {
+.preview-layout-block[data-selected="true"] > .preview-layout-tools {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .preview-code-layout .preview-layout-tools {
-  right: auto;
   left: 8px;
 }
 
 .preview-layout-tools button {
-  min-width: 24px;
+  min-width: max-content;
   height: 22px;
   padding: 0 6px;
   color: var(--text-muted);
   border-radius: 4px;
   font-size: 10px;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .preview-layout-tools button:hover,

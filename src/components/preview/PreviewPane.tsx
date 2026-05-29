@@ -542,18 +542,26 @@ function renderLayoutControls(
 
   const twoColumnCandidates = contiguousLayoutWrappers(root, wrapper, 2);
   const threeColumnCandidates = contiguousLayoutWrappers(root, wrapper, 3);
+  const groupColumns = getLayoutGroupColumns(layout);
 
   [2, 3].forEach((columns) => {
+    const candidates = columns === 2 ? twoColumnCandidates : threeColumnCandidates;
+    const active = isGroupedLayout(layout) && groupColumns === columns;
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = `${columns}열`;
-    button.title = `${columns}열로 묶기`;
-    button.disabled = isGroupedLayout(layout) || (columns === 2 ? twoColumnCandidates : threeColumnCandidates).length !== columns;
+    button.title = active ? `${columns}열 묶기 해제` : `${columns}열로 묶기`;
+    button.className = active ? 'active' : '';
+    button.disabled = !active && candidates.length !== columns;
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
 
-      const candidates = columns === 2 ? twoColumnCandidates : threeColumnCandidates;
+      if (active) {
+        onChange(groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' })));
+        return;
+      }
+
       if (candidates.length !== columns) return;
 
       const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -565,24 +573,6 @@ function renderLayoutControls(
     });
     tools.append(button);
   });
-
-  const ungroupButton = document.createElement('button');
-  ungroupButton.type = 'button';
-  ungroupButton.textContent = '풀기';
-  ungroupButton.title = '묶음 풀기';
-  ungroupButton.disabled = !isGroupedLayout(layout);
-  ungroupButton.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const groupId = getLayoutGroupId(layout);
-    const groupedLayouts = getLayoutWrappers(root)
-      .filter((item) => item.dataset.groupId === groupId)
-      .map((item) => layoutForWrapper(item, filePath, layoutByKey))
-      .map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }));
-    onChange(groupedLayouts.length > 0 ? groupedLayouts : clearLayoutGroup(layout));
-  });
-  tools.append(ungroupButton);
 
   wrapper.append(tools);
 }
@@ -700,6 +690,20 @@ function layoutForWrapper(
     layoutByKey.get(layoutIdentity(identity)) ??
     defaultBlockLayout(filePath, blockKind, blockKey, Number.isFinite(occurrenceIndex) ? occurrenceIndex : 0)
   );
+}
+
+function groupLayoutsForWrapper(
+  root: HTMLElement,
+  wrapper: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+): BlockLayout[] {
+  const groupId = wrapper.dataset.groupId;
+  if (!groupId) return [layoutForWrapper(wrapper, filePath, layoutByKey)];
+  const layouts = getLayoutWrappers(root)
+    .filter((item) => item.dataset.groupId === groupId)
+    .map((item) => layoutForWrapper(item, filePath, layoutByKey));
+  return layouts.length > 0 ? layouts : [layoutForWrapper(wrapper, filePath, layoutByKey)];
 }
 
 function normalizeLayoutGroups(
