@@ -214,12 +214,13 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     const root = localRef.current;
     if (!root) return;
 
-    const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
-    if (blocks.length === 0) return;
     let alive = true;
 
     void import('mermaid').then(({ default: mermaid }) => {
       if (!alive) return;
+      const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
+      if (blocks.length === 0) return;
+
       mermaid.initialize({
         startOnLoad: false,
         theme: theme === 'default' ? 'default' : 'dark',
@@ -228,20 +229,33 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
 
       void Promise.all(
         blocks.map(async (block, index) => {
-          const source = decodeURIComponent(block.dataset.source || '');
-          const id = `mermaid-${Date.now()}-${index}`;
-          const { svg } = await mermaid.render(id, source);
-          if (alive) block.innerHTML = svg;
+          try {
+            const source = decodeURIComponent(block.dataset.source || '');
+            const id = `mermaid-${Date.now()}-${index}`;
+            const { svg } = await mermaid.render(id, source);
+            if (alive) {
+              block.innerHTML = svg;
+              block.dataset.rendered = 'true';
+            }
+          } catch (error) {
+            console.error('failed to render mermaid block', error);
+            if (alive) block.dataset.rendered = 'false';
+          }
         }),
       ).finally(() => {
-        if (alive) notifyPreviewRendered(root);
+        if (!alive) return;
+        const filePath = activeFile?.path;
+        if (filePath && fileType.previewKind === 'markdown') {
+          enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
+        }
+        notifyPreviewRendered(root);
       });
     });
 
     return () => {
       alive = false;
     };
-  }, [html, theme]);
+  }, [activeFile?.path, blockLayouts, fileType.previewKind, html, saveBlockLayout, theme]);
 
   useEffect(() => {
     const root = localRef.current;
@@ -374,6 +388,7 @@ function enhancePreviewLayoutBlocks(
     const layout =
       layoutByKey.get(layoutIdentity(identity)) ??
       defaultBlockLayout(filePath, blockKind, blockKey, occurrenceIndex);
+    ensureLayoutSurface(wrapper);
     applyBlockLayout(wrapper, layout);
     renderLayoutControls(wrapper, layout, onChange);
   });
@@ -405,10 +420,11 @@ function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
   });
 
   root
-    .querySelectorAll<HTMLElement>('table, ul, ol, blockquote, .mermaid-block, .math-block')
+    .querySelectorAll<HTMLElement>('table, ul, ol, blockquote, pre, .mermaid-block, .math-block')
     .forEach((element) => {
       if (element.closest('.preview-layout-block')) return;
       if ((element.tagName === 'UL' || element.tagName === 'OL') && element.closest('li')) return;
+      if (element.classList.contains('mermaid-block') && !element.querySelector('svg')) return;
 
       const blockKind = blockKindForElement(element);
       const blockKey = stableBlockKey(element, blockKind);
@@ -433,8 +449,25 @@ function ensureLayoutWrapper(target: LayoutTarget): HTMLElement {
     target.element.replaceWith(wrapper);
   }
 
-  wrapper.append(target.element);
+  const surface = document.createElement('div');
+  surface.className = 'preview-layout-surface';
+  surface.append(target.element);
+  wrapper.append(surface);
   return wrapper;
+}
+
+function ensureLayoutSurface(wrapper: HTMLElement): HTMLElement {
+  const existing = wrapper.querySelector<HTMLElement>(':scope > .preview-layout-surface');
+  if (existing) return existing;
+
+  const surface = document.createElement('div');
+  surface.className = 'preview-layout-surface';
+  Array.from(wrapper.childNodes).forEach((node) => {
+    if (node instanceof HTMLElement && node.classList.contains('preview-layout-tools')) return;
+    surface.append(node);
+  });
+  wrapper.prepend(surface);
+  return surface;
 }
 
 function renderLayoutControls(
@@ -476,7 +509,7 @@ function renderLayoutControls(
     tools.append(button);
   });
 
-  wrapper.prepend(tools);
+  wrapper.append(tools);
 }
 
 function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
@@ -533,6 +566,7 @@ function blockKindForElement(element: HTMLElement): BlockKind {
   if (element.classList.contains('math-block')) return 'katex';
   if (element.tagName === 'TABLE') return 'table';
   if (element.tagName === 'BLOCKQUOTE') return 'blockquote';
+  if (element.tagName === 'PRE') return 'code';
   return 'list';
 }
 
@@ -542,6 +576,7 @@ function blockKindFromDataset(value?: string): BlockKind | null {
     value === 'table' ||
     value === 'list' ||
     value === 'blockquote' ||
+    value === 'code' ||
     value === 'mermaid' ||
     value === 'katex'
   ) {

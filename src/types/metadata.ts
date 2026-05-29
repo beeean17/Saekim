@@ -1,4 +1,4 @@
-export type BlockKind = 'image' | 'table' | 'list' | 'blockquote' | 'mermaid' | 'katex';
+export type BlockKind = 'image' | 'table' | 'list' | 'blockquote' | 'code' | 'mermaid' | 'katex';
 export type LayoutUnit = 'px' | '%' | 'auto';
 export type LayoutAlign = 'left' | 'center' | 'right';
 
