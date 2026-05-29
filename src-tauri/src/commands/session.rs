@@ -5,7 +5,7 @@ use std::{
 };
 
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::file::CommandResult;
@@ -13,6 +13,21 @@ use super::file::CommandResult;
 const SCHEMA_VERSION: i64 = 1;
 const DEFAULT_WORKSPACE_ID: &str = "ws_default";
 const DEFAULT_VIEW_ID: &str = "view_default";
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockLayoutPayload {
+    file_path: String,
+    block_kind: String,
+    block_key: String,
+    occurrence_index: i64,
+    width_value: Option<f64>,
+    width_unit: String,
+    height_value: Option<f64>,
+    height_unit: String,
+    align: String,
+    layout_json: Option<Value>,
+}
 
 #[tauri::command]
 pub fn load_session() -> CommandResult<Option<Value>> {
@@ -25,6 +40,22 @@ pub fn load_session() -> CommandResult<Option<Value>> {
 #[tauri::command]
 pub fn save_session(session: Value) -> CommandResult<Option<()>> {
     match save_session_to_metadata(&session) {
+        Ok(()) => ok(Some(())),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn load_block_layouts(file_path: String) -> CommandResult<Vec<BlockLayoutPayload>> {
+    match load_block_layouts_from_metadata(&file_path) {
+        Ok(layouts) => ok(layouts),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn save_block_layout(layout: BlockLayoutPayload) -> CommandResult<Option<()>> {
+    match save_block_layout_to_metadata(&layout) {
         Ok(()) => ok(Some(())),
         Err(error) => fail(error),
     }
@@ -221,6 +252,118 @@ fn save_session_to_metadata(session: &Value) -> Result<(), String> {
         .map_err(|error| format!("failed to commit metadata transaction: {error}"))
 }
 
+fn load_block_layouts_from_metadata(file_path: &str) -> Result<Vec<BlockLayoutPayload>, String> {
+    let connection = open_metadata_connection()?;
+    let Some((file_id, _workspace_id)) = find_file_for_path(&connection, file_path)? else {
+        return Ok(Vec::new());
+    };
+
+    let mut statement = connection
+        .prepare(
+            "SELECT block_kind, block_key, occurrence_index, width_value, width_unit,
+                    height_value, height_unit, align, layout_json
+             FROM block_layouts
+             WHERE file_id = ?1
+             ORDER BY block_kind ASC, block_key ASC, occurrence_index ASC",
+        )
+        .map_err(|error| format!("failed to prepare block layout query: {error}"))?;
+
+    let rows = statement
+        .query_map(params![file_id], |row| {
+            let layout_json: Option<String> = row.get(8)?;
+            Ok(BlockLayoutPayload {
+                file_path: file_path.to_string(),
+                block_kind: row.get(0)?,
+                block_key: row.get(1)?,
+                occurrence_index: row.get(2)?,
+                width_value: row.get(3)?,
+                width_unit: row.get(4)?,
+                height_value: row.get(5)?,
+                height_unit: row.get(6)?,
+                align: row.get(7)?,
+                layout_json: layout_json
+                    .as_deref()
+                    .and_then(|value| serde_json::from_str(value).ok()),
+            })
+        })
+        .map_err(|error| format!("failed to query block layouts: {error}"))?;
+
+    let mut layouts = Vec::new();
+    for row in rows {
+        layouts.push(row.map_err(|error| format!("failed to read block layout row: {error}"))?);
+    }
+
+    Ok(layouts)
+}
+
+fn save_block_layout_to_metadata(layout: &BlockLayoutPayload) -> Result<(), String> {
+    if layout.file_path.trim().is_empty() || layout.file_path.starts_with('~') || layout.file_path.starts_with("browser://") {
+        return Err("block layout requires a saved local file path".to_string());
+    }
+
+    let connection = open_metadata_connection()?;
+    let (workspace_id, canonical_root_path) = workspace_context_for_file(&connection, &layout.file_path)?;
+    ensure_workspace(&connection, &workspace_id, &canonical_root_path)?;
+    let display_name = file_name_from_path(&layout.file_path);
+    let file_id = upsert_file(
+        &connection,
+        &workspace_id,
+        &canonical_root_path,
+        &layout.file_path,
+        &display_name,
+        None,
+        current_timestamp_millis(),
+    )?;
+
+    let layout_id = stable_id(
+        "block",
+        &format!(
+            "{}:{}:{}:{}",
+            file_id, layout.block_kind, layout.block_key, layout.occurrence_index
+        ),
+    );
+    let layout_json = layout
+        .layout_json
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|error| format!("failed to serialize block layout metadata: {error}"))?;
+    let now = current_timestamp_millis();
+
+    connection
+        .execute(
+            "INSERT INTO block_layouts
+               (id, file_id, block_kind, block_key, occurrence_index, width_value,
+                width_unit, height_value, height_unit, align, layout_json, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             ON CONFLICT(file_id, block_kind, block_key, occurrence_index) DO UPDATE SET
+               width_value = excluded.width_value,
+               width_unit = excluded.width_unit,
+               height_value = excluded.height_value,
+               height_unit = excluded.height_unit,
+               align = excluded.align,
+               layout_json = excluded.layout_json,
+               updated_at = excluded.updated_at",
+            params![
+                layout_id,
+                file_id,
+                layout.block_kind,
+                layout.block_key,
+                layout.occurrence_index,
+                layout.width_value,
+                normalized_unit(&layout.width_unit),
+                layout.height_value,
+                normalized_unit(&layout.height_unit),
+                normalized_align(&layout.align),
+                layout_json,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to save block layout metadata: {error}"))?;
+
+    Ok(())
+}
+
 fn open_metadata_connection() -> Result<Connection, String> {
     let path = metadata_path();
     if let Some(parent) = path.parent() {
@@ -342,6 +485,92 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
             ",
         )
         .map_err(|error| format!("failed to initialize metadata schema: {error}"))
+}
+
+fn find_file_for_path(
+    connection: &Connection,
+    file_path: &str,
+) -> Result<Option<(String, String)>, String> {
+    connection
+        .query_row(
+            "SELECT id, workspace_id FROM files WHERE absolute_path = ?1 ORDER BY last_opened_at DESC LIMIT 1",
+            params![file_path],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()
+        .map_err(|error| format!("failed to find file metadata: {error}"))
+}
+
+fn workspace_context_for_file(
+    connection: &Connection,
+    file_path: &str,
+) -> Result<(String, String), String> {
+    if let Some((workspace_id, canonical_root_path)) = active_workspace_context(connection)? {
+        if path_is_inside(file_path, &canonical_root_path) {
+            return Ok((workspace_id, canonical_root_path));
+        }
+    }
+
+    if let Some((_, workspace_id)) = find_file_for_path(connection, file_path)? {
+        let canonical_root_path = connection
+            .query_row(
+                "SELECT canonical_root_path FROM workspaces WHERE id = ?1",
+                params![workspace_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|error| format!("failed to load file workspace metadata: {error}"))?
+            .unwrap_or_else(|| parent_path(file_path).unwrap_or_default());
+        return Ok((workspace_id, canonical_root_path));
+    }
+
+    let canonical_root_path = parent_path(file_path).unwrap_or_default();
+    let workspace_id = if canonical_root_path.is_empty() {
+        DEFAULT_WORKSPACE_ID.to_string()
+    } else {
+        stable_id("ws", &canonical_root_path)
+    };
+    Ok((workspace_id, canonical_root_path))
+}
+
+fn active_workspace_context(connection: &Connection) -> Result<Option<(String, String)>, String> {
+    let Some(workspace_id) = metadata_value(connection, "active_workspace_id")? else {
+        return Ok(None);
+    };
+    let canonical_root_path = connection
+        .query_row(
+            "SELECT canonical_root_path FROM workspaces WHERE id = ?1",
+            params![workspace_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| format!("failed to load active workspace metadata: {error}"))?;
+    Ok(canonical_root_path.map(|path| (workspace_id, path)))
+}
+
+fn ensure_workspace(
+    connection: &Connection,
+    workspace_id: &str,
+    canonical_root_path: &str,
+) -> Result<(), String> {
+    let now = current_timestamp_millis();
+    connection
+        .execute(
+            "INSERT INTO workspaces (id, canonical_root_path, display_name, created_at, last_opened_at)
+             VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT(id) DO UPDATE SET
+               canonical_root_path = excluded.canonical_root_path,
+               display_name = excluded.display_name,
+               last_opened_at = excluded.last_opened_at",
+            params![
+                workspace_id,
+                canonical_root_path,
+                workspace_display_name(canonical_root_path),
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to ensure workspace metadata: {error}"))?;
+    Ok(())
 }
 
 fn save_recent_file(
@@ -604,6 +833,13 @@ fn resolve_view_root(canonical_root_path: &str, view_relative_path: &str) -> Str
     }
 }
 
+fn path_is_inside(path: &str, root_path: &str) -> bool {
+    if root_path.is_empty() {
+        return false;
+    }
+    Path::new(path).starts_with(root_path)
+}
+
 fn relative_path(root_path: &str, path: &str) -> String {
     if root_path.is_empty() {
         return path.to_string();
@@ -678,6 +914,20 @@ fn stable_hash(value: &str) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
+}
+
+fn normalized_unit(value: &str) -> String {
+    match value {
+        "px" | "%" | "auto" => value.to_string(),
+        _ => "auto".to_string(),
+    }
+}
+
+fn normalized_align(value: &str) -> String {
+    match value {
+        "left" | "center" | "right" => value.to_string(),
+        _ => "center".to_string(),
+    }
 }
 
 fn current_timestamp_millis() -> i64 {

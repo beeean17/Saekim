@@ -1,7 +1,9 @@
 import type { BackendAdapter } from './types';
+import type { BlockLayout } from '../../types/metadata';
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
 const sessionKey = 'saekim-browser-session';
+const blockLayoutPrefix = 'saekim-block-layouts:';
 
 export const browserBackend: BackendAdapter = {
   async openFileDialog(): Promise<boolean> {
@@ -71,5 +73,23 @@ export const browserBackend: BackendAdapter = {
 
   async saveSession<T>(session: T): Promise<void> {
     localStorage.setItem(sessionKey, JSON.stringify(session));
+  },
+
+  async loadBlockLayouts(filePath: string): Promise<BlockLayout[]> {
+    const raw = localStorage.getItem(`${blockLayoutPrefix}${filePath}`);
+    return raw ? (JSON.parse(raw) as BlockLayout[]) : [];
+  },
+
+  async saveBlockLayout(layout: BlockLayout): Promise<void> {
+    const key = `${blockLayoutPrefix}${layout.filePath}`;
+    const existing = await this.loadBlockLayouts(layout.filePath);
+    const next = existing.filter(
+      (item) =>
+        item.blockKind !== layout.blockKind ||
+        item.blockKey !== layout.blockKey ||
+        item.occurrenceIndex !== layout.occurrenceIndex,
+    );
+    next.push(layout);
+    localStorage.setItem(key, JSON.stringify(next));
   },
 };

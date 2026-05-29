@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
+import { Backend } from '../../lib/backend';
 import { getFileTypeInfo } from '../../lib/fileType';
 import { renderBrowserHtmlDocument, renderSafeHtmlDocument } from '../../lib/html/renderHtml';
 import { escapeHtml } from '../../lib/markdown/escape';
@@ -8,6 +9,7 @@ import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import type { BlockKind, BlockLayout, LayoutAlign } from '../../types/metadata';
 import { Icon } from '../primitives/Icon';
 import { StructuredDataPreview, TabularDataPreview } from './StructuredDataPreview';
 
@@ -65,9 +67,42 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   const theme = useSettingsStore((state) => state.theme);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const [html, setHtml] = useState('');
+  const [blockLayouts, setBlockLayouts] = useState<BlockLayout[]>([]);
   const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path);
   const usesBrowserFrame = fileType.previewKind === 'html' && htmlPreviewMode === 'browser';
   const usesStructuredPreview = fileType.previewKind === 'structured-data' || fileType.previewKind === 'tabular-data';
+
+  useEffect(() => {
+    let alive = true;
+    const filePath = activeFile?.path;
+
+    if (!filePath || filePath.startsWith('~') || filePath.startsWith('browser://') || fileType.previewKind !== 'markdown') {
+      setBlockLayouts([]);
+      return () => {
+        alive = false;
+      };
+    }
+
+    void Backend.loadBlockLayouts(filePath)
+      .then((layouts) => {
+        if (alive) setBlockLayouts(layouts);
+      })
+      .catch((error) => {
+        console.error('failed to load block layouts', error);
+        if (alive) setBlockLayouts([]);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [activeFile?.path, fileType.previewKind]);
+
+  const saveBlockLayout = useCallback((layout: BlockLayout) => {
+    setBlockLayouts((current) => upsertBlockLayout(current, layout));
+    void Backend.saveBlockLayout(layout).catch((error) => {
+      console.error('failed to save block layout', error);
+    });
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -208,6 +243,14 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     };
   }, [html, theme]);
 
+  useEffect(() => {
+    const root = localRef.current;
+    const filePath = activeFile?.path;
+    if (!root || !filePath || fileType.previewKind !== 'markdown') return;
+
+    enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
+  }, [activeFile?.path, blockLayouts, fileType.previewKind, html, saveBlockLayout]);
+
   const className = usesBrowserFrame ? 'preview-content html-preview-browser' : 'preview-content';
   const setPreviewElement = (element: HTMLDivElement | null) => {
     localRef.current = element;
@@ -300,4 +343,237 @@ function bindHtmlPreviewFrame(
     observer.disconnect();
     doc.removeEventListener('click', onClick);
   };
+}
+
+type LayoutTarget = {
+  element: HTMLElement;
+  blockKind: BlockKind;
+  blockKey: string;
+  occurrenceIndex: number;
+};
+
+const layoutWidths = [100, 75, 50, 33];
+const layoutAligns: LayoutAlign[] = ['left', 'center', 'right'];
+
+function enhancePreviewLayoutBlocks(
+  root: HTMLElement,
+  filePath: string,
+  layouts: BlockLayout[],
+  onChange: (layout: BlockLayout) => void,
+): void {
+  if (filePath.startsWith('~') || filePath.startsWith('browser://')) return;
+
+  const layoutByKey = new Map(layouts.map((layout) => [layoutIdentity(layout), layout]));
+  root.querySelectorAll<HTMLElement>('.preview-layout-block').forEach((wrapper) => {
+    const blockKind = blockKindFromDataset(wrapper.dataset.blockKind);
+    const blockKey = wrapper.dataset.blockKey;
+    const occurrenceIndex = Number.parseInt(wrapper.dataset.occurrenceIndex ?? '', 10);
+    if (!blockKind || !blockKey || !Number.isFinite(occurrenceIndex)) return;
+
+    const identity = { blockKind, blockKey, occurrenceIndex };
+    const layout =
+      layoutByKey.get(layoutIdentity(identity)) ??
+      defaultBlockLayout(filePath, blockKind, blockKey, occurrenceIndex);
+    applyBlockLayout(wrapper, layout);
+    renderLayoutControls(wrapper, layout, onChange);
+  });
+
+  const targets = collectLayoutTargets(root);
+
+  targets.forEach((target) => {
+    const wrapper = ensureLayoutWrapper(target);
+    const layout =
+      layoutByKey.get(layoutIdentity(target)) ??
+      defaultBlockLayout(filePath, target.blockKind, target.blockKey, target.occurrenceIndex);
+
+    applyBlockLayout(wrapper, layout);
+    renderLayoutControls(wrapper, layout, onChange);
+  });
+}
+
+function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
+  const targets: LayoutTarget[] = [];
+  const imageCounts = new Map<string, number>();
+  const genericCounts = new Map<string, number>();
+
+  root.querySelectorAll<HTMLImageElement>('img').forEach((image) => {
+    if (image.closest('.preview-layout-block, .pending-image-block, .failed-image-block')) return;
+
+    const blockKey = image.getAttribute('data-original-src') || image.getAttribute('src') || image.alt || 'image';
+    const occurrenceIndex = nextOccurrence(imageCounts, blockKey);
+    targets.push({ element: image, blockKind: 'image', blockKey, occurrenceIndex });
+  });
+
+  root
+    .querySelectorAll<HTMLElement>('table, ul, ol, blockquote, .mermaid-block, .math-block')
+    .forEach((element) => {
+      if (element.closest('.preview-layout-block')) return;
+      if ((element.tagName === 'UL' || element.tagName === 'OL') && element.closest('li')) return;
+
+      const blockKind = blockKindForElement(element);
+      const blockKey = stableBlockKey(element, blockKind);
+      const occurrenceIndex = nextOccurrence(genericCounts, `${blockKind}:${blockKey}`);
+      targets.push({ element, blockKind, blockKey, occurrenceIndex });
+    });
+
+  return targets;
+}
+
+function ensureLayoutWrapper(target: LayoutTarget): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = `preview-layout-block preview-${target.blockKind}-layout`;
+  wrapper.dataset.blockKind = target.blockKind;
+  wrapper.dataset.blockKey = target.blockKey;
+  wrapper.dataset.occurrenceIndex = String(target.occurrenceIndex);
+
+  const parent = target.element.parentElement;
+  if (target.blockKind === 'image' && parent?.tagName === 'P' && isSingleImageParagraph(parent)) {
+    parent.replaceWith(wrapper);
+  } else {
+    target.element.replaceWith(wrapper);
+  }
+
+  wrapper.append(target.element);
+  return wrapper;
+}
+
+function renderLayoutControls(
+  wrapper: HTMLElement,
+  layout: BlockLayout,
+  onChange: (layout: BlockLayout) => void,
+): void {
+  wrapper.querySelector('.preview-layout-tools')?.remove();
+
+  const tools = document.createElement('div');
+  tools.className = 'preview-layout-tools';
+  tools.setAttribute('aria-label', '블록 레이아웃');
+
+  layoutWidths.forEach((width) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = width === 100 ? '1열' : width === 50 ? '2열' : width === 33 ? '3열' : `${width}%`;
+    button.title = `너비 ${width}%`;
+    button.className = layout.widthValue === width && layout.widthUnit === '%' ? 'active' : '';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onChange({ ...layout, widthValue: width, widthUnit: '%' });
+    });
+    tools.append(button);
+  });
+
+  layoutAligns.forEach((align) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
+    button.title = align === 'left' ? '왼쪽 정렬' : align === 'center' ? '가운데 정렬' : '오른쪽 정렬';
+    button.className = layout.align === align ? 'active' : '';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onChange({ ...layout, align });
+    });
+    tools.append(button);
+  });
+
+  wrapper.prepend(tools);
+}
+
+function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
+  const width =
+    layout.widthUnit === 'auto' || layout.widthValue === null
+      ? 'auto'
+      : `${Math.max(10, Math.min(100, layout.widthValue))}${layout.widthUnit}`;
+
+  wrapper.style.setProperty('--block-layout-width', width);
+  wrapper.dataset.align = layout.align;
+  wrapper.dataset.widthUnit = layout.widthUnit;
+  wrapper.dataset.widthValue = layout.widthValue === null ? 'auto' : String(layout.widthValue);
+}
+
+function defaultBlockLayout(
+  filePath: string,
+  blockKind: BlockKind,
+  blockKey: string,
+  occurrenceIndex: number,
+): BlockLayout {
+  return {
+    filePath,
+    blockKind,
+    blockKey,
+    occurrenceIndex,
+    widthValue: 100,
+    widthUnit: '%',
+    heightValue: null,
+    heightUnit: 'auto',
+    align: blockKind === 'list' || blockKind === 'blockquote' ? 'left' : 'center',
+    layoutJson: null,
+  };
+}
+
+function upsertBlockLayout(layouts: BlockLayout[], next: BlockLayout): BlockLayout[] {
+  return [
+    ...layouts.filter((layout) => layoutIdentity(layout) !== layoutIdentity(next)),
+    next,
+  ];
+}
+
+function layoutIdentity(layout: Pick<BlockLayout, 'blockKind' | 'blockKey' | 'occurrenceIndex'>): string {
+  return `${layout.blockKind}:${layout.blockKey}:${layout.occurrenceIndex}`;
+}
+
+function nextOccurrence(counts: Map<string, number>, key: string): number {
+  const next = counts.get(key) ?? 0;
+  counts.set(key, next + 1);
+  return next;
+}
+
+function blockKindForElement(element: HTMLElement): BlockKind {
+  if (element.classList.contains('mermaid-block')) return 'mermaid';
+  if (element.classList.contains('math-block')) return 'katex';
+  if (element.tagName === 'TABLE') return 'table';
+  if (element.tagName === 'BLOCKQUOTE') return 'blockquote';
+  return 'list';
+}
+
+function blockKindFromDataset(value?: string): BlockKind | null {
+  if (
+    value === 'image' ||
+    value === 'table' ||
+    value === 'list' ||
+    value === 'blockquote' ||
+    value === 'mermaid' ||
+    value === 'katex'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function stableBlockKey(element: HTMLElement, kind: BlockKind): string {
+  const sourceLine = element.getAttribute('data-source-line') ?? '0';
+  const sourceEndLine = element.getAttribute('data-source-end-line') ?? sourceLine;
+  const text = element.dataset.source ?? element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  return `${kind}:${sourceLine}-${sourceEndLine}:${stableHash(text)}`;
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function isSingleImageParagraph(paragraph: HTMLElement): boolean {
+  const children = Array.from(paragraph.childNodes);
+  const imageCount = children.filter((node) => node instanceof HTMLImageElement).length;
+  if (imageCount !== 1) return false;
+
+  return children.every((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return !node.textContent?.trim();
+    if (node instanceof HTMLBRElement) return true;
+    return node instanceof HTMLImageElement;
+  });
 }

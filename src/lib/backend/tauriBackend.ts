@@ -12,7 +12,7 @@ import {
   saveFile,
   saveFileAs,
 } from '../tauri/fs';
-import { loadSession, saveSession } from '../tauri/session';
+import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../tauri/session';
 import type { BackendAdapter } from './types';
 
 export const tauriBackend: BackendAdapter = {
@@ -30,4 +30,6 @@ export const tauriBackend: BackendAdapter = {
   saveFileAs,
   loadSession,
   saveSession,
+  loadBlockLayouts,
+  saveBlockLayout,
 };

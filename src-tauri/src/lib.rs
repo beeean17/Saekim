@@ -71,7 +71,9 @@ pub fn run() {
             commands::file::take_pending_open_files,
             commands::file::write_pdf_export,
             commands::session::load_session,
+            commands::session::load_block_layouts,
             commands::session::save_session,
+            commands::session::save_block_layout,
             commands::window::open_external_url,
             commands::window::set_window_min_size,
             commands::window::start_window_drag

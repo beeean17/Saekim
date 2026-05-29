@@ -1,4 +1,5 @@
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
+import type { BlockLayout } from '../../types/metadata';
 
 export interface BackendAdapter {
   openFileDialog(): Promise<boolean>;
@@ -15,4 +16,6 @@ export interface BackendAdapter {
   saveFileAs(content: string, suggestedName: string): Promise<string | null>;
   loadSession<T>(): Promise<T | null>;
   saveSession<T>(session: T): Promise<void>;
+  loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;
+  saveBlockLayout(layout: BlockLayout): Promise<void>;
 }
