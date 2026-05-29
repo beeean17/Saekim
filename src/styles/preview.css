@@ -608,6 +608,21 @@
   vertical-align: top;
 }
 
+.preview-layout-group {
+  display: grid;
+  grid-template-columns: repeat(var(--preview-layout-columns, 2), minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  margin: 14px 0;
+}
+
+.preview-layout-group > .preview-layout-block[data-flow="columns"] {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
 .preview-layout-surface {
   display: block;
   width: 100%;

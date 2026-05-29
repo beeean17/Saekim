@@ -380,6 +380,8 @@ function enhancePreviewLayoutBlocks(
 ): void {
   if (filePath.startsWith('~') || filePath.startsWith('browser://')) return;
 
+  unwrapLayoutGroups(root);
+
   const layoutByKey = new Map(layouts.map((layout) => [layoutIdentity(layout), layout]));
   root.querySelectorAll<HTMLElement>('.preview-layout-block').forEach((wrapper) => {
     const blockKind = blockKindFromDataset(wrapper.dataset.blockKind);
@@ -407,6 +409,8 @@ function enhancePreviewLayoutBlocks(
     applyBlockLayout(wrapper, layout);
     renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
   });
+
+  arrangeLayoutGroups(root);
 }
 
 function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
@@ -446,6 +450,9 @@ function ensureLayoutWrapper(target: LayoutTarget): HTMLElement {
   wrapper.dataset.occurrenceIndex = String(target.occurrenceIndex);
 
   const parent = target.element.parentElement;
+  const sourceElement = target.blockKind === 'image' && parent?.tagName === 'P' ? parent : target.element;
+  copySourceLineDataset(sourceElement, wrapper);
+
   if (target.blockKind === 'image' && parent?.tagName === 'P' && isSingleImageParagraph(parent)) {
     parent.replaceWith(wrapper);
   } else {
@@ -490,7 +497,7 @@ function renderLayoutControls(
   layoutWidths.forEach((width) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = width === 100 ? '1열' : width === 50 ? '2열' : width === 33 ? '3열' : `${width}%`;
+    button.textContent = `${width}%`;
     button.title = `너비 ${width}%`;
     button.className = layout.widthValue === width && layout.widthUnit === '%' ? 'active' : '';
     button.addEventListener('click', (event) => {
@@ -515,37 +522,79 @@ function renderLayoutControls(
     tools.append(button);
   });
 
-  const groupButton = document.createElement('button');
-  groupButton.type = 'button';
-  groupButton.textContent = isGroupedLayout(layout) ? '해제' : '묶기';
-  groupButton.title = isGroupedLayout(layout) ? '2열 묶음 해제' : '다음 블록과 2열로 묶기';
-  groupButton.className = isGroupedLayout(layout) ? 'active' : '';
-  groupButton.addEventListener('click', (event) => {
+  if (isGroupedLayout(layout)) {
+    renderGroupPositionButtons(tools, layout, onChange);
+  }
+
+  const twoColumnCandidates = contiguousLayoutWrappers(root, wrapper, 2);
+  const threeColumnCandidates = contiguousLayoutWrappers(root, wrapper, 3);
+
+  [2, 3].forEach((columns) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `${columns}열`;
+    button.title = `${columns}열로 묶기`;
+    button.disabled = isGroupedLayout(layout) || (columns === 2 ? twoColumnCandidates : threeColumnCandidates).length !== columns;
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const candidates = columns === 2 ? twoColumnCandidates : threeColumnCandidates;
+      if (candidates.length !== columns) return;
+
+      const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      onChange(
+        candidates.map((item, index) =>
+          withColumnGroup(layoutForWrapper(item, filePath, layoutByKey), groupId, columns, index),
+        ),
+      );
+    });
+    tools.append(button);
+  });
+
+  const ungroupButton = document.createElement('button');
+  ungroupButton.type = 'button';
+  ungroupButton.textContent = '풀기';
+  ungroupButton.title = '묶음 풀기';
+  ungroupButton.disabled = !isGroupedLayout(layout);
+  ungroupButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
 
-    const grouped = isGroupedLayout(layout);
-    if (grouped) {
-      const groupId = getLayoutGroupId(layout);
-      const groupedLayouts = getLayoutWrappers(root)
-        .filter((item) => item.dataset.groupId === groupId)
-        .map((item) => layoutForWrapper(item, filePath, layoutByKey))
-        .map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }));
-      onChange(groupedLayouts.length > 0 ? groupedLayouts : clearLayoutGroup(layout));
-      return;
-    }
-
-    const pair = nextLayoutWrapper(wrapper) ?? previousLayoutWrapper(wrapper);
-    if (!pair) return;
-
-    const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const current = withTwoColumnGroup(layout, groupId);
-    const adjacent = withTwoColumnGroup(layoutForWrapper(pair, filePath, layoutByKey), groupId);
-    onChange([current, adjacent]);
+    const groupId = getLayoutGroupId(layout);
+    const groupedLayouts = getLayoutWrappers(root)
+      .filter((item) => item.dataset.groupId === groupId)
+      .map((item) => layoutForWrapper(item, filePath, layoutByKey))
+      .map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }));
+    onChange(groupedLayouts.length > 0 ? groupedLayouts : clearLayoutGroup(layout));
   });
-  tools.append(groupButton);
+  tools.append(ungroupButton);
 
   wrapper.append(tools);
+}
+
+function renderGroupPositionButtons(
+  tools: HTMLElement,
+  layout: BlockLayout,
+  onChange: LayoutChangeHandler,
+): void {
+  const columns = getLayoutGroupColumns(layout);
+  const labels = columns === 2 ? ['LC', 'R'] : ['L', 'C', 'R'];
+  const currentIndex = getLayoutGroupIndex(layout);
+
+  labels.forEach((label, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.title = `${columns}열 위치: ${label}`;
+    button.className = currentIndex === index ? 'active' : '';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onChange(withGroupIndex(layout, index));
+    });
+    tools.append(button);
+  });
 }
 
 function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
@@ -559,6 +608,8 @@ function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
   wrapper.dataset.widthUnit = layout.widthUnit;
   wrapper.dataset.widthValue = layout.widthValue === null ? 'auto' : String(layout.widthValue);
   wrapper.dataset.flow = getLayoutGroupColumns(layout) > 1 ? 'columns' : 'block';
+  wrapper.dataset.groupColumns = String(getLayoutGroupColumns(layout));
+  wrapper.dataset.groupIndex = String(getLayoutGroupIndex(layout));
   const groupId = getLayoutGroupId(layout);
   if (groupId) {
     wrapper.dataset.groupId = groupId;
@@ -613,34 +664,59 @@ function getLayoutWrappers(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>('.preview-layout-block'));
 }
 
-function nextLayoutWrapper(wrapper: HTMLElement): HTMLElement | null {
-  let current = wrapper.nextElementSibling;
-  while (current) {
-    if (current instanceof HTMLElement && current.classList.contains('preview-layout-block')) return current;
-    current = current.nextElementSibling;
+function contiguousLayoutWrappers(root: HTMLElement, wrapper: HTMLElement, columns: number): HTMLElement[] {
+  const wrappers = getLayoutWrappers(root);
+  const index = wrappers.indexOf(wrapper);
+  if (index < 0) return [];
+
+  const forward = wrappers.slice(index, index + columns);
+  if (forward.length === columns && wrappersAreContiguous(forward)) return forward;
+
+  for (let start = Math.max(0, index - columns + 1); start <= index; start += 1) {
+    const slice = wrappers.slice(start, start + columns);
+    if (slice.length === columns && slice.includes(wrapper) && wrappersAreContiguous(slice)) {
+      return slice;
+    }
   }
-  return null;
+
+  return [];
 }
 
-function previousLayoutWrapper(wrapper: HTMLElement): HTMLElement | null {
-  let current = wrapper.previousElementSibling;
-  while (current) {
-    if (current instanceof HTMLElement && current.classList.contains('preview-layout-block')) return current;
-    current = current.previousElementSibling;
+function wrappersAreContiguous(wrappers: HTMLElement[]): boolean {
+  for (let index = 1; index < wrappers.length; index += 1) {
+    if (!sourceLinesAreContiguous(wrappers[index - 1], wrappers[index])) return false;
   }
-  return null;
+  return true;
 }
 
-function withTwoColumnGroup(layout: BlockLayout, groupId: string): BlockLayout {
+function sourceLinesAreContiguous(previous: HTMLElement, next: HTMLElement): boolean {
+  const previousEndLine = sourceEndLine(previous);
+  const nextStartLine = sourceStartLine(next);
+  return previousEndLine !== null && nextStartLine !== null && nextStartLine <= previousEndLine + 1;
+}
+
+function withColumnGroup(layout: BlockLayout, groupId: string, columns: number, index: number): BlockLayout {
+  const width = columns === 2 ? 50 : 33.3333;
   return {
     ...layout,
-    widthValue: 50,
+    widthValue: width,
     widthUnit: '%',
     align: 'left',
     layoutJson: {
       ...(layout.layoutJson ?? {}),
       groupId,
-      groupColumns: 2,
+      groupColumns: columns,
+      groupIndex: index,
+    },
+  };
+}
+
+function withGroupIndex(layout: BlockLayout, index: number): BlockLayout {
+  return {
+    ...layout,
+    layoutJson: {
+      ...(layout.layoutJson ?? {}),
+      groupIndex: index,
     },
   };
 }
@@ -649,6 +725,7 @@ function clearLayoutGroup(layout: BlockLayout): BlockLayout {
   const rest = { ...(layout.layoutJson ?? {}) };
   delete rest.groupId;
   delete rest.groupColumns;
+  delete rest.groupIndex;
   return {
     ...layout,
     layoutJson: Object.keys(rest).length > 0 ? rest : null,
@@ -667,6 +744,72 @@ function getLayoutGroupId(layout: BlockLayout): string | null {
 function getLayoutGroupColumns(layout: BlockLayout): number {
   const value = layout.layoutJson?.groupColumns;
   return typeof value === 'number' && value > 1 ? value : 1;
+}
+
+function getLayoutGroupIndex(layout: BlockLayout): number {
+  const value = layout.layoutJson?.groupIndex;
+  return typeof value === 'number' && value >= 0 ? value : 0;
+}
+
+function unwrapLayoutGroups(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.preview-layout-group').forEach((group) => {
+    const parent = group.parentElement;
+    if (!parent) return;
+    Array.from(group.children).forEach((child) => {
+      parent.insertBefore(child, group);
+    });
+    group.remove();
+  });
+}
+
+function arrangeLayoutGroups(root: HTMLElement): void {
+  const wrappers = getLayoutWrappers(root);
+  let index = 0;
+
+  while (index < wrappers.length) {
+    const wrapper = wrappers[index];
+    const groupId = wrapper.dataset.groupId;
+    const columns = Number.parseInt(wrapper.dataset.groupColumns ?? '1', 10);
+    if (!groupId || columns <= 1) {
+      index += 1;
+      continue;
+    }
+
+    const groupWrappers = wrappers
+      .filter((item) => item.dataset.groupId === groupId)
+      .sort((a, b) => Number.parseInt(a.dataset.groupIndex ?? '0', 10) - Number.parseInt(b.dataset.groupIndex ?? '0', 10));
+    if (groupWrappers.length <= 1) {
+      index += 1;
+      continue;
+    }
+
+    const group = document.createElement('div');
+    group.className = 'preview-layout-group';
+    group.dataset.columns = String(columns);
+    group.style.setProperty('--preview-layout-columns', String(columns));
+    wrapper.before(group);
+    groupWrappers.forEach((item) => group.append(item));
+    index += groupWrappers.length;
+  }
+}
+
+function copySourceLineDataset(from: HTMLElement, to: HTMLElement): void {
+  const startLine = from.getAttribute('data-source-line');
+  const endLine = from.getAttribute('data-source-end-line') ?? startLine;
+  if (startLine) to.dataset.sourceLine = startLine;
+  if (endLine) to.dataset.sourceEndLine = endLine;
+}
+
+function sourceStartLine(element: HTMLElement): number | null {
+  const value = element.dataset.sourceLine ?? element.getAttribute('data-source-line');
+  const line = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(line) ? line : null;
+}
+
+function sourceEndLine(element: HTMLElement): number | null {
+  const value = element.dataset.sourceEndLine ?? element.getAttribute('data-source-end-line') ?? element.dataset.sourceLine;
+  const line = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(line) ? line : null;
 }
 
 function layoutIdentity(layout: Pick<BlockLayout, 'blockKind' | 'blockKey' | 'occurrenceIndex'>): string {
