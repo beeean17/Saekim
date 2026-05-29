@@ -395,7 +395,6 @@ function enhancePreviewLayoutBlocks(
       defaultBlockLayout(filePath, blockKind, blockKey, occurrenceIndex);
     ensureLayoutSurface(wrapper);
     applyBlockLayout(wrapper, layout);
-    renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
   });
 
   const targets = collectLayoutTargets(root);
@@ -407,8 +406,22 @@ function enhancePreviewLayoutBlocks(
       defaultBlockLayout(filePath, target.blockKind, target.blockKey, target.occurrenceIndex);
 
     applyBlockLayout(wrapper, layout);
+  });
+
+  const normalizedLayouts = normalizeLayoutGroups(root, filePath, layoutByKey);
+  normalizedLayouts.forEach((layout) => {
+    layoutByKey.set(layoutIdentity(layout), layout);
+  });
+
+  getLayoutWrappers(root).forEach((wrapper) => {
+    const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
+    applyBlockLayout(wrapper, layout);
     renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
   });
+
+  if (normalizedLayouts.length > 0) {
+    onChange(normalizedLayouts);
+  }
 
   arrangeLayoutGroups(root);
 }
@@ -687,6 +700,41 @@ function layoutForWrapper(
     layoutByKey.get(layoutIdentity(identity)) ??
     defaultBlockLayout(filePath, blockKind, blockKey, Number.isFinite(occurrenceIndex) ? occurrenceIndex : 0)
   );
+}
+
+function normalizeLayoutGroups(
+  root: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+): BlockLayout[] {
+  const wrappers = getLayoutWrappers(root);
+  const groups = new Map<string, HTMLElement[]>();
+
+  wrappers.forEach((wrapper) => {
+    const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
+    const groupId = getLayoutGroupId(layout);
+    if (!groupId) return;
+    const group = groups.get(groupId) ?? [];
+    group.push(wrapper);
+    groups.set(groupId, group);
+  });
+
+  const normalized: BlockLayout[] = [];
+
+  groups.forEach((groupWrappers) => {
+    const orderedWrappers = groupWrappers.sort((a, b) => getLayoutWrappers(root).indexOf(a) - getLayoutWrappers(root).indexOf(b));
+    const shouldClear = orderedWrappers.length <= 1 || !wrappersAreContiguous(orderedWrappers);
+    if (!shouldClear) return;
+
+    orderedWrappers.forEach((wrapper) => {
+      const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
+      const next = clearLayoutGroup({ ...layout, widthValue: 100, widthUnit: '%' });
+      normalized.push(next);
+      applyBlockLayout(wrapper, next);
+    });
+  });
+
+  return normalized;
 }
 
 function getLayoutWrappers(root: HTMLElement): HTMLElement[] {
