@@ -493,6 +493,7 @@ function renderLayoutControls(
   const tools = document.createElement('div');
   tools.className = 'preview-layout-tools';
   tools.setAttribute('aria-label', '블록 레이아웃');
+  bindLayoutSelection(root, wrapper);
 
   layoutWidths.forEach((width) => {
     const button = document.createElement('button');
@@ -508,22 +509,22 @@ function renderLayoutControls(
     tools.append(button);
   });
 
-  layoutAligns.forEach((align) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
-    button.title = align === 'left' ? '왼쪽 정렬' : align === 'center' ? '가운데 정렬' : '오른쪽 정렬';
-    button.className = layout.align === align ? 'active' : '';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onChange({ ...layout, align });
-    });
-    tools.append(button);
-  });
-
   if (isGroupedLayout(layout)) {
     renderGroupPositionButtons(tools, layout, onChange);
+  } else {
+    layoutAligns.forEach((align) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
+      button.title = align === 'left' ? '왼쪽 정렬' : align === 'center' ? '가운데 정렬' : '오른쪽 정렬';
+      button.className = layout.align === align ? 'active' : '';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onChange({ ...layout, align });
+      });
+      tools.append(button);
+    });
   }
 
   const twoColumnCandidates = contiguousLayoutWrappers(root, wrapper, 2);
@@ -573,13 +574,40 @@ function renderLayoutControls(
   wrapper.append(tools);
 }
 
+function bindLayoutSelection(root: HTMLElement, wrapper: HTMLElement): void {
+  if (!root.dataset.layoutSelectionBound) {
+    root.dataset.layoutSelectionBound = 'true';
+    root.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('.preview-layout-block')) return;
+      clearSelectedLayoutBlocks(root);
+    });
+  }
+
+  if (wrapper.dataset.layoutSelectionBound) return;
+  wrapper.dataset.layoutSelectionBound = 'true';
+  wrapper.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest('.preview-layout-tools')) return;
+    clearSelectedLayoutBlocks(root);
+    wrapper.dataset.selected = 'true';
+  });
+}
+
+function clearSelectedLayoutBlocks(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.preview-layout-block[data-selected="true"]').forEach((item) => {
+    delete item.dataset.selected;
+  });
+}
+
 function renderGroupPositionButtons(
   tools: HTMLElement,
   layout: BlockLayout,
   onChange: LayoutChangeHandler,
 ): void {
   const columns = getLayoutGroupColumns(layout);
-  const labels = columns === 2 ? ['LC', 'R'] : ['L', 'C', 'R'];
+  const labels = columns === 2 ? ['L/C', 'R'] : ['L', 'C', 'R'];
   const currentIndex = getLayoutGroupIndex(layout);
 
   labels.forEach((label, index) => {

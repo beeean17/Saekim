@@ -664,7 +664,7 @@
   transition: opacity 0.12s ease;
 }
 
-.preview-layout-surface:hover ~ .preview-layout-tools,
+.preview-layout-block[data-selected="true"] > .preview-layout-tools,
 .preview-layout-tools:hover,
 .preview-layout-tools:focus-within {
   opacity: 1;
