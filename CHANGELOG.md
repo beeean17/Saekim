@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 이미지 삽입 버튼에 `원본 경로로 연결`과 `문서 assets로 복사` 드롭다운 옵션을 추가했습니다.
 - 브라우저에서 원격 이미지를 편집기에 드래그 앤 드롭하면 현재 문서 옆 `.assets/` 폴더로 다운로드해 상대 경로로 삽입하는 기능을 추가했습니다.
 - 원격 이미지 다운로드 중 Markdown preview의 이미지 위치에 진행률/실패 상태를 표시하도록 추가했습니다.
+- 클립보드 이미지 붙여넣기 시 현재 문서 옆 `.assets/` 폴더에 저장하고 Markdown 이미지 문법을 자동 삽입하도록 추가했습니다.
+- `.assets` 폴더의 이미지 파일을 워크스페이스 파일 트리에 표시하도록 추가했습니다.
+- 워크스페이스 이미지 파일 클릭 시 앱 내부에서 이미지 미리보기 모달을 열 수 있도록 추가했습니다.
+- Markdown preview의 이미지, 표, 리스트, 인용문, 코드블럭, Mermaid, KaTeX 블럭에 크기/정렬 metadata를 저장하는 블럭 레이아웃 기능을 추가했습니다.
+- 연속된 preview 블럭을 2열 또는 3열로 묶어 표시하는 column group 기능을 추가했습니다.
+- 앱 metadata 저장소를 SQLite 기반 구조로 확장하고 workspace, file, block layout metadata 저장 기반을 추가했습니다.
+- Windows 데스크톱 빌드 지원을 추가했습니다.
 
 ### Changed
 
@@ -38,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSV/TSV preview는 대용량 파일에서 첫 1,000개 행만 표시하고 전체 행 수와 truncation 상태를 표시합니다.
 - JSON/YAML/TOML/CSV/TSV preview 렌더링은 기존 Markdown/HTML 문자열 렌더링 경로와 분리된 React 컴포넌트 기반 렌더링 경로를 사용하도록 변경했습니다.
 - Markdown preview에서 상대 이미지 경로를 현재 문서 위치 기준으로 해석하도록 변경했습니다.
+- 이미지 assets 복사 시 원본 파일명을 우선 사용하고, 같은 파일이 이미 `.assets`에 있으면 중복 복사하지 않고 기존 파일을 재사용하도록 변경했습니다.
+- 원격 이미지 URL 가져오기 메뉴는 기능 안정성과 필요성 대비 구현 비용을 고려해 UI에서 숨겼습니다.
+- 현재 열린 파일 경로 기준으로 워크스페이스 루트를 표시하도록 정리해 `.assets`와 문서 주변 파일을 함께 탐색할 수 있도록 변경했습니다.
+- preview 블럭 레이아웃 도구는 hover가 아니라 블럭 클릭 선택 상태에서만 표시되도록 변경했습니다.
+- preview 블럭 그룹 해제는 별도 `풀기` 버튼 대신 활성화된 `2열`/`3열` 버튼을 다시 누르는 토글 방식으로 변경했습니다.
+- 묶인 preview 블럭은 같은 시작 높이를 기준으로 정렬되도록 변경했습니다.
 
 ### Fixed
 
@@ -49,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSV/TSV 파싱 경고가 있을 때 표 preview와 함께 경고 메시지를 표시하도록 했습니다.
 - 원격 이미지 assets 가져오기에서 `http`/`https` 외 URL, 사설망/localhost URL, remote SVG, 비이미지 MIME, 20MB 초과 파일을 차단하도록 했습니다.
 - 원격 이미지 다운로드 실패 시 임시 파일이 남지 않도록 처리했습니다.
+- Markdown preview에서 문서 옆 `.assets` 상대 이미지가 렌더링되지 않던 문제를 수정했습니다.
+- preview 블럭 레이아웃 도구가 코드블럭 라벨 영역에만 반응하거나 hover로 불필요하게 노출되던 문제를 수정했습니다.
+- Mermaid 블럭을 레이아웃 wrapper로 감싼 뒤 다이어그램 렌더링이 깨지던 문제를 수정했습니다.
+- 묶이지 않은 preview 블럭에 stale group metadata가 남아 `풀기` 상태로 보이던 문제를 수정했습니다.
+- preview 블럭 그룹 버튼 텍스트가 좁은 패널에서 위아래로 줄바꿈되어 도구 영역을 벗어나던 문제를 수정했습니다.
+- Windows 환경에서 PDF export와 데스크톱 빌드가 동작하도록 플랫폼별 경로/빌드 설정 문제를 수정했습니다.
 
 ### Build
 
@@ -56,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 구조화 데이터 preview를 위해 `yaml`, `smol-toml`, `papaparse` 의존성을 추가했습니다.
 - 이미지 assets 가져오기 개발 계획 문서를 `private/3.0.1/image_assets_import_plan.md`에 추가했습니다.
 - 원격 이미지 스트리밍 다운로드를 위해 Rust `reqwest`, `futures-util` 의존성을 추가했습니다.
+- metadata 저장소 설계 문서를 `private/3.0.1/metadata_store_plan.md`에 추가했습니다.
 
 ---
 
@@ -203,7 +223,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
-| 3.0.1 | Unreleased | Flexible text-file detection, HTML preview rendering, browser/safe HTML preview modes |
+| 3.0.1 | Unreleased | Flexible text-file detection, HTML/data previews, image assets workflow, preview block layouts, Windows desktop support |
 | 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
 | 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |
 | 1.2.0 | 2025-12-23 | Resize overlay, Pretendard font, ViewToggle styles, Refresh feature |
