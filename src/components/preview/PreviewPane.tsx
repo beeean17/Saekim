@@ -97,10 +97,11 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     };
   }, [activeFile?.path, fileType.previewKind]);
 
-  const saveBlockLayout = useCallback((layout: BlockLayout) => {
-    setBlockLayouts((current) => upsertBlockLayout(current, layout));
-    void Backend.saveBlockLayout(layout).catch((error) => {
-      console.error('failed to save block layout', error);
+  const saveBlockLayout = useCallback((layoutOrLayouts: BlockLayout | BlockLayout[]) => {
+    const layouts = Array.isArray(layoutOrLayouts) ? layoutOrLayouts : [layoutOrLayouts];
+    setBlockLayouts((current) => layouts.reduce(upsertBlockLayout, current));
+    void Promise.all(layouts.map((layout) => Backend.saveBlockLayout(layout))).catch((error) => {
+      console.error('failed to save block layouts', error);
     });
   }, []);
 
@@ -366,6 +367,8 @@ type LayoutTarget = {
   occurrenceIndex: number;
 };
 
+type LayoutChangeHandler = (layout: BlockLayout | BlockLayout[]) => void;
+
 const layoutWidths = [100, 75, 50, 33];
 const layoutAligns: LayoutAlign[] = ['left', 'center', 'right'];
 
@@ -373,7 +376,7 @@ function enhancePreviewLayoutBlocks(
   root: HTMLElement,
   filePath: string,
   layouts: BlockLayout[],
-  onChange: (layout: BlockLayout) => void,
+  onChange: LayoutChangeHandler,
 ): void {
   if (filePath.startsWith('~') || filePath.startsWith('browser://')) return;
 
@@ -390,7 +393,7 @@ function enhancePreviewLayoutBlocks(
       defaultBlockLayout(filePath, blockKind, blockKey, occurrenceIndex);
     ensureLayoutSurface(wrapper);
     applyBlockLayout(wrapper, layout);
-    renderLayoutControls(wrapper, layout, onChange);
+    renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
   });
 
   const targets = collectLayoutTargets(root);
@@ -402,7 +405,7 @@ function enhancePreviewLayoutBlocks(
       defaultBlockLayout(filePath, target.blockKind, target.blockKey, target.occurrenceIndex);
 
     applyBlockLayout(wrapper, layout);
-    renderLayoutControls(wrapper, layout, onChange);
+    renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
   });
 }
 
@@ -473,7 +476,10 @@ function ensureLayoutSurface(wrapper: HTMLElement): HTMLElement {
 function renderLayoutControls(
   wrapper: HTMLElement,
   layout: BlockLayout,
-  onChange: (layout: BlockLayout) => void,
+  root: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+  onChange: LayoutChangeHandler,
 ): void {
   wrapper.querySelector('.preview-layout-tools')?.remove();
 
@@ -490,7 +496,7 @@ function renderLayoutControls(
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      onChange({ ...layout, widthValue: width, widthUnit: '%' });
+      onChange(clearLayoutGroup({ ...layout, widthValue: width, widthUnit: '%' }));
     });
     tools.append(button);
   });
@@ -509,6 +515,36 @@ function renderLayoutControls(
     tools.append(button);
   });
 
+  const groupButton = document.createElement('button');
+  groupButton.type = 'button';
+  groupButton.textContent = isGroupedLayout(layout) ? '해제' : '묶기';
+  groupButton.title = isGroupedLayout(layout) ? '2열 묶음 해제' : '다음 블록과 2열로 묶기';
+  groupButton.className = isGroupedLayout(layout) ? 'active' : '';
+  groupButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const grouped = isGroupedLayout(layout);
+    if (grouped) {
+      const groupId = getLayoutGroupId(layout);
+      const groupedLayouts = getLayoutWrappers(root)
+        .filter((item) => item.dataset.groupId === groupId)
+        .map((item) => layoutForWrapper(item, filePath, layoutByKey))
+        .map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }));
+      onChange(groupedLayouts.length > 0 ? groupedLayouts : clearLayoutGroup(layout));
+      return;
+    }
+
+    const pair = nextLayoutWrapper(wrapper) ?? previousLayoutWrapper(wrapper);
+    if (!pair) return;
+
+    const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const current = withTwoColumnGroup(layout, groupId);
+    const adjacent = withTwoColumnGroup(layoutForWrapper(pair, filePath, layoutByKey), groupId);
+    onChange([current, adjacent]);
+  });
+  tools.append(groupButton);
+
   wrapper.append(tools);
 }
 
@@ -522,6 +558,13 @@ function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
   wrapper.dataset.align = layout.align;
   wrapper.dataset.widthUnit = layout.widthUnit;
   wrapper.dataset.widthValue = layout.widthValue === null ? 'auto' : String(layout.widthValue);
+  wrapper.dataset.flow = getLayoutGroupColumns(layout) > 1 ? 'columns' : 'block';
+  const groupId = getLayoutGroupId(layout);
+  if (groupId) {
+    wrapper.dataset.groupId = groupId;
+  } else {
+    delete wrapper.dataset.groupId;
+  }
 }
 
 function defaultBlockLayout(
@@ -549,6 +592,81 @@ function upsertBlockLayout(layouts: BlockLayout[], next: BlockLayout): BlockLayo
     ...layouts.filter((layout) => layoutIdentity(layout) !== layoutIdentity(next)),
     next,
   ];
+}
+
+function layoutForWrapper(
+  wrapper: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+): BlockLayout {
+  const blockKind = blockKindFromDataset(wrapper.dataset.blockKind) ?? 'image';
+  const blockKey = wrapper.dataset.blockKey ?? 'block';
+  const occurrenceIndex = Number.parseInt(wrapper.dataset.occurrenceIndex ?? '0', 10);
+  const identity = { blockKind, blockKey, occurrenceIndex };
+  return (
+    layoutByKey.get(layoutIdentity(identity)) ??
+    defaultBlockLayout(filePath, blockKind, blockKey, Number.isFinite(occurrenceIndex) ? occurrenceIndex : 0)
+  );
+}
+
+function getLayoutWrappers(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>('.preview-layout-block'));
+}
+
+function nextLayoutWrapper(wrapper: HTMLElement): HTMLElement | null {
+  let current = wrapper.nextElementSibling;
+  while (current) {
+    if (current instanceof HTMLElement && current.classList.contains('preview-layout-block')) return current;
+    current = current.nextElementSibling;
+  }
+  return null;
+}
+
+function previousLayoutWrapper(wrapper: HTMLElement): HTMLElement | null {
+  let current = wrapper.previousElementSibling;
+  while (current) {
+    if (current instanceof HTMLElement && current.classList.contains('preview-layout-block')) return current;
+    current = current.previousElementSibling;
+  }
+  return null;
+}
+
+function withTwoColumnGroup(layout: BlockLayout, groupId: string): BlockLayout {
+  return {
+    ...layout,
+    widthValue: 50,
+    widthUnit: '%',
+    align: 'left',
+    layoutJson: {
+      ...(layout.layoutJson ?? {}),
+      groupId,
+      groupColumns: 2,
+    },
+  };
+}
+
+function clearLayoutGroup(layout: BlockLayout): BlockLayout {
+  const rest = { ...(layout.layoutJson ?? {}) };
+  delete rest.groupId;
+  delete rest.groupColumns;
+  return {
+    ...layout,
+    layoutJson: Object.keys(rest).length > 0 ? rest : null,
+  };
+}
+
+function isGroupedLayout(layout: BlockLayout): boolean {
+  return getLayoutGroupColumns(layout) > 1 && Boolean(getLayoutGroupId(layout));
+}
+
+function getLayoutGroupId(layout: BlockLayout): string | null {
+  const value = layout.layoutJson?.groupId;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function getLayoutGroupColumns(layout: BlockLayout): number {
+  const value = layout.layoutJson?.groupColumns;
+  return typeof value === 'number' && value > 1 ? value : 1;
 }
 
 function layoutIdentity(layout: Pick<BlockLayout, 'blockKind' | 'blockKey' | 'occurrenceIndex'>): string {

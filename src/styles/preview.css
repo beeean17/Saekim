@@ -601,11 +601,10 @@
   margin-left: auto;
 }
 
-.preview-image-layout[data-width-unit="%"][data-width-value="50"],
-.preview-image-layout[data-width-unit="%"][data-width-value="33"],
-.preview-image-layout[data-width-unit="%"][data-width-value="75"] {
+.preview-layout-block[data-flow="columns"] {
   display: inline-grid;
-  margin-right: 10px;
+  width: calc(var(--block-layout-width, 50%) - 6px);
+  margin-right: 12px;
   vertical-align: top;
 }
 
