@@ -115,7 +115,7 @@ export function App() {
   };
 
   return (
-    <AppShell>
+    <AppShell menuHandlers={shortcuts}>
       <main className="body" ref={bodyRef}>
         <Sidebar />
         <PaneResizer hidden={sidebarMode === 'collapsed'} label="사이드바 크기 조절" onPointerDown={startSidebarResize} />

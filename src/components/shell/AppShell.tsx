@@ -2,15 +2,16 @@ import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
-import { Header } from './Header';
+import { Header, type AppMenuHandlers } from './Header';
 import { SettingsPanel } from './SettingsPanel';
 import { StatusBar } from './StatusBar';
 
 interface AppShellProps {
   children: ReactNode;
+  menuHandlers: AppMenuHandlers;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, menuHandlers }: AppShellProps) {
   useNativeWindowChrome();
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
@@ -26,7 +27,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app" data-sidebar={sidebarMode} data-view={viewMode} style={layoutStyle}>
-      <Header />
+      <Header menuHandlers={menuHandlers} />
       <SettingsPanel />
       {children}
       <StatusBar />

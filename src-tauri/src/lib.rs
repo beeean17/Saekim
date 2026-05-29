@@ -6,26 +6,39 @@ mod text_file;
 
 use app_state::AppState;
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "windows"))]
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{DragDropEvent, Emitter, Manager, WebviewEvent, WindowEvent};
 
+#[cfg(not(target_os = "windows"))]
 const MENU_SAVE: &str = "save";
+#[cfg(not(target_os = "windows"))]
 const MENU_SAVE_AS: &str = "save-as";
+#[cfg(not(target_os = "windows"))]
 const MENU_EXPORT_PDF: &str = "export-pdf";
+#[cfg(not(target_os = "windows"))]
 const MENU_NEW_FILE: &str = "new-file";
+#[cfg(not(target_os = "windows"))]
 const MENU_OPEN_FILE: &str = "open-file";
+#[cfg(not(target_os = "windows"))]
 const MENU_OPEN_FOLDER: &str = "open-folder";
+#[cfg(not(target_os = "windows"))]
 const EVENT_SAVE: &str = "saekim-menu-save";
+#[cfg(not(target_os = "windows"))]
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
+#[cfg(not(target_os = "windows"))]
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
+#[cfg(not(target_os = "windows"))]
 const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
+#[cfg(not(target_os = "windows"))]
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
+#[cfg(not(target_os = "windows"))]
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(single_instance_plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -35,25 +48,28 @@ pub fn run() {
             macos_open_documents::install(app.handle());
             queue_open_files(app.handle(), startup_document_args());
             Ok(())
-        })
-        .menu(build_menu)
-        .on_menu_event(|app, event| {
-            let event_name = match event.id().as_ref() {
-                MENU_SAVE => Some(EVENT_SAVE),
-                MENU_SAVE_AS => Some(EVENT_SAVE_AS),
-                MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
-                MENU_NEW_FILE => Some(EVENT_NEW_FILE),
-                MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
-                MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
-                _ => None,
-            };
+        });
 
-            if let Some(event_name) = event_name {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.emit(event_name, ());
-                }
+    #[cfg(not(target_os = "windows"))]
+    let builder = builder.menu(build_menu).on_menu_event(|app, event| {
+        let event_name = match event.id().as_ref() {
+            MENU_SAVE => Some(EVENT_SAVE),
+            MENU_SAVE_AS => Some(EVENT_SAVE_AS),
+            MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
+            MENU_NEW_FILE => Some(EVENT_NEW_FILE),
+            MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
+            MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
+            _ => None,
+        };
+
+        if let Some(event_name) = event_name {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.emit(event_name, ());
             }
-        })
+        }
+    });
+
+    let app = builder
         .invoke_handler(tauri::generate_handler![
             commands::file::open_file_dialog,
             commands::file::open_folder_dialog,
@@ -82,6 +98,7 @@ pub fn run() {
         .expect("failed to build Saekim");
 
     app.run(|app, event| match event {
+        #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
         tauri::RunEvent::Opened { urls } => {
             queue_open_files(app, document_paths_from_urls(urls));
         }
@@ -156,7 +173,6 @@ fn hex_value(byte: u8) -> Option<u8> {
 
 fn startup_document_args() -> Vec<String> {
     std::env::args_os()
-        .skip(1)
         .filter_map(|arg| arg.into_string().ok())
         .filter_map(|arg| document_path_from_arg(&arg, None))
         .collect()
@@ -164,32 +180,74 @@ fn startup_document_args() -> Vec<String> {
 
 fn document_args_from_strings(args: Vec<String>, cwd: Option<&str>) -> Vec<String> {
     args.into_iter()
-        .skip(1)
         .filter_map(|arg| document_path_from_arg(&arg, cwd))
         .collect()
 }
 
 fn document_path_from_arg(arg: &str, cwd: Option<&str>) -> Option<String> {
+    let arg = arg.trim().trim_matches('"');
+
     if arg.is_empty() || arg.starts_with('-') {
         return None;
     }
 
-    let path = if let Ok(url) = url::Url::parse(arg) {
+    let plain_path = PathBuf::from(arg);
+    let path = if plain_path.is_absolute() {
+        plain_path
+    } else if let Ok(url) = url::Url::parse(arg) {
         url.to_file_path().ok().or_else(|| {
             (url.scheme() == "file").then(|| PathBuf::from(percent_decode(url.path())))
         })?
     } else {
-        let path = PathBuf::from(arg);
-        if path.is_absolute() {
-            path
-        } else {
-            cwd.map(|cwd| Path::new(cwd).join(path))?
-        }
+        cwd.map(|cwd| Path::new(cwd).join(plain_path))?
     };
 
     is_supported_document_path(&path).then(|| path.to_string_lossy().to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{env, fs, time::{SystemTime, UNIX_EPOCH}};
+
+    #[test]
+    fn document_args_accepts_single_file_arg_without_program_name() {
+        let path = temp_text_path("single-file.md");
+        fs::write(&path, "# opened from association").unwrap();
+
+        let paths = document_args_from_strings(vec![path.to_string_lossy().to_string()], None);
+
+        assert_eq!(paths, vec![path.to_string_lossy().to_string()]);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn document_args_ignores_program_path_but_keeps_file_arg() {
+        let exe = temp_text_path("saekim.exe");
+        let document = temp_text_path("with-program.txt");
+        fs::write(&exe, "not really an exe").unwrap();
+        fs::write(&document, "opened from default app").unwrap();
+
+        let paths = document_args_from_strings(
+            vec![exe.to_string_lossy().to_string(), document.to_string_lossy().to_string()],
+            None,
+        );
+
+        assert_eq!(paths, vec![document.to_string_lossy().to_string()]);
+        let _ = fs::remove_file(exe);
+        let _ = fs::remove_file(document);
+    }
+
+    fn temp_text_path(name: &str) -> PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!("saekim-open-arg-{timestamp}-{name}"))
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
 fn document_paths_from_urls(urls: Vec<url::Url>) -> Vec<String> {
     urls.into_iter()
         .filter_map(|url| {
@@ -240,6 +298,7 @@ pub(crate) fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let package_info = app.package_info();
     let config = app.config();
