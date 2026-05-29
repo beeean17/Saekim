@@ -68,11 +68,11 @@ export function App() {
 
   useShortcuts(shortcuts);
   useNativeMenuCommands(shortcuts);
-  useExternalFileOpen(openFile);
+  const sessionLoaded = useSessionPersistence();
+  useExternalFileOpen(openFile, sessionLoaded);
   useScrollSync(editorRef, previewRef, syncScroll && viewMode === 'split');
   useResponsiveSplitWidth(bodyRef, viewMode, sidebarMode, sidebarWidth, editorWidth);
   useWindowSizeConstraints(viewMode, sidebarMode, sidebarWidth);
-  useSessionPersistence();
 
   const startSidebarResize = (event: React.PointerEvent<HTMLDivElement>) => {
     const body = bodyRef.current;
@@ -115,7 +115,7 @@ export function App() {
   };
 
   return (
-    <AppShell>
+    <AppShell menuHandlers={shortcuts}>
       <main className="body" ref={bodyRef}>
         <Sidebar />
         <PaneResizer hidden={sidebarMode === 'collapsed'} label="사이드바 크기 조절" onPointerDown={startSidebarResize} />

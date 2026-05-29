@@ -7,6 +7,9 @@ const A4_WIDTH_PX = 794;
 const A4_WIDTH_PT = 595.28;
 const A4_HEIGHT_PT = 841.89;
 const A4_HEIGHT_PX = (A4_WIDTH_PX * A4_HEIGHT_PT) / A4_WIDTH_PT;
+const CANVAS_WHITE_THRESHOLD = 248;
+const CANVAS_BOTTOM_TRIM_STEP_PX = 2;
+const MIN_PDF_PAGE_SLICE_PX = 8;
 const PAGE_BREAK_AVOID_SELECTOR = [
   'h1',
   'h2',
@@ -21,6 +24,8 @@ const PAGE_BREAK_AVOID_SELECTOR = [
   'pre',
   'blockquote',
   '.shiki',
+  '.preview-layout-block',
+  '.preview-layout-group',
   '.mermaid-block',
   '.math-block',
   '.katex-display',
@@ -40,7 +45,7 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
   const targetPath = await pickExportTarget(suggestedName);
   if (isTauriRuntime() && !targetPath) return false;
 
-  const exportRoot = createPdfTemplate(preview, title);
+  const exportRoot = createPdfTemplate(preview);
   document.body.appendChild(exportRoot);
 
   try {
@@ -57,20 +62,57 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
   }
 }
 
-function createPdfTemplate(preview: HTMLElement, title: string): HTMLElement {
+function createPdfTemplate(preview: HTMLElement): HTMLElement {
   document.querySelectorAll(`.${EXPORT_ROOT_CLASS}`).forEach((node) => node.remove());
 
   const exportRoot = document.createElement('article');
   exportRoot.className = `${EXPORT_ROOT_CLASS} preview-content`;
   exportRoot.setAttribute('aria-hidden', 'true');
-  exportRoot.innerHTML = `
-    <header class="pdf-cover">
-      <h1>${escapeHtml(title)}</h1>
-    </header>
-    <main class="pdf-content">${preview.innerHTML}</main>
-  `;
+
+  const content = document.createElement('main');
+  content.className = 'pdf-content';
+  const previewClone = clonePreviewForPdf(preview);
+  while (previewClone.firstChild) {
+    content.append(previewClone.firstChild);
+  }
+
+  exportRoot.append(content);
 
   return exportRoot;
+}
+
+function clonePreviewForPdf(preview: HTMLElement): HTMLElement {
+  const clone = preview.cloneNode(true) as HTMLElement;
+  inlineBrowserFramePreviews(preview, clone);
+  sanitizePdfPreviewClone(clone);
+  return clone;
+}
+
+function inlineBrowserFramePreviews(source: HTMLElement, clone: HTMLElement): void {
+  const sourceFrames = Array.from(source.querySelectorAll<HTMLIFrameElement>('iframe.html-preview-frame'));
+  const cloneFrames = Array.from(clone.querySelectorAll<HTMLIFrameElement>('iframe.html-preview-frame'));
+
+  cloneFrames.forEach((frame, index) => {
+    const replacement = document.createElement('div');
+    replacement.className = 'html-preview';
+
+    const sourceDocument = sourceFrames[index]?.contentDocument;
+    if (sourceDocument?.body) {
+      replacement.innerHTML = sourceDocument.body.innerHTML;
+    }
+
+    frame.replaceWith(replacement);
+  });
+}
+
+function sanitizePdfPreviewClone(root: HTMLElement): void {
+  root.querySelectorAll('.preview-layout-tools, .preview-mode-tabs').forEach((node) => node.remove());
+  root.querySelectorAll<HTMLElement>('.preview-layout-block[data-selected="true"]').forEach((node) => {
+    delete node.dataset.selected;
+  });
+  root.querySelectorAll<HTMLElement>('[data-layout-selection-bound]').forEach((node) => {
+    delete node.dataset.layoutSelectionBound;
+  });
 }
 
 function prepareKatexForCanvas(root: HTMLElement): void {
@@ -171,9 +213,17 @@ async function renderMermaidForPdf(root: HTMLElement): Promise<void> {
       const source = decodeURIComponent(block.dataset.source || '');
       if (!source) return;
 
-      const id = `pdf-mermaid-${Date.now()}-${index}`;
-      const { svg } = await mermaid.render(id, source);
-      block.innerHTML = svg;
+      if (block.querySelector('svg')) return;
+
+      try {
+        const id = `pdf-mermaid-${Date.now()}-${index}`;
+        const { svg } = await mermaid.render(id, source);
+        block.innerHTML = svg;
+      } catch (error) {
+        console.error('failed to render mermaid block for PDF', error);
+        block.textContent = source;
+        block.dataset.rendered = 'false';
+      }
     }),
   );
 }
@@ -188,6 +238,7 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
   });
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
   const pageHeightPx = Math.floor((canvas.width * A4_HEIGHT_PT) / A4_WIDTH_PT);
+  const effectiveHeight = trimCanvasBottomWhitespace(canvas);
   const pageCanvas = document.createElement('canvas');
   const pageContext = pageCanvas.getContext('2d');
 
@@ -197,8 +248,11 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
 
   pageCanvas.width = canvas.width;
 
-  for (let offsetY = 0, pageIndex = 0; offsetY < canvas.height; offsetY += pageHeightPx, pageIndex += 1) {
-    const sliceHeight = Math.min(pageHeightPx, canvas.height - offsetY);
+  for (let offsetY = 0, pageIndex = 0; offsetY < effectiveHeight; offsetY += pageHeightPx, pageIndex += 1) {
+    const remainingHeight = effectiveHeight - offsetY;
+    if (pageIndex > 0 && remainingHeight < MIN_PDF_PAGE_SLICE_PX) break;
+
+    const sliceHeight = Math.min(pageHeightPx, remainingHeight);
     pageCanvas.height = sliceHeight;
     pageContext.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
     pageContext.drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, pageCanvas.width, sliceHeight);
@@ -212,6 +266,40 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
   }
 
   return new Uint8Array(pdf.output('arraybuffer'));
+}
+
+function trimCanvasBottomWhitespace(canvas: HTMLCanvasElement): number {
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return canvas.height;
+
+  for (let y = canvas.height - 1; y >= 0; y -= CANVAS_BOTTOM_TRIM_STEP_PX) {
+    const row = context.getImageData(0, y, canvas.width, 1).data;
+    if (!isWhitePixelRow(row)) {
+      return Math.min(canvas.height, y + CANVAS_BOTTOM_TRIM_STEP_PX + 1);
+    }
+  }
+
+  return Math.min(canvas.height, pageHeightFallback(canvas.width));
+}
+
+function isWhitePixelRow(row: Uint8ClampedArray): boolean {
+  for (let index = 0; index < row.length; index += 4) {
+    const alpha = row[index + 3];
+    if (alpha === 0) continue;
+    if (
+      row[index] < CANVAS_WHITE_THRESHOLD ||
+      row[index + 1] < CANVAS_WHITE_THRESHOLD ||
+      row[index + 2] < CANVAS_WHITE_THRESHOLD
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function pageHeightFallback(canvasWidth: number): number {
+  return Math.floor((canvasWidth * A4_HEIGHT_PT) / A4_WIDTH_PT);
 }
 
 async function pickExportTarget(suggestedName: string): Promise<string | null> {
@@ -300,11 +388,3 @@ function toPdfFileName(value: string): string {
   return `${baseName}.pdf`;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}

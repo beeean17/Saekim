@@ -1,13 +1,18 @@
-import { useMemo, useState } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { useEffect, useMemo, useState } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
+import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import type { FileTreeNode, OpenFile } from '../../types/workspace';
+import type { FileTreeNode, OpenFile, RecentFile, SidebarViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 
 export function Sidebar() {
+  const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
+  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openFile = useWorkspaceStore((state) => state.openFile);
@@ -16,66 +21,145 @@ export function Sidebar() {
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const closeFile = useWorkspaceStore((state) => state.closeFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
-  const [fileSearchOpen, setFileSearchOpen] = useState(false);
-  const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const visibleTree = useMemo(() => filterTree(tree, fileSearchQuery), [fileSearchQuery, tree]);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+  const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
+  const setSidebarViewMode = useUIStore((state) => state.setSidebarViewMode);
+  const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
+  const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
+  const [recentSearchOpen, setRecentSearchOpen] = useState(false);
+  const [recentSearchQuery, setRecentSearchQuery] = useState('');
+  const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
+  const searchOpen = sidebarViewMode === 'files' ? workspaceSearchOpen : recentSearchOpen;
+  const searchQuery = sidebarViewMode === 'files' ? workspaceSearchQuery : recentSearchQuery;
+  const setSearchQuery = sidebarViewMode === 'files' ? setWorkspaceSearchQuery : setRecentSearchQuery;
+  const closeSearch =
+    sidebarViewMode === 'files'
+      ? () => {
+          setWorkspaceSearchQuery('');
+          setWorkspaceSearchOpen(false);
+        }
+      : () => {
+          setRecentSearchQuery('');
+          setRecentSearchOpen(false);
+        };
+  const visibleTree = useMemo(() => filterTree(tree, workspaceSearchQuery), [workspaceSearchQuery, tree]);
+  const visibleRecentFiles = useMemo(
+    () => filterRecentFiles(getRecentEntries(recentFiles, openFiles), recentSearchQuery),
+    [recentSearchQuery, openFiles, recentFiles],
+  );
 
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
-        <div className="sidebar-title">탐색기</div>
+        <button className="brand-mark sidebar-toggle" title="탐색기 접기/펼치기" type="button" onClick={toggleSidebar}>
+          <Icon name="sidebar" />
+        </button>
         <SidebarActions
+          mode={sidebarViewMode}
           onCreateFile={() => void createFile()}
           onOpenFolder={() => void openFolder()}
-          onSearch={() => setFileSearchOpen((open) => !open)}
+          onSearch={() => {
+            if (sidebarViewMode === 'files') {
+              setWorkspaceSearchOpen((open) => !open);
+              return;
+            }
+            setRecentSearchOpen((open) => !open);
+          }}
           onRefresh={() => void refresh()}
         />
         <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onClose={closeFile} onSelect={setActiveFile} />
       </div>
-      {fileSearchOpen ? (
+      <SidebarViewSwitch mode={sidebarViewMode} onChange={setSidebarViewMode} />
+      {sidebarViewMode === 'files' ? <FolderPath path={rootPath} /> : null}
+      {searchOpen ? (
         <div className="sidebar-search">
           <Icon name="search" />
           <input
             autoFocus
-            value={fileSearchQuery}
-            placeholder="파일 검색"
-            onChange={(event) => setFileSearchQuery(event.currentTarget.value)}
+            value={searchQuery}
+            placeholder={sidebarViewMode === 'files' ? '워크스페이스에서 찾기' : '최근 파일에서 찾기'}
+            onChange={(event) => setSearchQuery(event.currentTarget.value)}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
-                setFileSearchQuery('');
-                setFileSearchOpen(false);
+                closeSearch();
               }
             }}
           />
         </div>
       ) : null}
-      <div className="file-tree">
-        {visibleTree.map((node) => (
-          <FileTreeNodeView
-            activePath={activeFile?.path ?? null}
-            key={node.id}
-            node={node}
-            openFiles={openFiles}
-            onToggle={toggleFolder}
-            onOpen={(path) => void openFile(path)}
-          />
-        ))}
-      </div>
+      {sidebarViewMode === 'files' ? (
+        <div className="file-tree">
+          {visibleTree.map((node) => (
+            <FileTreeNodeView
+              activePath={activeFile?.path ?? null}
+              key={node.id}
+              node={node}
+              openFiles={openFiles}
+              onToggle={toggleFolder}
+              onOpen={(path) => void openFile(path)}
+              onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
+            />
+          ))}
+        </div>
+      ) : (
+        <RecentFilesView
+          activePath={activeFile?.path ?? null}
+          files={visibleRecentFiles}
+          openFiles={openFiles}
+          onOpen={(path) => void openFile(path)}
+        />
+      )}
+      {imagePreview ? <ImagePreviewModal image={imagePreview} onClose={() => setImagePreview(null)} /> : null}
     </aside>
   );
 }
 
+function SidebarViewSwitch({ mode, onChange }: { mode: SidebarViewMode; onChange: (mode: SidebarViewMode) => void }) {
+  return (
+    <div className="sidebar-view-switch" role="tablist" aria-label="사이드바 보기">
+      <button className={mode === 'files' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'files'} onClick={() => onChange('files')}>
+        워크스페이스
+      </button>
+      <button className={mode === 'recent' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'recent'} onClick={() => onChange('recent')}>
+        최근
+      </button>
+    </div>
+  );
+}
+
+function FolderPath({ path }: { path: string | null }) {
+  const label = path || '열린 폴더 없음';
+
+  return (
+    <div className="sidebar-folder-path" title={label}>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function SidebarActions({
+  mode,
   onCreateFile,
   onOpenFolder,
   onSearch,
   onRefresh,
 }: {
+  mode: SidebarViewMode;
   onCreateFile: () => void;
   onOpenFolder: () => void;
   onSearch: () => void;
   onRefresh: () => void;
 }) {
+  if (mode === 'recent') {
+    return (
+      <div className="sidebar-actions">
+        <IconButton label="최근 파일 검색" onClick={onSearch}>
+          <Icon name="search" />
+        </IconButton>
+      </div>
+    );
+  }
+
   return (
     <div className="sidebar-actions">
       <IconButton label="새 파일" onClick={onCreateFile}>
@@ -111,6 +195,69 @@ function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
       },
     ];
   });
+}
+
+function getRecentEntries(recentFiles: RecentFile[], openFiles: OpenFile[]): RecentFile[] {
+  const entries = [...recentFiles];
+  const knownPaths = new Set(entries.map((file) => file.path));
+
+  for (const file of openFiles) {
+    if (!knownPaths.has(file.path)) {
+      entries.unshift({ path: file.path, name: file.name, openedAt: Date.now() });
+    }
+  }
+
+  return entries;
+}
+
+function filterRecentFiles(files: RecentFile[], query: string): RecentFile[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return files;
+
+  return files.filter((file) => `${file.name} ${file.path}`.toLowerCase().includes(needle));
+}
+
+function RecentFilesView({
+  files,
+  openFiles,
+  activePath,
+  onOpen,
+}: {
+  files: RecentFile[];
+  openFiles: OpenFile[];
+  activePath: string | null;
+  onOpen: (path: string) => void;
+}) {
+  return (
+    <div className="recent-file-list">
+      {files.length === 0 ? (
+        <p className="sidebar-empty">최근 파일 없음</p>
+      ) : (
+        files.map((file) => {
+          const openFile = openFiles.find((candidate) => candidate.path === file.path);
+          const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
+          const active = file.path === activePath;
+
+          return (
+            <button className={`recent-file ${active ? 'current' : ''}`} key={file.path} type="button" title={file.path} onClick={() => onOpen(file.path)}>
+              <Icon name="file" />
+              <span className="recent-file-text">
+                <span className="name">{file.name}</span>
+                <span className="path">{parentPath(file.path)}</span>
+              </span>
+              {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(file.openedAt)}</span>}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function parentPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  const index = normalized.lastIndexOf('/');
+  return index > 0 ? normalized.slice(0, index) : normalized;
 }
 
 function RailTabs({
@@ -182,12 +329,14 @@ function FileTreeNodeView({
   openFiles,
   onToggle,
   onOpen,
+  onPreviewImage,
 }: {
   node: FileTreeNode;
   activePath: string | null;
   openFiles: OpenFile[];
   onToggle: (path: string) => Promise<void>;
   onOpen: (path: string) => void;
+  onPreviewImage: (node: FileTreeNode) => void;
 }) {
   if (node.type === 'folder') {
     return (
@@ -210,6 +359,7 @@ function FileTreeNodeView({
                 openFiles={openFiles}
                 onToggle={onToggle}
                 onOpen={onOpen}
+                onPreviewImage={onPreviewImage}
               />
             ))}
           </div>
@@ -221,11 +371,73 @@ function FileTreeNodeView({
   const active = node.path === activePath;
   const openFile = openFiles.find((file) => file.path === node.path);
   const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
+  const imageAsset = isWorkspaceImageAsset(node.path);
   return (
-    <button className={`file ${active ? 'current' : ''}`} type="button" onClick={() => onOpen(node.path)}>
-      <Icon name="file" />
+    <button
+      className={`file ${active ? 'current' : ''} ${imageAsset ? 'asset-file' : ''}`}
+      title={imageAsset ? node.path : undefined}
+      type="button"
+      onClick={() => {
+        if (imageAsset) {
+          onPreviewImage(node);
+          return;
+        }
+        onOpen(node.path);
+      }}
+    >
+      <Icon name={imageAsset ? 'image' : 'file'} />
       <span className="name">{node.name}</span>
       {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(node.modifiedAt)}</span>}
     </button>
   );
+}
+
+function ImagePreviewModal({
+  image,
+  onClose,
+}: {
+  image: { path: string; name: string };
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="image-preview-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="image-preview-modal" role="dialog" aria-modal="true" aria-label={`${image.name} 미리보기`} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="image-preview-head">
+          <div>
+            <strong>{image.name}</strong>
+            <span>{image.path}</span>
+          </div>
+          <button type="button" title="닫기" onClick={onClose}>
+            x
+          </button>
+        </div>
+        <div className="image-preview-body">
+          <img alt={image.name} src={localImagePreviewSrc(image.path)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function isWorkspaceImageAsset(path: string): boolean {
+  const normalized = path.replace(/\\/g, '/').toLowerCase();
+  return (
+    normalized.includes('/.assets/') &&
+    /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/.test(normalized)
+  );
+}
+
+function localImagePreviewSrc(path: string): string {
+  if (isTauriRuntime()) return convertFileSrc(path);
+  const normalized = path.replace(/\\/g, '/');
+  return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : encodeURI(normalized);
 }

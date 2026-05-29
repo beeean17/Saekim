@@ -30,34 +30,21 @@
   pointer-events: none;
 }
 
-.pdf-export-root :where(.pdf-cover, .pdf-content, h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, th, td, hr, img, .shiki, .math-block, .mermaid-block, .pdf-page-spacer) {
+.pdf-export-root :where(.pdf-content, h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, th, td, hr, img, .shiki, .math-block, .mermaid-block, .pdf-page-spacer) {
   box-sizing: border-box;
 }
 
-.pdf-export-root .pdf-cover {
-  margin-bottom: 28px;
-  padding-bottom: 18px;
-  border-bottom: 2px solid #5f6bff;
-}
-
-.pdf-export-root .pdf-cover h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 30px;
-  line-height: 1.24;
-}
-
-.pdf-export-root .pdf-content > h1:first-child {
-  display: none;
-}
-
 .pdf-export-root h1 {
-  margin: 26px 0 12px;
+  margin: 0 0 12px;
   padding-bottom: 8px;
   color: #111827;
   border-bottom: 1px solid #d8dde8;
   font-size: 26px;
   line-height: 1.3;
+}
+
+.pdf-export-root h1:not(:first-child) {
+  margin-top: 26px;
 }
 
 .pdf-export-root h2 {
@@ -89,6 +76,13 @@
   color: #4f5dff;
   font-style: normal;
   font-weight: 600;
+}
+
+.pdf-export-root mark {
+  padding: 0 3px;
+  color: #111827;
+  background: #eef0ff !important;
+  border-radius: 3px;
 }
 
 .pdf-export-root ul,
@@ -207,6 +201,10 @@
   font-weight: 700;
 }
 
+.pdf-export-root tbody tr:nth-child(even) {
+  background: #f8fafc !important;
+}
+
 .pdf-export-root hr {
   height: 1px;
   margin: 24px 0;
@@ -231,6 +229,52 @@
 
 .pdf-export-root .math-block .katex-display {
   margin: 0;
+}
+
+.pdf-export-root .preview-layout-tools,
+.pdf-export-root .preview-mode-tabs {
+  display: none !important;
+}
+
+.pdf-export-root .preview-layout-group {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(var(--preview-layout-columns, 2), minmax(0, 1fr));
+  margin: 16px 0;
+}
+
+.pdf-export-root .preview-layout-block {
+  display: block;
+  grid-column: var(--preview-layout-column, auto);
+  width: var(--block-layout-width, 100%);
+  max-width: 100%;
+  margin: 16px 0;
+}
+
+.pdf-export-root .preview-layout-block[data-align="center"] {
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.pdf-export-root .preview-layout-block[data-align="right"] {
+  margin-left: auto;
+}
+
+.pdf-export-root .preview-layout-group .preview-layout-block {
+  width: 100%;
+  margin: 0;
+}
+
+.pdf-export-root .preview-layout-surface {
+  display: block;
+  width: 100%;
+}
+
+.pdf-export-root .preview-error-panel,
+.pdf-export-root .failed-image-block {
+  color: #991b1b;
+  background: #fff1f2 !important;
+  border: 1px solid #fecdd3 !important;
 }
 
 .pdf-export-root .mermaid-block {

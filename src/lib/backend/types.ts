@@ -1,8 +1,13 @@
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
+import type { BlockLayout } from '../../types/metadata';
 
 export interface BackendAdapter {
-  openFileDialog(): Promise<OpenFilePayload | null>;
+  openFileDialog(): Promise<boolean>;
   openFolderDialog(): Promise<string | null>;
+  pickImagePath(): Promise<string | null>;
+  copyImageToAssets(sourcePath: string, currentFilePath: string): Promise<string>;
+  importImageBytesToAssets(bytes: number[], fileName: string | null, mimeType: string | null, currentFilePath: string): Promise<string>;
+  downloadImageToAssets(id: string, imageUrl: string, currentFilePath: string): Promise<string>;
   importPdf(path: string): Promise<OpenFilePayload>;
   readFile(path: string): Promise<OpenFilePayload>;
   readFolder(path: string): Promise<FolderPayload>;
@@ -11,4 +16,6 @@ export interface BackendAdapter {
   saveFileAs(content: string, suggestedName: string): Promise<string | null>;
   loadSession<T>(): Promise<T | null>;
   saveSession<T>(session: T): Promise<void>;
+  loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;
+  saveBlockLayout(layout: BlockLayout): Promise<void>;
 }

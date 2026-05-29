@@ -39,6 +39,7 @@ function readLegacyMetadata(): LegacyMetadata {
             theme: settings.theme,
             fontSize: settings.fontSize,
             editorFontFamily: settings.editorFontFamily,
+            htmlPreviewMode: settings.htmlPreviewMode,
           }
         : null,
     ui:
@@ -63,17 +64,19 @@ function clearLegacyLocalStorage(): void {
   }
 }
 
-export function useSessionPersistence(): void {
+export function useSessionPersistence(): boolean {
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<number | null>(null);
 
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
+  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
 
   const sidebarMode = useUIStore((state) => state.sidebarMode);
+  const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
   const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
@@ -85,6 +88,7 @@ export function useSessionPersistence(): void {
   const theme = useSettingsStore((state) => state.theme);
   const fontSize = useSettingsStore((state) => state.fontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
+  const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const restoreSettings = useSettingsStore((state) => state.restoreSettings);
 
   useEffect(() => {
@@ -127,10 +131,12 @@ export function useSessionPersistence(): void {
           rootPath,
           tree,
           openFiles,
+          recentFiles,
           activeFileId,
         },
         ui: {
           sidebarMode,
+          sidebarViewMode,
           toolbarExpanded,
           viewMode,
           sidebarWidth,
@@ -142,6 +148,7 @@ export function useSessionPersistence(): void {
           theme,
           fontSize,
           editorFontFamily,
+          htmlPreviewMode,
         },
       };
 
@@ -158,10 +165,13 @@ export function useSessionPersistence(): void {
     editorFontFamily,
     editorWidth,
     fontSize,
+    htmlPreviewMode,
     loaded,
     openFiles,
+    recentFiles,
     rootPath,
     sidebarMode,
+    sidebarViewMode,
     sidebarWidth,
     splitRatio,
     syncScroll,
@@ -170,4 +180,6 @@ export function useSessionPersistence(): void {
     tree,
     viewMode,
   ]);
+
+  return loaded;
 }

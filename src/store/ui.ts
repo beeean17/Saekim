@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { UISession } from '../types/session';
-import type { SidebarMode, ViewMode } from '../types/workspace';
+import type { SidebarMode, SidebarViewMode, ViewMode } from '../types/workspace';
 
 const DEFAULT_SIDEBAR_WIDTH = 248;
 const DEFAULT_EDITOR_WIDTH = 560;
@@ -27,6 +27,7 @@ function restoreEditorWidth(ui: UISession): number {
 
 interface UIState {
   sidebarMode: SidebarMode;
+  sidebarViewMode: SidebarViewMode;
   toolbarExpanded: boolean;
   viewMode: ViewMode;
   sidebarWidth: number;
@@ -37,6 +38,7 @@ interface UIState {
   findOpen: boolean;
   settingsOpen: boolean;
   toggleSidebar: () => void;
+  setSidebarViewMode: (mode: SidebarViewMode) => void;
   toggleToolbarExpanded: () => void;
   setViewMode: (mode: ViewMode) => void;
   setSidebarWidth: (width: number) => void;
@@ -53,6 +55,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>()((set) => ({
   sidebarMode: 'expanded',
+  sidebarViewMode: 'files',
   toolbarExpanded: true,
   viewMode: 'split',
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
@@ -66,6 +69,7 @@ export const useUIStore = create<UIState>()((set) => ({
     set((state) => ({
       sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
     })),
+  setSidebarViewMode: (mode) => set({ sidebarViewMode: mode }),
   toggleToolbarExpanded: () =>
     set((state) => ({
       toolbarExpanded: !state.toolbarExpanded,
@@ -81,5 +85,5 @@ export const useUIStore = create<UIState>()((set) => ({
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
   restoreUI: (ui) =>
-    set({ ...ui, editorWidth: restoreEditorWidth(ui), pdfExportStatus: 'idle', findOpen: false, settingsOpen: false }),
+    set({ ...ui, sidebarViewMode: ui.sidebarViewMode ?? 'files', editorWidth: restoreEditorWidth(ui), pdfExportStatus: 'idle', findOpen: false, settingsOpen: false }),
 }));

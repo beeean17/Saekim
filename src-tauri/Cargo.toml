@@ -1,6 +1,6 @@
 [package]
 name = "saekim"
-version = "3.0.0"
+version = "3.0.1"
 description = "Saekim Markdown Editor"
 authors = ["Saekim"]
 edition = "2021"
@@ -14,8 +14,18 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 dirs = "6"
+futures-util = "0.3"
+reqwest = { version = "0.13", features = ["stream"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+url = "2"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"

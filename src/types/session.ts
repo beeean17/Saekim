@@ -1,14 +1,18 @@
-import type { FileTreeNode, OpenFile, SidebarMode, ThemeName, ViewMode } from './workspace';
+import type { FileTreeNode, OpenFile, RecentFile, SidebarMode, SidebarViewMode, ThemeName, ViewMode } from './workspace';
+
+export type HtmlPreviewMode = 'browser' | 'safe';
 
 export interface WorkspaceSession {
   rootPath: string | null;
   tree: FileTreeNode[];
   openFiles: OpenFile[];
+  recentFiles?: RecentFile[];
   activeFileId: string | null;
 }
 
 export interface UISession {
   sidebarMode: SidebarMode;
+  sidebarViewMode?: SidebarViewMode;
   toolbarExpanded: boolean;
   viewMode: ViewMode;
   sidebarWidth: number;
@@ -21,6 +25,7 @@ export interface SettingsSession {
   theme: ThemeName;
   fontSize: number;
   editorFontFamily: string;
+  htmlPreviewMode?: HtmlPreviewMode;
 }
 
 export interface AppSession {
