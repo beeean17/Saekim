@@ -1,5 +1,13 @@
 # 새김 Saekim
 
+![Version](https://img.shields.io/badge/version-3.0.1-555555.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
+![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
+![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6.svg)
+![Rust](https://img.shields.io/badge/Rust-stable-B7410E.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)
+
 새김은 Markdown과 텍스트 기반 문서를 위한 로컬 우선 데스크톱 에디터입니다.
 Tauri 2, React, TypeScript, Rust 기반으로 동작하며, 편집기와 미리보기를
 나란히 두고 문서를 작성하는 흐름에 초점을 맞춥니다.
