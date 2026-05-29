@@ -1,209 +1,163 @@
 # Third-Party Licenses and Attributions
 
-This document lists all open-source software (OSS) used in the Saekim project, along with their respective licenses and attributions.
+This document lists the primary open-source software used by Saekim and the
+licenses that apply to those dependencies.
+
+Dependency versions are based on the current lockfiles:
+
+- JavaScript/TypeScript: `package.json`, `pnpm-lock.yaml`
+- Rust/Tauri: `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`
+- Legacy Python code retained in `src/`: historical PyQt/PDF import modules
+
+Transitive dependencies are resolved by the package managers and recorded in the
+lockfiles. This document focuses on direct dependencies and bundled assets.
 
 ---
 
 ## Project License
 
 **Saekim (새김) - Markdown Editor**
-- **License**: GNU Affero General Public License v3.0 (AGPL-3.0)
-- **Reason**: This project uses PyMuPDF (fitz), which is licensed under AGPL-3.0.
-- **Copyright**: © 2025 윤성빈 (Yoon Seongbin)
+
+- **Project license**: GNU Affero General Public License v3.0 (AGPL-3.0)
+- **Copyright**: © 2025-2026 Saekim Contributors
+- **License file**: `Licenses/LICENSE`
+
+The current 3.x desktop app is built with Tauri, React, TypeScript, and Rust.
+Legacy Python/PyQt source files are still present in the repository and include
+PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 
 ---
 
-## Python Dependencies
+## JavaScript / TypeScript Runtime Dependencies
 
-### Desktop Framework
-
-#### 1. PyQt6
-- **Version**: ≥6.6.0
-- **License**: GNU General Public License v3.0 (GPL-3.0)
-- **Homepage**: https://www.riverbankcomputing.com/software/pyqt/
-- **Copyright**: © Riverbank Computing Limited
-- **Usage**: Desktop application framework and GUI widgets
-
-#### 2. PyQt6-WebEngine
-- **Version**: ≥6.6.0
-- **License**: GNU General Public License v3.0 (GPL-3.0)
-- **Homepage**: https://www.riverbankcomputing.com/software/pyqt/
-- **Copyright**: © Riverbank Computing Limited
-- **Usage**: Chromium-based web engine for rendering markdown preview and PDF export
-
----
-
-### PDF Processing
-
-#### 3. PyMuPDF (fitz)
-- **Version**: ≥1.24.0
-- **License**: GNU Affero General Public License v3.0 (AGPL-3.0)
-- **Homepage**: https://pymupdf.readthedocs.io/
-- **Repository**: https://github.com/pymupdf/PyMuPDF
-- **Copyright**: © Artifex Software, Inc.
-- **Usage**: PDF → Markdown conversion, text extraction
-- **Note**: This is the primary reason the project uses AGPL-3.0 license
-
-#### 4. pdfplumber
-- **Version**: ≥0.11.0
-- **License**: MIT License
-- **Homepage**: https://github.com/jsvine/pdfplumber
-- **Copyright**: © Jeremy Singer-Vine
-- **Usage**: Extracting tables from PDF files
+| Package | Version | License | Usage |
+| --- | ---: | --- | --- |
+| `@fontsource/ibm-plex-sans-kr` | 5.2.8 | OFL-1.1 | IBM Plex Sans KR webfont package |
+| `@tauri-apps/api` | 2.11.0 | Apache-2.0 OR MIT | Frontend API bridge for Tauri commands/events |
+| `html2canvas` | 1.4.1 | MIT | Render preview DOM to canvas for PDF export |
+| `jspdf` | 4.2.1 | MIT | Generate PDF output from rendered preview canvas |
+| `katex` | 0.16.47 | MIT | Math rendering in editor helpers, preview, and export |
+| `markdown-it` | 14.1.1 | MIT | Markdown parsing/rendering pipeline |
+| `markdown-it-katex` | 2.0.3 | MIT | KaTeX syntax integration for Markdown parsing |
+| `mermaid` | 11.15.0 | MIT | Mermaid diagram rendering |
+| `papaparse` | 5.5.3 | MIT | CSV/TSV parsing for tabular previews |
+| `react` | 18.3.1 | MIT | Frontend UI framework |
+| `react-dom` | 18.3.1 | MIT | React DOM renderer |
+| `shiki` | 3.23.0 | MIT | Code block syntax highlighting |
+| `smol-toml` | 1.6.1 | BSD-3-Clause | TOML parsing for structured data previews |
+| `yaml` | 2.9.0 | ISC | YAML parsing for structured data/OpenAPI previews |
+| `zustand` | 5.0.13 | MIT | Frontend state management |
 
 ---
 
-### Markdown Processing
+## JavaScript / TypeScript Development Dependencies
 
-#### 5. Markdown
-- **Version**: ≥3.5.0
-- **License**: BSD 3-Clause License
-- **Homepage**: https://python-markdown.github.io/
-- **Repository**: https://github.com/Python-Markdown/markdown
-- **Copyright**: © 2007-2024 The Python Markdown Project
-- **Usage**: Server-side Markdown to HTML conversion
+| Package | Version | License | Usage |
+| --- | ---: | --- | --- |
+| `@tauri-apps/cli` | 2.11.2 | Apache-2.0 OR MIT | Tauri development/build CLI |
+| `@types/markdown-it` | 14.1.2 | MIT | TypeScript types |
+| `@types/papaparse` | 5.5.2 | MIT | TypeScript types |
+| `@types/react` | 18.3.28 | MIT | TypeScript types |
+| `@types/react-dom` | 18.3.7 | MIT | TypeScript types |
+| `@vitejs/plugin-react` | 4.7.0 | MIT | React plugin for Vite |
+| `typescript` | 5.9.3 | Apache-2.0 | TypeScript compiler |
+| `vite` | 6.4.2 | MIT | Frontend dev server and bundler |
 
 ---
 
-## JavaScript Dependencies (CDN)
+## Rust / Tauri Dependencies
 
-These JavaScript libraries are loaded via CDN in the web-based editor interface:
+| Crate | Version | License | Usage |
+| --- | ---: | --- | --- |
+| `dirs` | 6.0.0 | MIT OR Apache-2.0 | OS-specific application support/config paths |
+| `futures-util` | 0.3.32 | MIT OR Apache-2.0 | Async stream utilities |
+| `objc2` | 0.6.4 | MIT | macOS Objective-C interop for document open events |
+| `reqwest` | 0.13.3 | MIT OR Apache-2.0 | HTTP client for image download/import workflows |
+| `rusqlite` | 0.32.1 | MIT | SQLite-backed metadata/session storage |
+| `serde` | 1.0.228 | MIT OR Apache-2.0 | Serialization/deserialization |
+| `serde_json` | 1.0.149 | MIT OR Apache-2.0 | JSON serialization/deserialization |
+| `tauri` | 2.11.2 | Apache-2.0 OR MIT | Desktop app runtime |
+| `tauri-build` | 2.6.2 | Apache-2.0 OR MIT | Tauri build integration |
+| `tauri-plugin-dialog` | 2.7.1 | Apache-2.0 OR MIT | Native open/save dialogs |
+| `tauri-plugin-opener` | 2.5.4 | Apache-2.0 OR MIT | Open files/URLs with system handlers |
+| `tauri-plugin-single-instance` | 2.4.2 | Apache-2.0 OR MIT | Single-instance app behavior and file-open forwarding |
+| `url` | 2.5.8 | MIT OR Apache-2.0 | URL parsing and validation |
 
-### Markdown & Rendering
+### Bundled Native Components
 
-#### 6. Marked.js
-- **Version**: 11.1.0
-- **License**: MIT License
-- **Homepage**: https://marked.js.org/
-- **Repository**: https://github.com/markedjs/marked
-- **Copyright**: © 2011-2024 Christopher Jeffrey and contributors
-- **Usage**: Client-side Markdown parser and compiler
-
-#### 7. Highlight.js
-- **Version**: 11.9.0
-- **License**: BSD 3-Clause License
-- **Homepage**: https://highlightjs.org/
-- **Repository**: https://github.com/highlightjs/highlight.js
-- **Copyright**: © 2006 Ivan Sagalaev and contributors
-- **Usage**: Syntax highlighting for code blocks
-
-#### 8. Mermaid.js
-- **Version**: 10.6.1
-- **License**: MIT License
-- **Homepage**: https://mermaid.js.org/
-- **Repository**: https://github.com/mermaid-js/mermaid
-- **Copyright**: © 2014-2024 Knut Sveidqvist and contributors
-- **Usage**: Diagram and flowchart generation
-
-#### 9. KaTeX
-- **Version**: 0.16.9
-- **License**: MIT License
-- **Homepage**: https://katex.org/
-- **Repository**: https://github.com/KaTeX/KaTeX
-- **Copyright**: © 2013-2020 Khan Academy and other contributors
-- **Usage**: Fast math typesetting for LaTeX equations
-
-#### 10. DOMPurify
-- **Version**: 3.0.6
-- **License**: Apache License 2.0 / Mozilla Public License 2.0 (Dual License)
-- **Homepage**: https://github.com/cure53/DOMPurify
-- **Copyright**: © 2015-2024 Mario Heiderich and contributors
-- **Usage**: XSS sanitizer for HTML content
+| Component | Source | License | Usage |
+| --- | --- | --- | --- |
+| SQLite | via `rusqlite`/`libsqlite3-sys` bundled feature | Public Domain | Embedded metadata database |
 
 ---
 
 ## Fonts
 
-### 11. Pretendard
-- **Version**: 1.3.9
-- **License**: SIL Open Font License 1.1 (OFL-1.1)
+| Font | Version / Source | License | Usage |
+| --- | --- | --- | --- |
+| Pretendard | 1.3.9, bundled in `src/resources/fonts/Pretendard-1.3.9/` | SIL Open Font License 1.1 | Default UI/editor/preview font |
+| IBM Plex Sans KR | via `@fontsource/ibm-plex-sans-kr` 5.2.8 | SIL Open Font License 1.1 | Optional Korean font family |
+
+### Pretendard
+
 - **Homepage**: https://cactus.tistory.com/306
 - **Repository**: https://github.com/orioncactus/pretendard
 - **Copyright**: © 2021 Kil Hyung-jin
-- **Usage**: Primary font family for UI and text rendering
-- **Font Files**: Variable font (PretendardVariable.ttf) bundled in `src/resources/fonts/`
+- **Full license**: `src/resources/fonts/Pretendard-1.3.9/LICENSE.txt`
+- **Reserved Font Name**: Pretendard
 
-**License Summary:**
-- The font can be used, studied, modified and redistributed freely
-- Cannot be sold by itself, but can be bundled with software
-- Derivatives must remain under OFL-1.1 license
-- Reserved Font Name: "Pretendard"
+### IBM Plex Sans KR
 
-**Full License**: See `src/resources/fonts/Pretendard-1.3.9/LICENSE.txt`
+- **Homepage**: https://fontsource.org/fonts/ibm-plex-sans-kr
+- **Repository**: https://github.com/IBM/plex
+- **License**: SIL Open Font License 1.1
 
 ---
 
-## License Compatibility
+## Legacy Python Dependencies
 
-This project is licensed under AGPL-3.0 due to PyMuPDF's license requirements. All dependencies are compatible:
+The repository still contains legacy Python/PyQt modules under `src/`.
+They are not the primary 3.x Tauri runtime, but their source references the
+following open-source libraries.
 
-| License | Status |
-|---------|--------|
-| AGPL-3.0 | Primary (PyMuPDF) |
-| GPL-3.0 | Compatible (PyQt6) |
-| MIT | Compatible |
-| BSD-3-Clause | Compatible |
-| Apache-2.0 | Compatible |
-| OFL-1.1 | Compatible (Pretendard Font) |
+| Package | Version / Requirement | License | Usage |
+| --- | --- | --- | --- |
+| PyQt6 | >= 6.6.0 | GPL-3.0 or commercial | Legacy desktop UI framework |
+| PyQt6-WebEngine | >= 6.6.0 | GPL-3.0 or commercial | Legacy Chromium preview/export webview |
+| PyQt6-Frameless-Window | >= 0.3.0 | MIT | Legacy frameless window behavior |
+| PyMuPDF | >= 1.24.0 | AGPL-3.0 or commercial | Legacy PDF-to-Markdown import |
+| pdfplumber | >= 0.11.0 | MIT | Legacy PDF table extraction fallback |
+| Python-Markdown | >= 3.5.0 | BSD-3-Clause | Legacy Markdown-to-HTML conversion fallback |
+
+Legacy package files were archived under `private/legacy/root/pyqt_packaging/`.
+
+---
+
+## License Compatibility Summary
+
+| License | Used by | Notes |
+| --- | --- | --- |
+| AGPL-3.0 | Saekim, legacy PyMuPDF reference | Strong copyleft; project license remains AGPL-3.0 |
+| GPL-3.0 | Legacy PyQt6/PyQt6-WebEngine path | Relevant to legacy Python runtime |
+| MIT | React, Mermaid, KaTeX, Shiki, rusqlite, many others | Compatible |
+| Apache-2.0 | Tauri dual-license path, TypeScript | Compatible with AGPL-3.0 |
+| BSD-3-Clause | `smol-toml`, Python-Markdown | Compatible |
+| ISC | `yaml` | Compatible |
+| OFL-1.1 | Pretendard, IBM Plex Sans KR | Font license; compatible for bundling |
+| Public Domain | SQLite | Compatible |
 
 ---
 
 ## Full License Texts
 
-### GNU Affero General Public License v3.0
-https://www.gnu.org/licenses/agpl-3.0.html
-
-### GNU General Public License v3.0
-https://www.gnu.org/licenses/gpl-3.0.html
-
-### MIT License
-```
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software...
-```
-
-### BSD 3-Clause License
-```
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met...
-```
-
-### Apache License 2.0
-https://www.apache.org/licenses/LICENSE-2.0
-
-### SIL Open Font License 1.1
-```
-Copyright (c) 2021, Kil Hyung-jin (https://github.com/orioncactus/pretendard),
-with Reserved Font Name Pretendard.
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-
-PERMISSION & CONDITIONS
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of the Font Software, to use, study, copy, merge, embed, modify,
-redistribute, and sell modified and unmodified copies of the Font
-Software, subject to the following conditions:
-
-1) Neither the Font Software nor any of its individual components,
-in Original or Modified Versions, may be sold by itself.
-
-2) Original or Modified Versions of the Font Software may be bundled,
-redistributed and/or sold with any software, provided that each copy
-contains the above copyright notice and this license.
-
-3) No Modified Version of the Font Software may use the Reserved Font
-Name(s) unless explicit written permission is granted by the corresponding
-Copyright Holder.
-
-4) The Font Software, modified or unmodified, in part or in whole,
-must be distributed entirely under this license, and must not be
-distributed under any other license.
-```
-
-Full license text: https://scripts.sil.org/OFL
+- AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
+- GPL-3.0: https://www.gnu.org/licenses/gpl-3.0.html
+- MIT: https://opensource.org/license/mit/
+- Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+- BSD-3-Clause: https://opensource.org/license/bsd-3-clause/
+- ISC: https://opensource.org/license/isc-license-txt/
+- SIL Open Font License 1.1: https://scripts.sil.org/OFL
+- SQLite public domain notice: https://www.sqlite.org/copyright.html
 
 ---
 
@@ -214,4 +168,4 @@ Full license text: https://scripts.sil.org/OFL
 
 ---
 
-**Last Updated**: December 23, 2025
+**Last Updated**: May 30, 2026
