@@ -610,6 +610,7 @@ function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
   wrapper.dataset.flow = getLayoutGroupColumns(layout) > 1 ? 'columns' : 'block';
   wrapper.dataset.groupColumns = String(getLayoutGroupColumns(layout));
   wrapper.dataset.groupIndex = String(getLayoutGroupIndex(layout));
+  wrapper.style.setProperty('--preview-layout-column', String(getLayoutGroupIndex(layout) + 1));
   const groupId = getLayoutGroupId(layout);
   if (groupId) {
     wrapper.dataset.groupId = groupId;

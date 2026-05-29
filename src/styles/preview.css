@@ -619,6 +619,9 @@
 
 .preview-layout-group > .preview-layout-block[data-flow="columns"] {
   display: block;
+  grid-column: var(--preview-layout-column, auto);
+  grid-row: 1;
+  align-self: start;
   width: 100%;
   margin: 0;
 }
