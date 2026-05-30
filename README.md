@@ -154,18 +154,20 @@ notarization should be handled before uploading the release artifact.
 
 ```text
 .
-├── src/                  # React frontend and retained legacy Python source
+├── src/                  # React frontend source
 ├── src-tauri/            # Tauri/Rust desktop backend
+├── public/fonts/         # Bundled web fonts served by Vite
 ├── Licenses/             # Project license and third-party notices
 ├── _bmad-output/         # Planning and implementation artifacts
-├── private/              # Private planning/archive submodule
+├── private/              # Private planning/archive submodule, including legacy source
 ├── package.json
 ├── pnpm-lock.yaml
 └── vite.config.ts
 ```
 
 The active 3.x application path is the React/Tauri code. Legacy PyQt/Python
-files remain in `src/` for historical reference and migration context.
+files are archived under `private/legacy/pyqt-src/` for historical reference
+and migration context.
 
 ---
 

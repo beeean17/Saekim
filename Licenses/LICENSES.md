@@ -7,7 +7,7 @@ Dependency versions are based on the current lockfiles:
 
 - JavaScript/TypeScript: `package.json`, `pnpm-lock.yaml`
 - Rust/Tauri: `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`
-- Legacy Python code retained in `src/`: historical PyQt/PDF import modules
+- Legacy Python code archived in `private/legacy/pyqt-src/`: historical PyQt/PDF import modules
 
 Transitive dependencies are resolved by the package managers and recorded in the
 lockfiles. This document focuses on direct dependencies and bundled assets.
@@ -23,8 +23,8 @@ lockfiles. This document focuses on direct dependencies and bundled assets.
 - **License file**: `Licenses/LICENSE`
 
 The current 3.x desktop app is built with Tauri, React, TypeScript, and Rust.
-Legacy Python/PyQt source files are still present in the repository and include
-PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
+Legacy Python/PyQt source files are archived in `private/legacy/pyqt-src/` and
+include PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 
 ---
 
@@ -95,7 +95,7 @@ PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 
 | Font | Version / Source | License | Usage |
 | --- | --- | --- | --- |
-| Pretendard | 1.3.9, bundled in `src/resources/fonts/Pretendard-1.3.9/` | SIL Open Font License 1.1 | Default UI/editor/preview font |
+| Pretendard | 1.3.9, bundled in `public/fonts/Pretendard-1.3.9/` | SIL Open Font License 1.1 | Default UI/editor/preview font |
 | IBM Plex Sans KR | via `@fontsource/ibm-plex-sans-kr` 5.2.8 | SIL Open Font License 1.1 | Optional Korean font family |
 
 ### Pretendard
@@ -103,7 +103,7 @@ PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 - **Homepage**: https://cactus.tistory.com/306
 - **Repository**: https://github.com/orioncactus/pretendard
 - **Copyright**: © 2021 Kil Hyung-jin
-- **Full license**: `src/resources/fonts/Pretendard-1.3.9/LICENSE.txt`
+- **Full license**: `public/fonts/Pretendard-1.3.9/LICENSE.txt`
 - **Reserved Font Name**: Pretendard
 
 ### IBM Plex Sans KR
@@ -116,7 +116,8 @@ PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 
 ## Legacy Python Dependencies
 
-The repository still contains legacy Python/PyQt modules under `src/`.
+The repository still contains archived legacy Python/PyQt modules under
+`private/legacy/pyqt-src/`.
 They are not the primary 3.x Tauri runtime, but their source references the
 following open-source libraries.
 
@@ -129,7 +130,8 @@ following open-source libraries.
 | pdfplumber | >= 0.11.0 | MIT | Legacy PDF table extraction fallback |
 | Python-Markdown | >= 3.5.0 | BSD-3-Clause | Legacy Markdown-to-HTML conversion fallback |
 
-Legacy package files were archived under `private/legacy/root/pyqt_packaging/`.
+Legacy source files are archived under `private/legacy/pyqt-src/`, and legacy
+package files are archived under `private/legacy/root/pyqt_packaging/`.
 
 ---
 

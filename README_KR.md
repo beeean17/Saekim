@@ -153,18 +153,20 @@ notarization을 처리해야 합니다.
 
 ```text
 .
-├── src/                  # React 프론트엔드와 보존된 legacy Python 코드
+├── src/                  # React 프론트엔드 소스
 ├── src-tauri/            # Tauri/Rust 데스크톱 백엔드
+├── public/fonts/         # Vite가 제공하는 번들 웹폰트
 ├── Licenses/             # 프로젝트 라이선스와 서드파티 고지
 ├── _bmad-output/         # 기획/구현 산출물
-├── private/              # private 기획/아카이브 submodule
+├── private/              # private 기획/아카이브 submodule, legacy source 포함
 ├── package.json
 ├── pnpm-lock.yaml
 └── vite.config.ts
 ```
 
-현재 3.x 앱의 실제 실행 경로는 React/Tauri 코드입니다. `src/` 안의 PyQt/Python
-파일은 마이그레이션 이력과 legacy 기능 참고를 위해 남아 있습니다.
+현재 3.x 앱의 실제 실행 경로는 React/Tauri 코드입니다. PyQt/Python legacy
+파일은 마이그레이션 이력과 legacy 기능 참고를 위해
+`private/legacy/pyqt-src/`에 보관되어 있습니다.
 
 ---
 
