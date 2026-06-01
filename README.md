@@ -1,7 +1,7 @@
 # Saekim
 
 ![Version](https://img.shields.io/badge/version-3.1.0-555555.svg)
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6.svg)
@@ -159,28 +159,23 @@ notarization should be handled before uploading the release artifact.
 ├── public/fonts/         # Bundled web fonts served by Vite
 ├── Licenses/             # Project license and third-party notices
 ├── _bmad-output/         # Planning and implementation artifacts
-├── private/              # Private planning/archive submodule, including legacy source
 ├── package.json
 ├── pnpm-lock.yaml
 └── vite.config.ts
 ```
 
-The active 3.x application path is the React/Tauri code. Legacy PyQt/Python
-files are archived under `private/legacy/pyqt-src/` for historical reference
-and migration context.
+The active 3.x application path is the React/Tauri code.
 
 ---
 
 ## License
 
-Saekim is licensed under the GNU Affero General Public License v3.0
-(AGPL-3.0). See [Licenses/LICENSE](Licenses/LICENSE).
+Saekim is licensed under the MIT License. See
+[Licenses/LICENSE](Licenses/LICENSE).
 
 Third-party dependency notices are documented in
 [Licenses/LICENSES.md](Licenses/LICENSES.md). The current 3.x app primarily uses
 MIT, Apache-2.0, BSD-3-Clause, ISC, OFL-1.1, and public-domain components.
-Legacy Python/PDF import code references PyMuPDF, which is AGPL-3.0 licensed,
-so the project license remains AGPL-3.0.
 
 ---
 

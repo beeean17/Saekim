@@ -3,6 +3,7 @@ name = "saekim"
 version = "3.1.0"
 description = "Saekim Markdown Editor"
 authors = ["Saekim"]
+license = "MIT"
 edition = "2021"
 
 [lib]

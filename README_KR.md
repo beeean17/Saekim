@@ -1,7 +1,7 @@
 # 새김 Saekim
 
 ![Version](https://img.shields.io/badge/version-3.1.0-555555.svg)
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6.svg)
@@ -158,28 +158,23 @@ notarization을 처리해야 합니다.
 ├── public/fonts/         # Vite가 제공하는 번들 웹폰트
 ├── Licenses/             # 프로젝트 라이선스와 서드파티 고지
 ├── _bmad-output/         # 기획/구현 산출물
-├── private/              # private 기획/아카이브 submodule, legacy source 포함
 ├── package.json
 ├── pnpm-lock.yaml
 └── vite.config.ts
 ```
 
-현재 3.x 앱의 실제 실행 경로는 React/Tauri 코드입니다. PyQt/Python legacy
-파일은 마이그레이션 이력과 legacy 기능 참고를 위해
-`private/legacy/pyqt-src/`에 보관되어 있습니다.
+현재 3.x 앱의 실제 실행 경로는 React/Tauri 코드입니다.
 
 ---
 
 ## 라이선스
 
-새김은 GNU Affero General Public License v3.0(AGPL-3.0)으로 배포됩니다.
-자세한 내용은 [Licenses/LICENSE](Licenses/LICENSE)를 확인하세요.
+새김은 MIT License로 배포됩니다. 자세한 내용은
+[Licenses/LICENSE](Licenses/LICENSE)를 확인하세요.
 
 서드파티 의존성 고지는 [Licenses/LICENSES.md](Licenses/LICENSES.md)에 정리되어
 있습니다. 현재 3.x 앱은 주로 MIT, Apache-2.0, BSD-3-Clause, ISC, OFL-1.1,
-public-domain 구성 요소를 사용합니다. 다만 legacy Python/PDF import 코드가
-AGPL-3.0 라이선스의 PyMuPDF를 참조하므로 프로젝트 라이선스는 AGPL-3.0을
-유지합니다.
+public-domain 구성 요소를 사용합니다.
 
 ---
 

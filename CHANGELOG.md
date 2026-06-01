@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 확장 아코디언 툴바를 제거하고, Markdown/Mermaid/KaTeX 검색 중심의 기본 툴바로 정리했습니다.
 - Markdown preview는 기본 Markdown 줄바꿈을 유지하고, 코드블럭은 fenced code block 문법만 렌더링하도록 조정했습니다.
 - Windows 패키징에서 `.txt` 파일은 앱 아이콘 대신 시스템 텍스트 문서 아이콘을 쓰는 별도 Open With ProgID로 등록하도록 조정했습니다.
+- 공개 3.x 앱의 현재 의존성 기준으로 프로젝트 라이선스와 서드파티 고지 범위를 MIT 중심으로 정리했습니다.
 
 ### Fixed
 

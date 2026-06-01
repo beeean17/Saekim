@@ -1,13 +1,15 @@
 # Third-Party Licenses and Attributions
 
-This document lists the primary open-source software used by Saekim and the
-licenses that apply to those dependencies.
+This document lists the primary open-source software used by the public Saekim
+3.x desktop application and the licenses that apply to those dependencies.
 
 Dependency versions are based on the current lockfiles:
 
 - JavaScript/TypeScript: `package.json`, `pnpm-lock.yaml`
 - Rust/Tauri: `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`
-- Legacy Python code archived in `private/legacy/pyqt-src/`: historical PyQt/PDF import modules
+
+Non-public submodules and archival material that are not part of the public
+distribution are outside the scope of this notice.
 
 Transitive dependencies are resolved by the package managers and recorded in the
 lockfiles. This document focuses on direct dependencies and bundled assets.
@@ -18,13 +20,11 @@ lockfiles. This document focuses on direct dependencies and bundled assets.
 
 **Saekim (새김) - Markdown Editor**
 
-- **Project license**: GNU Affero General Public License v3.0 (AGPL-3.0)
-- **Copyright**: © 2025-2026 Saekim Contributors
+- **Project license**: MIT License
+- **Copyright**: 2025-2026 Saekim Contributors
 - **License file**: `Licenses/LICENSE`
 
 The current 3.x desktop app is built with Tauri, React, TypeScript, and Rust.
-Legacy Python/PyQt source files are archived in `private/legacy/pyqt-src/` and
-include PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 
 ---
 
@@ -114,36 +114,13 @@ include PDF import code that references PyMuPDF, which is AGPL-3.0 licensed.
 
 ---
 
-## Legacy Python Dependencies
-
-The repository still contains archived legacy Python/PyQt modules under
-`private/legacy/pyqt-src/`.
-They are not the primary 3.x Tauri runtime, but their source references the
-following open-source libraries.
-
-| Package | Version / Requirement | License | Usage |
-| --- | --- | --- | --- |
-| PyQt6 | >= 6.6.0 | GPL-3.0 or commercial | Legacy desktop UI framework |
-| PyQt6-WebEngine | >= 6.6.0 | GPL-3.0 or commercial | Legacy Chromium preview/export webview |
-| PyQt6-Frameless-Window | >= 0.3.0 | MIT | Legacy frameless window behavior |
-| PyMuPDF | >= 1.24.0 | AGPL-3.0 or commercial | Legacy PDF-to-Markdown import |
-| pdfplumber | >= 0.11.0 | MIT | Legacy PDF table extraction fallback |
-| Python-Markdown | >= 3.5.0 | BSD-3-Clause | Legacy Markdown-to-HTML conversion fallback |
-
-Legacy source files are archived under `private/legacy/pyqt-src/`, and legacy
-package files are archived under `private/legacy/root/pyqt_packaging/`.
-
----
-
 ## License Compatibility Summary
 
 | License | Used by | Notes |
 | --- | --- | --- |
-| AGPL-3.0 | Saekim, legacy PyMuPDF reference | Strong copyleft; project license remains AGPL-3.0 |
-| GPL-3.0 | Legacy PyQt6/PyQt6-WebEngine path | Relevant to legacy Python runtime |
 | MIT | React, Mermaid, KaTeX, Shiki, rusqlite, many others | Compatible |
-| Apache-2.0 | Tauri dual-license path, TypeScript | Compatible with AGPL-3.0 |
-| BSD-3-Clause | `smol-toml`, Python-Markdown | Compatible |
+| Apache-2.0 | Tauri dual-license path, TypeScript | Compatible |
+| BSD-3-Clause | `smol-toml` | Compatible |
 | ISC | `yaml` | Compatible |
 | OFL-1.1 | Pretendard, IBM Plex Sans KR | Font license; compatible for bundling |
 | Public Domain | SQLite | Compatible |
@@ -152,8 +129,6 @@ package files are archived under `private/legacy/root/pyqt_packaging/`.
 
 ## Full License Texts
 
-- AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
-- GPL-3.0: https://www.gnu.org/licenses/gpl-3.0.html
 - MIT: https://opensource.org/license/mit/
 - Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
 - BSD-3-Clause: https://opensource.org/license/bsd-3-clause/
@@ -170,4 +145,4 @@ package files are archived under `private/legacy/root/pyqt_packaging/`.
 
 ---
 
-**Last Updated**: May 30, 2026
+**Last Updated**: June 1, 2026
