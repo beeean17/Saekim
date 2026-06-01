@@ -219,9 +219,28 @@ fn save_session_to_metadata(session: &Value) -> Result<(), String> {
         )
         .map_err(|error| format!("failed to reset file view state: {error}"))?;
 
-    for recent_file in recent_files {
-        save_recent_file(&transaction, &workspace_id, &canonical_root_path, &recent_file, now)?;
+    transaction
+        .execute(
+            "DELETE FROM recent_file_queue WHERE workspace_id = ?1",
+            params![workspace_id],
+        )
+        .map_err(|error| format!("failed to reset recent file queue: {error}"))?;
+
+    for (index, recent_file) in recent_files.iter().enumerate() {
+        save_recent_file(
+            &transaction,
+            &workspace_id,
+            &canonical_root_path,
+            recent_file,
+            index,
+            now,
+        )?;
     }
+    save_metadata_value(
+        &transaction,
+        &recent_file_queue_initialized_key(&workspace_id),
+        "true",
+    )?;
 
     for (index, open_file) in open_files.iter().enumerate() {
         save_open_file(
@@ -437,6 +456,16 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS recent_file_queue (
+              workspace_id TEXT NOT NULL,
+              file_id TEXT NOT NULL,
+              queue_order INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL,
+              PRIMARY KEY(workspace_id, file_id),
+              FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+              FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS block_layouts (
               id TEXT PRIMARY KEY,
               file_id TEXT NOT NULL,
@@ -478,6 +507,8 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
 
             CREATE INDEX IF NOT EXISTS idx_files_workspace_opened
               ON files(workspace_id, last_opened_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_recent_file_queue_order
+              ON recent_file_queue(workspace_id, queue_order ASC);
             CREATE INDEX IF NOT EXISTS idx_file_view_state_view_order
               ON file_view_state(workspace_view_id, is_open, open_order);
             CREATE INDEX IF NOT EXISTS idx_block_layouts_file
@@ -578,6 +609,7 @@ fn save_recent_file(
     workspace_id: &str,
     canonical_root_path: &str,
     recent_file: &Value,
+    index: usize,
     fallback_time: i64,
 ) -> Result<(), String> {
     let Some(path) = recent_file.get("path").and_then(Value::as_str) else {
@@ -592,7 +624,7 @@ fn save_recent_file(
         .and_then(Value::as_str)
         .map(str::to_string)
         .unwrap_or_else(|| file_name_from_path(path));
-    upsert_file(
+    let file_id = upsert_file(
         connection,
         workspace_id,
         canonical_root_path,
@@ -600,8 +632,20 @@ fn save_recent_file(
         &name,
         None,
         opened_at,
-    )
-    .map(|_| ())
+    )?;
+
+    connection
+        .execute(
+            "INSERT INTO recent_file_queue (workspace_id, file_id, queue_order, updated_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(workspace_id, file_id) DO UPDATE SET
+               queue_order = excluded.queue_order,
+               updated_at = excluded.updated_at",
+            params![workspace_id, file_id, index as i64, fallback_time],
+        )
+        .map_err(|error| format!("failed to save recent file queue: {error}"))?;
+
+    Ok(())
 }
 
 fn save_open_file(
@@ -728,6 +772,39 @@ fn load_open_files(connection: &Connection, view_id: &str) -> Result<Value, Stri
 }
 
 fn load_recent_files(connection: &Connection, workspace_id: &str) -> Result<Value, String> {
+    let mut queue_statement = connection
+        .prepare(
+            "SELECT files.absolute_path, files.display_name, files.last_opened_at
+             FROM recent_file_queue
+             JOIN files ON files.id = recent_file_queue.file_id
+             WHERE recent_file_queue.workspace_id = ?1
+             ORDER BY recent_file_queue.queue_order ASC
+             LIMIT 50",
+        )
+        .map_err(|error| format!("failed to prepare recent file queue query: {error}"))?;
+
+    let queue_rows = queue_statement
+        .query_map(params![workspace_id], |row| {
+            Ok(json!({
+                "path": row.get::<_, String>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "openedAt": row.get::<_, i64>(2)?,
+            }))
+        })
+        .map_err(|error| format!("failed to query recent file queue: {error}"))?;
+
+    let mut queued_files = Vec::new();
+    for row in queue_rows {
+        queued_files.push(row.map_err(|error| format!("failed to read recent file queue row: {error}"))?);
+    }
+
+    if !queued_files.is_empty() {
+        return Ok(Value::Array(queued_files));
+    }
+    if metadata_value(connection, &recent_file_queue_initialized_key(workspace_id))?.is_some() {
+        return Ok(Value::Array(queued_files));
+    }
+
     let mut statement = connection
         .prepare(
             "SELECT absolute_path, display_name, last_opened_at FROM files
@@ -785,6 +862,10 @@ fn delete_metadata_value(connection: &Connection, key: &str) -> Result<(), Strin
         .execute("DELETE FROM metadata_kv WHERE key = ?1", params![key])
         .map_err(|error| format!("failed to delete metadata value {key}: {error}"))?;
     Ok(())
+}
+
+fn recent_file_queue_initialized_key(workspace_id: &str) -> String {
+    format!("recent_file_queue_initialized:{workspace_id}")
 }
 
 fn load_legacy_session() -> Result<Option<Value>, String> {
@@ -941,7 +1022,6 @@ fn default_ui() -> Value {
     json!({
         "sidebarMode": "expanded",
         "sidebarViewMode": "files",
-        "toolbarExpanded": true,
         "viewMode": "split",
         "sidebarWidth": 248,
         "splitRatio": 0.5,

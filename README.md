@@ -1,6 +1,6 @@
 # Saekim
 
-![Version](https://img.shields.io/badge/version-3.0.1-555555.svg)
+![Version](https://img.shields.io/badge/version-3.1.0-555555.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
@@ -122,7 +122,7 @@ Recommended release flow:
 1. Update `package.json`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md` for
    the release version.
 2. Build and verify the app on each target OS.
-3. Create a Git tag such as `v3.0.1`.
+3. Create a Git tag such as `v3.1.0`.
 4. Upload the generated desktop bundles to the GitHub Release.
 
 macOS artifacts are built on macOS:

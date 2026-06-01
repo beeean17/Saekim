@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.0] - Unreleased
+
+### Added
+
+- Markdown 문법 검색 모달에 문단 도구로 줄바꿈, 들여쓰기, 내어쓰기 항목을 추가했습니다.
+- Markdown 문법 검색 모달의 이미지 항목에서 원본 경로 연결과 문서 assets 복사 삽입을 실행할 수 있도록 추가했습니다.
+- Assets 이미지 미리보기에서 현재 문서에 이미지를 추가할 수 있는 버튼을 추가했습니다.
+- 열린 문서가 없을 때 편집기와 미리보기 영역에 파일 선택/열기 안내 메시지를 표시하도록 추가했습니다.
+- 열린 문서가 없는 상태에서 메타데이터에 저장된 최근 파일 순서 큐의 맨 위 파일을 즉시 열도록 추가했습니다.
+- 문단 도구 단축키로 `Shift+Enter`, `Tab`, `Shift+Tab`, `Cmd/Ctrl+]`, `Cmd/Ctrl+[`를 추가했습니다.
+- Mermaid/KaTeX 헬퍼와 같은 검색 모달로 일반 Markdown 문법을 찾아 삽입할 수 있도록 추가했습니다.
+- Markdown preview에서 `->`, `<-`, `^|`, `v|` 텍스트 화살표를 방향 화살표로 렌더링하도록 추가했습니다.
+- ASCII 박스/흐름도 형태의 일반 텍스트 코드블럭을 선 연결 문자로 다듬어 렌더링하도록 추가했습니다.
+
+### Changed
+
+- 확장 아코디언 툴바를 제거하고, Markdown/Mermaid/KaTeX 검색 중심의 기본 툴바로 정리했습니다.
+- Markdown preview는 기본 Markdown 줄바꿈을 유지하고, 코드블럭은 fenced code block 문법만 렌더링하도록 조정했습니다.
+- Windows 패키징에서 `.txt` 파일은 앱 아이콘 대신 시스템 텍스트 문서 아이콘을 쓰는 별도 Open With ProgID로 등록하도록 조정했습니다.
+
+### Fixed
+
+- 한 줄짜리 `-` 입력이 이전 줄을 setext heading처럼 렌더링하던 문제를 수정했습니다.
+- preview 블럭 레이아웃 도구가 실제 블럭 외부 여백 클릭으로 열리던 문제를 수정했습니다.
+- 최근 파일에서 열린 파일을 `Cmd/Ctrl+W`로 닫아도 최근 파일 목록에 남던 문제를 수정했습니다.
+- Shiki 코드블럭 텍스트 선택 시 줄 바깥 여백까지 선택되는 것처럼 보이던 시각 문제를 완화했습니다.
+
+---
+
 ## [3.0.1] - Unreleased
 
 ### Added
@@ -223,6 +252,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.1.0 | Unreleased | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, recent-file close cleanup, Windows text icon handling |
 | 3.0.1 | Unreleased | Flexible text-file detection, HTML/data previews, image assets workflow, preview block layouts, Windows desktop support |
 | 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
 | 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |

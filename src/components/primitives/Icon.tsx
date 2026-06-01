@@ -14,7 +14,6 @@ type IconName =
   | 'chevronDown'
   | 'undo'
   | 'redo'
-  | 'tools'
   | 'heading'
   | 'heading1'
   | 'heading2'
@@ -30,6 +29,8 @@ type IconName =
   | 'numberedList'
   | 'checkList'
   | 'quote'
+  | 'indentIncrease'
+  | 'indentDecrease'
   | 'table'
   | 'divider'
   | 'lineBreak'
@@ -95,13 +96,6 @@ const paths: Record<IconName, JSX.Element> = {
     <>
       <path d="M21 7v6h-6" />
       <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3L21 13" />
-    </>
-  ),
-  tools: (
-    <>
-      <path d="M14.7 6.3a4 4 0 0 0-5 5L3 18v3h3l6.7-6.7a4 4 0 0 0 5-5l-2.4 2.4-2.8-2.8z" />
-      <path d="M17 3l4 4" />
-      <path d="M19 5l-7 7" />
     </>
   ),
   heading: (
@@ -216,6 +210,24 @@ const paths: Record<IconName, JSX.Element> = {
     <>
       <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z" />
       <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
+    </>
+  ),
+  indentIncrease: (
+    <>
+      <line x1="13" y1="6" x2="21" y2="6" />
+      <line x1="13" y1="12" x2="21" y2="12" />
+      <line x1="13" y1="18" x2="21" y2="18" />
+      <polyline points="3 8 7 12 3 16" />
+      <line x1="8" y1="12" x2="3" y2="12" />
+    </>
+  ),
+  indentDecrease: (
+    <>
+      <line x1="13" y1="6" x2="21" y2="6" />
+      <line x1="13" y1="12" x2="21" y2="12" />
+      <line x1="13" y1="18" x2="21" y2="18" />
+      <polyline points="8 8 4 12 8 16" />
+      <line x1="4" y1="12" x2="9" y2="12" />
     </>
   ),
   table: (

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
@@ -19,6 +19,8 @@ export function App() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const openFile = useWorkspaceStore((state) => state.openFile);
+  const openFileCount = useWorkspaceStore((state) => state.openFiles.length);
+  const nextRecentPath = useWorkspaceStore((state) => state.recentFiles[0]?.path ?? null);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
   const createFile = useWorkspaceStore((state) => state.createFile);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
@@ -34,6 +36,7 @@ export function App() {
   const setSidebarWidth = useUIStore((state) => state.setSidebarWidth);
   const setEditorWidth = useUIStore((state) => state.setEditorWidth);
   const setPdfExportStatus = useUIStore((state) => state.setPdfExportStatus);
+  const openingRecentFileRef = useRef(false);
 
   const shortcuts = useMemo(
     () => ({
@@ -70,6 +73,18 @@ export function App() {
   useNativeMenuCommands(shortcuts);
   const sessionLoaded = useSessionPersistence();
   useExternalFileOpen(openFile, sessionLoaded);
+  useEffect(() => {
+    if (!sessionLoaded || openFileCount > 0 || !nextRecentPath || openingRecentFileRef.current) return;
+
+    openingRecentFileRef.current = true;
+    void openFile(nextRecentPath)
+      .catch((error) => {
+        console.error('최근 파일 자동 열기 실패:', error);
+      })
+      .finally(() => {
+        openingRecentFileRef.current = false;
+      });
+  }, [nextRecentPath, openFile, openFileCount, sessionLoaded]);
   useScrollSync(editorRef, previewRef, syncScroll && viewMode === 'split');
   useResponsiveSplitWidth(bodyRef, viewMode, sidebarMode, sidebarWidth, editorWidth);
   useWindowSizeConstraints(viewMode, sidebarMode, sidebarWidth);
@@ -117,7 +132,7 @@ export function App() {
   return (
     <AppShell menuHandlers={shortcuts}>
       <main className="body" ref={bodyRef}>
-        <Sidebar />
+        <Sidebar textareaRef={editorRef} />
         <PaneResizer hidden={sidebarMode === 'collapsed'} label="사이드바 크기 조절" onPointerDown={startSidebarResize} />
         <EditorPane textareaRef={editorRef} />
         <PaneResizer hidden={viewMode !== 'split'} label="편집 구역 크기 조절" onPointerDown={startSplitResize} />

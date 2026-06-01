@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
 import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { useUIStore } from '../../store/ui';
@@ -8,7 +8,7 @@ import type { FileTreeNode, OpenFile, RecentFile, SidebarViewMode } from '../../
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 
-export function Sidebar() {
+export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaElement> }) {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
@@ -20,6 +20,7 @@ export function Sidebar() {
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
   const closeFile = useWorkspaceStore((state) => state.closeFile);
+  const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
@@ -47,6 +48,16 @@ export function Sidebar() {
     () => filterRecentFiles(getRecentEntries(recentFiles, openFiles), recentSearchQuery),
     [recentSearchQuery, openFiles, recentFiles],
   );
+  const addImageToDocument = (image: { path: string; name: string }) => {
+    if (!activeFile) {
+      window.alert('이미지를 추가할 문서를 먼저 열어주세요.');
+      return;
+    }
+
+    const imagePath = markdownImagePathForDocument(image.path, activeFile.path);
+    insertImageSnippetIntoDocument(textareaRef.current, activeFile, updateContent, markdownImageSnippet(imagePath, image.name));
+    setImagePreview(null);
+  };
 
   return (
     <aside className="sidebar">
@@ -109,7 +120,14 @@ export function Sidebar() {
           onOpen={(path) => void openFile(path)}
         />
       )}
-      {imagePreview ? <ImagePreviewModal image={imagePreview} onClose={() => setImagePreview(null)} /> : null}
+      {imagePreview ? (
+        <ImagePreviewModal
+          canAddToDocument={Boolean(activeFile)}
+          image={imagePreview}
+          onAddToDocument={() => addImageToDocument(imagePreview)}
+          onClose={() => setImagePreview(null)}
+        />
+      ) : null}
     </aside>
   );
 }
@@ -393,10 +411,14 @@ function FileTreeNodeView({
 }
 
 function ImagePreviewModal({
+  canAddToDocument,
   image,
+  onAddToDocument,
   onClose,
 }: {
+  canAddToDocument: boolean;
   image: { path: string; name: string };
+  onAddToDocument: () => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -416,9 +438,20 @@ function ImagePreviewModal({
             <strong>{image.name}</strong>
             <span>{image.path}</span>
           </div>
-          <button type="button" title="닫기" onClick={onClose}>
-            x
-          </button>
+          <div className="image-preview-actions">
+            <button
+              className="image-preview-add"
+              disabled={!canAddToDocument}
+              type="button"
+              title={canAddToDocument ? '현재 문서에 이미지 추가' : '이미지를 추가할 문서를 먼저 열어주세요'}
+              onClick={onAddToDocument}
+            >
+              문서에 추가
+            </button>
+            <button className="image-preview-close" type="button" title="닫기" onClick={onClose}>
+              x
+            </button>
+          </div>
         </div>
         <div className="image-preview-body">
           <img alt={image.name} src={localImagePreviewSrc(image.path)} />
@@ -440,4 +473,103 @@ function localImagePreviewSrc(path: string): string {
   if (isTauriRuntime()) return convertFileSrc(path);
   const normalized = path.replace(/\\/g, '/');
   return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : encodeURI(normalized);
+}
+
+function insertImageSnippetIntoDocument(
+  textarea: HTMLTextAreaElement | null,
+  activeFile: OpenFile,
+  updateContent: (id: string, text: string) => void,
+  snippet: string,
+): void {
+  const value = textarea?.value ?? activeFile.content;
+  const start = textarea ? textarea.selectionStart : value.length;
+  const end = textarea ? textarea.selectionEnd : value.length;
+  const insertion = textarea ? snippet : appendBlockSnippet(value, snippet);
+  const next = `${value.slice(0, start)}${insertion}${value.slice(end)}`;
+  const cursor = start + insertion.length;
+
+  updateContent(activeFile.id, next);
+
+  if (!textarea) return;
+  window.requestAnimationFrame(() => {
+    textarea.focus();
+    textarea.selectionStart = cursor;
+    textarea.selectionEnd = cursor;
+  });
+}
+
+function appendBlockSnippet(value: string, snippet: string): string {
+  if (!value) return snippet;
+  return `${value.endsWith('\n') ? '' : '\n'}${snippet}`;
+}
+
+function markdownImageSnippet(path: string, altText: string): string {
+  const alt = escapeMarkdownAlt(altText.replace(/\.[^.]+$/, '') || '이미지');
+  return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
+}
+
+function markdownImagePathForDocument(imagePath: string, documentPath: string): string {
+  if (isPlaceholderDocumentPath(documentPath)) return normalizePath(imagePath);
+
+  const image = normalizePath(imagePath);
+  const documentDir = parentFolderFromPath(documentPath);
+  if (!documentDir || pathRoot(image) !== pathRoot(documentDir)) return image;
+
+  const relative = relativePath(documentDir, image);
+  if (!relative || relative.startsWith('../')) return relative || fileNameFromPath(image);
+  return relative.startsWith('./') ? relative : `./${relative}`;
+}
+
+function relativePath(fromDirectory: string, toPath: string): string {
+  const fromParts = pathParts(fromDirectory);
+  const toParts = pathParts(toPath);
+  let common = 0;
+
+  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
+    common += 1;
+  }
+
+  return [...Array.from({ length: fromParts.length - common }, () => '..'), ...toParts.slice(common)].join('/');
+}
+
+function parentFolderFromPath(path: string): string | null {
+  const normalized = normalizePath(path);
+  const index = normalized.lastIndexOf('/');
+  if (index <= 0) return null;
+  return normalized.slice(0, index);
+}
+
+function pathParts(path: string): string[] {
+  return normalizePath(path)
+    .replace(/^[A-Za-z]:\//, '')
+    .replace(/^\/+/, '')
+    .split('/')
+    .filter(Boolean);
+}
+
+function pathRoot(path: string): string {
+  const normalized = normalizePath(path);
+  const windowsDrive = normalized.match(/^[A-Za-z]:\//)?.[0];
+  if (windowsDrive) return windowsDrive.toUpperCase();
+  return normalized.startsWith('/') ? '/' : '';
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+function isPlaceholderDocumentPath(path: string): boolean {
+  return path.startsWith('~') || path.startsWith('browser://');
+}
+
+function fileNameFromPath(path: string): string {
+  return normalizePath(path).split('/').filter(Boolean).pop() ?? 'image';
+}
+
+function escapeMarkdownDestination(path: string): string {
+  return normalizePath(path).replace(/>/g, '%3E');
+}
+
+function escapeMarkdownAlt(value: string): string {
+  return value.replace(/]/g, '\\]');
 }

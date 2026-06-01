@@ -1,10 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import katex from 'katex';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { Backend } from '../../lib/backend';
 import { getFileTypeLabel } from '../../lib/fileType';
-import { katexHelperItems, mermaidHelperItems, type KatexHelperItem, type MermaidHelperItem } from '../../lib/markdown/helperCatalog';
+import {
+  katexHelperItems,
+  markdownHelperItems,
+  mermaidHelperItems,
+  type KatexHelperItem,
+  type MarkdownHelperItem,
+  type MermaidHelperItem,
+} from '../../lib/markdown/helperCatalog';
+import { renderMarkdown } from '../../lib/markdown/renderer';
 import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { useSettingsStore } from '../../store/settings';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -12,8 +19,8 @@ import type { OpenFile } from '../../types/workspace';
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
 
-type HelperMode = 'mermaid' | 'katex';
-type HelperItem = KatexHelperItem | MermaidHelperItem;
+type HelperMode = 'markdown' | 'mermaid' | 'katex';
+type HelperItem = MarkdownHelperItem | KatexHelperItem | MermaidHelperItem;
 type ImageInsertMode = 'link' | 'copy';
 type DroppedImage =
   | { type: 'remote'; url: string }
@@ -35,6 +42,10 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef.current);
   const findOpen = useUIStore((state) => state.findOpen);
   const closeFind = useUIStore((state) => state.closeFind);
+
+  useEffect(() => {
+    if (!activeFile && findOpen) closeFind();
+  }, [activeFile, closeFind, findOpen]);
 
   useEffect(() => {
     const onDragOver = (event: DragEvent) => {
@@ -70,16 +81,22 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
   }, [activeFile, refresh, textareaRef]);
 
   return (
-    <section className="editor-pane">
+    <section className="editor-pane" data-disabled={!activeFile}>
       <Toolbar textareaRef={textareaRef} />
-      {findOpen ? <FindBar content={activeFile?.content ?? ''} textareaRef={textareaRef} onClose={closeFind} /> : null}
-      <EditorContent
-        activeFile={activeFile}
-        activeLine={cursor.row}
-        value={activeFile?.content ?? ''}
-        onChange={(value) => activeFile && updateContent(activeFile.id, value)}
-        textareaRef={textareaRef}
-      />
+      {activeFile ? (
+        <>
+          {findOpen ? <FindBar content={activeFile.content} textareaRef={textareaRef} onClose={closeFind} /> : null}
+          <EditorContent
+            activeFile={activeFile}
+            activeLine={cursor.row}
+            value={activeFile.content}
+            onChange={(value) => updateContent(activeFile.id, value)}
+            textareaRef={textareaRef}
+          />
+        </>
+      ) : (
+        <EmptyDocumentState />
+      )}
     </section>
   );
 }
@@ -161,11 +178,15 @@ function FindBar({
 
 function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
   const activeFile = useWorkspaceStore(selectActiveFile);
-  const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
-  const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
+  const refresh = useWorkspaceStore((state) => state.refresh);
   const openFind = useUIStore((state) => state.openFind);
   const [helperMode, setHelperMode] = useState<HelperMode | null>(null);
-  const fileType = useMemo(() => getFileTypeLabel(activeFile?.name, activeFile?.path), [activeFile?.name, activeFile?.path]);
+  const disabled = !activeFile;
+  const fileType = useMemo(() => (activeFile ? getFileTypeLabel(activeFile.name, activeFile.path) : '-'), [activeFile]);
+
+  useEffect(() => {
+    if (disabled) setHelperMode(null);
+  }, [disabled]);
 
   return (
     <>
@@ -174,23 +195,26 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
           {fileType}
         </div>
         <div className="tool-group">
-          <ToolButton label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램 문법 찾기" onClick={() => setHelperMode('mermaid')} />
-          <ToolButton label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식 문법 찾기" onClick={() => setHelperMode('katex')} />
+          <ToolButton disabled={disabled} label="Markdown" special="markdown" tooltip="Markdown 문법 찾기" onClick={() => setHelperMode('markdown')} />
+          <ToolButton disabled={disabled} label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램 문법 찾기" onClick={() => setHelperMode('mermaid')} />
+          <ToolButton disabled={disabled} label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식 문법 찾기" onClick={() => setHelperMode('katex')} />
         </div>
         <div className="tool-spacer" />
-        <ToolButton icon="search" tooltip="문서 내 탐색" onClick={openFind} />
-        <button className={`toolbar-expand ${toolbarExpanded ? 'open' : ''}`} type="button" onClick={toggleToolbarExpanded} title="모든 마크다운 도구 보기" aria-label="모든 마크다운 도구 보기">
-          <Icon name="tools" className="ic" />
-        </button>
+        <ToolButton disabled={disabled} icon="search" tooltip="문서 내 탐색" onClick={openFind} />
       </div>
-      {toolbarExpanded ? <ToolbarExpanded textareaRef={textareaRef} /> : null}
       {helperMode ? (
         <MarkdownHelperModal
           mode={helperMode}
           onClose={() => setHelperMode(null)}
-          onInsert={(snippet) => {
-            insertTextAtSelection(textareaRef.current, snippet);
+          onInsert={(item) => {
+            insertHelperItem(textareaRef.current, helperMode, item);
             setHelperMode(null);
+          }}
+          onImageInsert={(mode) => {
+            setHelperMode(null);
+            void insertSelectedImage(textareaRef.current, activeFile, mode).then(() => {
+              if (mode === 'copy') void refresh();
+            });
           }}
         />
       ) : null}
@@ -198,148 +222,30 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
   );
 }
 
-function ToolbarExpanded({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
-  const activeFile = useWorkspaceStore(selectActiveFile);
-
-  return (
-    <div className="toolbar-expanded">
-      <div className="tool-group">
-        <ToolButton icon="heading1" tooltip="제목 1" onClick={() => insertMarkdown(textareaRef.current, '# ', '')} />
-        <ToolButton icon="heading2" tooltip="제목 2" onClick={() => insertMarkdown(textareaRef.current, '## ', '')} />
-        <ToolButton icon="heading3" tooltip="제목 3" onClick={() => insertMarkdown(textareaRef.current, '### ', '')} />
-      </div>
-      <div className="tool-group">
-        <ToolButton icon="bold" tooltip="볼드" onClick={() => wrapSelection(textareaRef.current, '**', '**')} />
-        <ToolButton icon="italic" tooltip="이탤릭" onClick={() => wrapSelection(textareaRef.current, '*', '*')} />
-        <ToolButton icon="strike" tooltip="취소선" onClick={() => wrapSelection(textareaRef.current, '~~', '~~')} />
-        <ToolButton icon="highlight" tooltip="강조 표시" onClick={() => wrapSelection(textareaRef.current, '==', '==')} />
-        <ToolButton icon="code" tooltip="코드 블록" onClick={() => insertCodeBlock(textareaRef.current)} />
-      </div>
-      <div className="tool-group">
-        <ToolButton icon="list" tooltip="불릿 리스트" onClick={() => insertMarkdown(textareaRef.current, '- ', '')} />
-        <ToolButton icon="numberedList" tooltip="번호 리스트" onClick={() => insertMarkdown(textareaRef.current, '1. ', '')} />
-        <ToolButton icon="checkList" tooltip="체크리스트" onClick={() => insertMarkdown(textareaRef.current, '- [ ] ', '')} />
-      </div>
-      <div className="tool-group">
-        <ToolButton icon="quote" tooltip="인용" onClick={() => insertMarkdown(textareaRef.current, '> ', '')} />
-        <ToolButton icon="lineBreak" tooltip="줄바꿈" onClick={() => insertMarkdown(textareaRef.current, '  \n', '')} />
-        <ToolButton icon="table" tooltip="표" onClick={() => insertMarkdown(textareaRef.current, '| 제목 | 값 |\n| --- | --- |\n| 항목 | 내용 |', '')} />
-        <ToolButton icon="divider" tooltip="구분선" onClick={() => insertMarkdown(textareaRef.current, '---', '')} />
-      </div>
-      <div className="tool-group">
-        <ImageToolButton activeFile={activeFile} textareaRef={textareaRef} />
-        <ToolButton icon="link" tooltip="링크" onClick={() => wrapSelection(textareaRef.current, '[', '](https://)')} />
-        <ToolButton icon="footnote" tooltip="각주" onClick={() => insertMarkdown(textareaRef.current, '[^1]\n\n[^1]: ', '')} />
-      </div>
-    </div>
-  );
-}
-
-function ImageToolButton({
-  activeFile,
-  textareaRef,
-}: {
-  activeFile: OpenFile | null;
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
-}) {
-  const refresh = useWorkspaceStore((state) => state.refresh);
-  const [open, setOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  const updateMenuPosition = () => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const rect = root.getBoundingClientRect();
-    const menuWidth = 218;
-    setMenuPosition({
-      top: rect.bottom + 4,
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8)),
-    });
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    updateMenuPosition();
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return;
-      if (menuRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
-    };
-
-    window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('resize', updateMenuPosition);
-    window.addEventListener('scroll', updateMenuPosition, true);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('resize', updateMenuPosition);
-      window.removeEventListener('scroll', updateMenuPosition, true);
-    };
-  }, [open]);
-
-  const insert = (mode: ImageInsertMode) => {
-    setOpen(false);
-    void insertSelectedImage(textareaRef.current, activeFile, mode).then(() => {
-      if (mode === 'copy') void refresh();
-    });
-  };
-
-  return (
-    <div className="tool-dropdown" ref={rootRef}>
-      <button
-        className={`tool-btn ${open ? 'active' : ''}`}
-        type="button"
-        title="이미지"
-        aria-label="이미지"
-        onClick={() => {
-          updateMenuPosition();
-          setOpen((state) => !state);
-        }}
-      >
-        <Icon name="image" />
-      </button>
-      {open && menuPosition
-        ? createPortal(
-            <div
-              className="tool-menu"
-              ref={menuRef}
-              role="menu"
-              aria-label="이미지 삽입 방식"
-              style={{ top: menuPosition.top, left: menuPosition.left }}
-            >
-          <button type="button" role="menuitem" onClick={() => insert('link')}>
-            <span>원본 경로로 연결</span>
-            <small>파일을 이동하지 않고 현재 경로를 삽입</small>
-          </button>
-          <button type="button" role="menuitem" onClick={() => insert('copy')}>
-            <span>문서 assets로 복사</span>
-            <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
-          </button>
-            </div>,
-            document.body,
-          )
-        : null}
-    </div>
-  );
-}
-
 interface ToolButtonProps {
   icon?: Parameters<typeof Icon>[0]['name'];
   label?: string;
   tooltip: string;
-  special?: 'mermaid' | 'katex';
+  special?: HelperMode;
+  disabled?: boolean;
   onClick: () => void;
 }
 
-function ToolButton({ icon, label, tooltip, special, onClick }: ToolButtonProps) {
+function ToolButton({ icon, label, tooltip, special, disabled, onClick }: ToolButtonProps) {
   return (
-    <button className="tool-btn" data-special={special} title={tooltip} aria-label={tooltip} type="button" onClick={onClick}>
+    <button className="tool-btn" data-special={special} disabled={disabled} title={tooltip} aria-label={tooltip} type="button" onClick={onClick}>
       {icon ? <Icon name={icon} /> : null}
       {label ? <span className="label">{label}</span> : null}
     </button>
+  );
+}
+
+function EmptyDocumentState() {
+  return (
+    <div className="empty-document-state" role="status">
+      <strong>열린 문서가 없습니다</strong>
+      <span>워크스페이스에서 파일을 선택하거나 파일을 열어주세요.</span>
+    </div>
   );
 }
 
@@ -347,19 +253,21 @@ function MarkdownHelperModal({
   mode,
   onClose,
   onInsert,
+  onImageInsert,
 }: {
   mode: HelperMode;
   onClose: () => void;
-  onInsert: (snippet: string) => void;
+  onInsert: (item: HelperItem) => void;
+  onImageInsert: (mode: ImageInsertMode) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState('');
-  const items: HelperItem[] = mode === 'katex' ? katexHelperItems : mermaidHelperItems;
+  const items = helperItems(mode);
   const filteredItems = useMemo(() => searchHelperItems(items, query), [items, query]);
   const [selectedId, setSelectedId] = useState<string>(items[0]?.id ?? '');
   const selectedItem = filteredItems.find((item) => item.id === selectedId) ?? filteredItems[0] ?? null;
-  const title = mode === 'katex' ? 'KaTeX 수식 찾기' : 'Mermaid 다이어그램 찾기';
-  const placeholder = mode === 'katex' ? '예: 곱하기, 분수, 적분, matrix' : '예: 순서도, 시퀀스, ERD, 간트';
+  const title = helperTitle(mode);
+  const placeholder = helperPlaceholder(mode);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -384,7 +292,7 @@ function MarkdownHelperModal({
         <div className="helper-modal-head">
           <div>
             <h2>{title}</h2>
-            <p>{mode === 'katex' ? '검색 후 문법을 선택하면 현재 커서 위치에 삽입됩니다.' : '템플릿을 선택하면 Mermaid 코드블럭으로 삽입됩니다.'}</p>
+            <p>{helperDescription(mode)}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="닫기">
             ×
@@ -405,7 +313,7 @@ function MarkdownHelperModal({
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedId(item.id)}
-                  onDoubleClick={() => onInsert(helperSnippet(mode, item))}
+                  onDoubleClick={() => onInsert(item)}
                 >
                   <span className="helper-result-title">{item.title}</span>
                   <span className="helper-result-category">{item.category}</span>
@@ -422,16 +330,85 @@ function MarkdownHelperModal({
                     <span>{selectedItem.title}</span>
                     <code>{helperSyntax(selectedItem)}</code>
                   </div>
-                  <button type="button" onClick={() => onInsert(helperSnippet(mode, selectedItem))}>
-                    삽입
+                  <button type="button" onClick={() => onInsert(selectedItem)}>
+                    {isMarkdownHelperItem(selectedItem) && selectedItem.action ? '실행' : '삽입'}
                   </button>
                 </div>
-                {isKatexHelperItem(selectedItem) ? <KatexHelperPreview item={selectedItem} /> : <MermaidHelperPreview item={selectedItem} />}
+                {isMarkdownHelperItem(selectedItem) ? (
+                  <>
+                    <MarkdownSyntaxPreview item={selectedItem} />
+                    {selectedItem.id === 'image' ? <MarkdownImageActions onImageInsert={onImageInsert} /> : null}
+                  </>
+                ) : isKatexHelperItem(selectedItem) ? (
+                  <KatexHelperPreview item={selectedItem} />
+                ) : (
+                  <MermaidHelperPreview item={selectedItem} />
+                )}
               </>
             ) : null}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MarkdownImageActions({ onImageInsert }: { onImageInsert: (mode: ImageInsertMode) => void }) {
+  return (
+    <div className="markdown-image-actions" aria-label="이미지 파일 삽입 방식">
+      <button type="button" onClick={() => onImageInsert('link')}>
+        <span>원본 경로로 연결</span>
+        <small>파일을 이동하지 않고 현재 경로를 삽입</small>
+      </button>
+      <button type="button" onClick={() => onImageInsert('copy')}>
+        <span>문서 assets로 복사</span>
+        <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
+      </button>
+    </div>
+  );
+}
+
+function helperItems(mode: HelperMode): HelperItem[] {
+  if (mode === 'markdown') return markdownHelperItems;
+  if (mode === 'katex') return katexHelperItems;
+  return mermaidHelperItems;
+}
+
+function helperTitle(mode: HelperMode): string {
+  if (mode === 'markdown') return 'Markdown 문법 찾기';
+  if (mode === 'katex') return 'KaTeX 수식 찾기';
+  return 'Mermaid 다이어그램 찾기';
+}
+
+function helperPlaceholder(mode: HelperMode): string {
+  if (mode === 'markdown') return '예: 제목, 볼드, 표, 체크리스트, 이미지, 줄바꿈';
+  if (mode === 'katex') return '예: 곱하기, 분수, 적분, matrix';
+  return '예: 순서도, 시퀀스, ERD, 간트';
+}
+
+function helperDescription(mode: HelperMode): string {
+  if (mode === 'markdown') return '검색 후 문법을 선택하면 현재 커서 위치에 삽입되거나 편집 동작이 실행됩니다.';
+  if (mode === 'katex') return '검색 후 문법을 선택하면 현재 커서 위치에 삽입됩니다.';
+  return '템플릿을 선택하면 Mermaid 코드블럭으로 삽입됩니다.';
+}
+
+function MarkdownSyntaxPreview({ item }: { item: MarkdownHelperItem }) {
+  const [html, setHtml] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    void renderMarkdown(item.example, 'light').then((nextHtml) => {
+      if (alive) setHtml(nextHtml);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [item]);
+
+  return (
+    <div className="helper-render markdown-helper-render">
+      <div className="markdown-helper-preview" dangerouslySetInnerHTML={{ __html: html }} />
+      <pre>{item.example}</pre>
     </div>
   );
 }
@@ -500,19 +477,33 @@ function searchHelperItems<T extends HelperItem>(items: T[], query: string): T[]
   });
 }
 
-function helperSyntax(item: KatexHelperItem | MermaidHelperItem): string {
+function helperSyntax(item: HelperItem): string {
   return 'syntax' in item ? item.syntax : item.template.split('\n')[0];
 }
 
 function helperSnippet(mode: HelperMode, item: HelperItem): string {
+  if (isMarkdownHelperItem(item)) return item.snippet;
   if (mode === 'mermaid' && !isKatexHelperItem(item)) return `\n\`\`\`mermaid\n${item.template}\n\`\`\`\n`;
   if (!isKatexHelperItem(item)) return item.template;
 
   return item.displayMode ? `$$\n${item.syntax}\n$$` : `$${item.syntax}$`;
 }
 
+function insertHelperItem(textarea: HTMLTextAreaElement | null, mode: HelperMode, item: HelperItem): void {
+  if (isMarkdownHelperItem(item) && item.action) {
+    indentSelectedLines(textarea, item.action === 'outdent');
+    return;
+  }
+
+  insertTextAtSelection(textarea, helperSnippet(mode, item));
+}
+
+function isMarkdownHelperItem(item: HelperItem): item is MarkdownHelperItem {
+  return 'snippet' in item;
+}
+
 function isKatexHelperItem(item: HelperItem): item is KatexHelperItem {
-  return 'syntax' in item;
+  return 'syntax' in item && !('snippet' in item);
 }
 
 function EditorContent({
@@ -539,6 +530,20 @@ function EditorContent({
   const lineCount = Math.max(1, value.split('\n').length);
   const updateSelectionLines = (textarea: HTMLTextAreaElement) => {
     setSelectionLines(getSelectionLines(textarea));
+  };
+  const applyIndentChange = (textarea: HTMLTextAreaElement, outdent: boolean) => {
+    const change = getLineIndentChange(textarea, outdent);
+    onChange(change.value);
+    setTextareaValue(textarea, change.value);
+    textarea.selectionStart = change.selectionStart;
+    textarea.selectionEnd = change.selectionEnd;
+    window.requestAnimationFrame(() => {
+      const current = textareaRef.current;
+      if (!current) return;
+      current.selectionStart = change.selectionStart;
+      current.selectionEnd = change.selectionEnd;
+      updateSelectionLines(current);
+    });
   };
   const syncLineNumbers = (scrollTop: number) => {
     latestScrollTopRef.current = scrollTop;
@@ -625,6 +630,33 @@ function EditorContent({
         wrap="off"
         onScroll={(event) => syncLineNumbers(event.currentTarget.scrollTop)}
         onSelect={(event) => updateSelectionLines(event.currentTarget)}
+        onKeyDown={(event) => {
+          const meta = event.metaKey || event.ctrlKey;
+
+          if (event.key === 'Tab') {
+            event.preventDefault();
+            applyIndentChange(event.currentTarget, event.shiftKey);
+            return;
+          }
+
+          if (event.key === 'Enter' && event.shiftKey) {
+            event.preventDefault();
+            insertHardLineBreak(event.currentTarget);
+            updateSelectionLines(event.currentTarget);
+            return;
+          }
+
+          if (meta && event.key === ']') {
+            event.preventDefault();
+            applyIndentChange(event.currentTarget, false);
+            return;
+          }
+
+          if (meta && event.key === '[') {
+            event.preventDefault();
+            applyIndentChange(event.currentTarget, true);
+          }
+        }}
         onKeyUp={(event) => updateSelectionLines(event.currentTarget)}
         onMouseUp={(event) => updateSelectionLines(event.currentTarget)}
         onDragOver={(event) => {
@@ -700,25 +732,85 @@ function findMatches(content: string, query: string): Array<{ start: number; end
   return matches;
 }
 
-function insertMarkdown(textarea: HTMLTextAreaElement | null, before: string, after: string): void {
-  wrapSelection(textarea, before, after);
+const tabIndent = '    ';
+
+interface LineIndentChange {
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
 }
 
-function insertCodeBlock(textarea: HTMLTextAreaElement | null): void {
+function insertHardLineBreak(textarea: HTMLTextAreaElement | null): void {
+  insertTextAtSelection(textarea, '  \n');
+}
+
+function indentSelectedLines(textarea: HTMLTextAreaElement | null, outdent: boolean): void {
   if (!textarea) return;
+
+  const change = getLineIndentChange(textarea, outdent);
+  setTextareaValue(textarea, change.value);
+  textarea.selectionStart = change.selectionStart;
+  textarea.selectionEnd = change.selectionEnd;
+  dispatchTextareaInput(textarea);
+  textarea.focus();
+}
+
+function getLineIndentChange(textarea: HTMLTextAreaElement, outdent: boolean): LineIndentChange {
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const value = textarea.value;
   const selected = value.slice(start, end);
-  const before = '```\n';
-  const after = selected && !selected.endsWith('\n') ? '\n```' : '```';
-  const replacement = `${before}${selected}${after}`;
-  const selectionStart = start + before.length;
-  const selectionEnd = selectionStart + selected.length;
 
-  replaceSelectionUndoably(textarea, replacement);
-  textarea.selectionStart = selectionStart;
-  textarea.selectionEnd = selectionEnd;
+  if (outdent) return getLineOutdentChange(value, start, end);
+
+  if (!selected.includes('\n')) {
+    return {
+      value: `${value.slice(0, start)}${tabIndent}${value.slice(end)}`,
+      selectionStart: start + tabIndent.length,
+      selectionEnd: start + tabIndent.length,
+    };
+  }
+
+  const blockStart = value.lastIndexOf('\n', start - 1) + 1;
+  const selectedEnd = Math.max(start, end - 1);
+  const nextLineBreak = value.indexOf('\n', selectedEnd);
+  const blockEnd = nextLineBreak === -1 ? value.length : nextLineBreak;
+  const block = value.slice(blockStart, blockEnd);
+  const lineCount = block.split('\n').length;
+  const replacement = block.replace(/^/gm, tabIndent);
+  return {
+    value: `${value.slice(0, blockStart)}${replacement}${value.slice(blockEnd)}`,
+    selectionStart: start + tabIndent.length,
+    selectionEnd: end + tabIndent.length * lineCount,
+  };
+}
+
+function getLineOutdentChange(value: string, start: number, end: number): LineIndentChange {
+  const blockStart = value.lastIndexOf('\n', start - 1) + 1;
+  const selectedEnd = Math.max(start, end - 1);
+  const nextLineBreak = value.indexOf('\n', selectedEnd);
+  const blockEnd = nextLineBreak === -1 ? value.length : nextLineBreak;
+  const block = value.slice(blockStart, blockEnd);
+  let removedBeforeStart = 0;
+  let removedBeforeEnd = 0;
+  let position = blockStart;
+
+  const replacement = block
+    .split('\n')
+    .map((line) => {
+      const removeCount = line.startsWith(tabIndent) ? tabIndent.length : Math.min(line.match(/^ */)?.[0].length ?? 0, tabIndent.length);
+      if (position < start) removedBeforeStart += Math.min(removeCount, Math.max(0, start - position));
+      if (position < end) removedBeforeEnd += Math.min(removeCount, Math.max(0, end - position));
+      position += line.length + 1;
+      return line.slice(removeCount);
+    })
+    .join('\n');
+
+  return {
+    value: `${value.slice(0, blockStart)}${replacement}${value.slice(blockEnd)}`,
+    selectionStart: Math.max(blockStart, start - removedBeforeStart),
+    selectionEnd: Math.max(blockStart, end - removedBeforeEnd),
+  };
 }
 
 async function insertSelectedImage(textarea: HTMLTextAreaElement | null, activeFile: OpenFile | null, mode: ImageInsertMode): Promise<void> {
@@ -1065,18 +1157,6 @@ function insertTextAtSelection(textarea: HTMLTextAreaElement | null, snippet: st
   replaceSelectionUndoably(textarea, snippet);
   textarea.selectionStart = start + snippet.length;
   textarea.selectionEnd = start + snippet.length;
-}
-
-function wrapSelection(textarea: HTMLTextAreaElement | null, before: string, after: string): void {
-  if (!textarea) return;
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const value = textarea.value;
-  const selected = value.slice(start, end);
-
-  replaceSelectionUndoably(textarea, `${before}${selected}${after}`);
-  textarea.selectionStart = start + before.length;
-  textarea.selectionEnd = end + before.length;
 }
 
 function replaceSelectionUndoably(textarea: HTMLTextAreaElement, replacement: string): void {

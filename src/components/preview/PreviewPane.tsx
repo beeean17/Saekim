@@ -22,7 +22,7 @@ export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject
   const isHtmlPreview = getFileTypeInfo(activeFile?.name, activeFile?.path).previewKind === 'html';
 
   return (
-    <section className="preview-pane">
+    <section className="preview-pane" data-disabled={!activeFile}>
       <div className="preview-head">
         <span className="label">미리보기</span>
         {isHtmlPreview ? (
@@ -47,6 +47,7 @@ export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject
         ) : null}
         <button
           className={`preview-action ${syncScroll ? 'active' : ''}`}
+          disabled={!activeFile}
           title={syncScroll ? '스크롤 동기화 풀기' : '스크롤 동기화'}
           type="button"
           onClick={toggleSyncScroll}
@@ -272,6 +273,14 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     previewRef.current = element;
   };
 
+  if (!activeFile) {
+    return (
+      <div className={`${className} empty-document-content`} ref={setPreviewElement}>
+        <EmptyDocumentState />
+      </div>
+    );
+  }
+
   if (usesBrowserFrame) {
     return (
       <div className={className} ref={setPreviewElement}>
@@ -309,6 +318,15 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
       ref={setPreviewElement}
       dangerouslySetInnerHTML={{ __html: html }}
     />
+  );
+}
+
+function EmptyDocumentState() {
+  return (
+    <div className="empty-document-state" role="status">
+      <strong>열린 문서가 없습니다</strong>
+      <span>워크스페이스에서 파일을 선택하거나 파일을 열어주세요.</span>
+    </div>
   );
 }
 
@@ -593,9 +611,35 @@ function bindLayoutSelection(root: HTMLElement, wrapper: HTMLElement): void {
   wrapper.addEventListener('click', (event) => {
     const target = event.target;
     if (target instanceof Element && target.closest('.preview-layout-tools')) return;
+    if (!(target instanceof Element) || !isLayoutSelectionTarget(wrapper, target)) {
+      clearSelectedLayoutBlocks(root);
+      return;
+    }
+
     clearSelectedLayoutBlocks(root);
     wrapper.dataset.selected = 'true';
   });
+}
+
+function isLayoutSelectionTarget(wrapper: HTMLElement, target: Element): boolean {
+  const surface = wrapper.querySelector<HTMLElement>(':scope > .preview-layout-surface');
+  if (!surface || !surface.contains(target)) return false;
+
+  const blockKind = blockKindFromDataset(wrapper.dataset.blockKind);
+  const selectorByKind: Record<BlockKind, string> = {
+    image: 'img',
+    table: 'table',
+    list: 'ul, ol',
+    blockquote: 'blockquote',
+    code: 'pre, .shiki, code',
+    mermaid: '.mermaid-block',
+    katex: '.math-block',
+  };
+  const selector = blockKind ? selectorByKind[blockKind] : null;
+  if (!selector) return false;
+
+  const selected = target.closest<HTMLElement>(selector);
+  return Boolean(selected && surface.contains(selected));
 }
 
 function clearSelectedLayoutBlocks(root: HTMLElement): void {

@@ -1,6 +1,6 @@
 # 새김 Saekim
 
-![Version](https://img.shields.io/badge/version-3.0.1-555555.svg)
+![Version](https://img.shields.io/badge/version-3.1.0-555555.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
@@ -121,7 +121,7 @@ corepack pnpm tauri:build:dmg
 1. `package.json`, `src-tauri/tauri.conf.json`, `CHANGELOG.md`의 버전을
    릴리즈 버전에 맞게 정리합니다.
 2. 대상 OS별로 앱을 빌드하고 실행 검증합니다.
-3. `v3.0.1` 같은 Git tag를 생성합니다.
+3. `v3.1.0` 같은 Git tag를 생성합니다.
 4. 생성된 데스크톱 번들을 GitHub Release에 업로드합니다.
 
 macOS 배포 파일은 macOS에서 빌드합니다:

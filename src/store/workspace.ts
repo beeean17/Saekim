@@ -208,6 +208,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         openFiles,
         activeFileId,
+        recentFiles: closedPath ? state.recentFiles.filter((file) => file.path !== closedPath) : state.recentFiles,
         history: {
           back: closedPath ? state.history.back.filter((path) => path !== closedPath) : state.history.back,
           forward: closedPath ? state.history.forward.filter((path) => path !== closedPath) : state.history.forward,
@@ -340,13 +341,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     }),
   restoreWorkspace: (workspace) => {
-    const openFiles = workspace.openFiles.length > 0 ? workspace.openFiles : [initialFile];
+    const openFiles = workspace.openFiles;
+    const activeFileId =
+      workspace.activeFileId && openFiles.some((file) => file.id === workspace.activeFileId)
+        ? workspace.activeFileId
+        : openFiles[0]?.id ?? null;
     set({
       rootPath: workspace.rootPath,
       tree: workspace.tree.length > 0 ? workspace.tree : initialTree,
       openFiles,
       recentFiles: normalizeRecentFiles(workspace.recentFiles, openFiles),
-      activeFileId: workspace.activeFileId ?? openFiles[0]?.id ?? initialFile.id,
+      activeFileId,
     });
   },
 }));

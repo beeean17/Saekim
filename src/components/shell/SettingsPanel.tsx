@@ -21,8 +21,6 @@ export function SettingsPanel() {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const open = useUIStore((state) => state.settingsOpen);
   const close = useUIStore((state) => state.closeSettings);
-  const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
-  const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
   const viewMode = useUIStore((state) => state.viewMode);
   const setViewMode = useUIStore((state) => state.setViewMode);
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -139,10 +137,6 @@ export function SettingsPanel() {
       </section>
 
       <section className="settings-section">
-        <label className="settings-check">
-          <input checked={toolbarExpanded} type="checkbox" onChange={toggleToolbarExpanded} />
-          확장 툴바
-        </label>
         <label className="settings-check">
           <input checked={syncScroll} type="checkbox" onChange={toggleSyncScroll} />
           스크롤 동기화

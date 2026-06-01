@@ -43,10 +43,9 @@ function readLegacyMetadata(): LegacyMetadata {
           }
         : null,
     ui:
-      ui?.sidebarMode && ui.toolbarExpanded !== undefined && ui.viewMode && typeof ui.sidebarWidth === 'number'
+      ui?.sidebarMode && ui.viewMode && typeof ui.sidebarWidth === 'number'
         ? {
             sidebarMode: ui.sidebarMode,
-            toolbarExpanded: ui.toolbarExpanded,
             viewMode: ui.viewMode,
             sidebarWidth: ui.sidebarWidth,
             splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
@@ -77,7 +76,6 @@ export function useSessionPersistence(): boolean {
 
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
-  const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
@@ -137,7 +135,6 @@ export function useSessionPersistence(): boolean {
         ui: {
           sidebarMode,
           sidebarViewMode,
-          toolbarExpanded,
           viewMode,
           sidebarWidth,
           splitRatio,
@@ -176,7 +173,6 @@ export function useSessionPersistence(): boolean {
     splitRatio,
     syncScroll,
     theme,
-    toolbarExpanded,
     tree,
     viewMode,
   ]);

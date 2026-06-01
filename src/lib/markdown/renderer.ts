@@ -30,6 +30,7 @@ const md = new MarkdownIt({
   breaks: false,
 });
 
+md.disable('code');
 md.use(markdownItKatex, katexOptions);
 
 md.inline.ruler.before('text', 'saekim_safe_br_tag', brTagRule);
@@ -67,6 +68,17 @@ md.core.ruler.after('inline', 'saekim_task_lists', (state: StateCore) => {
     listItem.attrJoin('class', 'task-list-item');
     token.children = taskListChildren(state.Token, token, match[1].toLowerCase() === 'x', match[0].length);
     token.content = token.content.slice(match[0].length);
+  });
+});
+
+md.core.ruler.after('inline', 'saekim_typographic_arrows', (state: StateCore) => {
+  state.tokens.forEach((token) => {
+    if (token.type !== 'inline' || !token.children) return;
+
+    token.children.forEach((child) => {
+      if (child.type !== 'text') return;
+      child.content = normalizeArrowText(child.content);
+    });
   });
 });
 
@@ -159,6 +171,10 @@ md.renderer.rules.fence = (tokens, idx) => {
     return `<div class="mermaid-block"${attrs} data-source="${encodeURIComponent(content)}"></div>`;
   }
 
+  if (isAsciiDiagramFence(content, lang)) {
+    return `<pre${attrs} class="ascii-diagram"><code>${escapeHtml(renderAsciiDiagram(content))}</code></pre>`;
+  }
+
   if (!lang) {
     return `<pre${attrs}><code>${escapeHtml(content)}</code></pre>`;
   }
@@ -169,7 +185,7 @@ md.renderer.rules.fence = (tokens, idx) => {
 let shikiModulePromise: Promise<typeof import('shiki')> | null = null;
 
 export async function renderMarkdown(text: string, theme: 'light' | 'dark' = 'light', basePath?: string): Promise<string> {
-  const footnoteDocument = extractFootnotes(normalizeTaskListShortcuts(text));
+  const footnoteDocument = extractFootnotes(normalizeMarkdownInput(text));
   const raw = md.render(footnoteDocument.text);
   const highlighted = await highlightCode(raw, theme);
   const withFootnotes = renderFootnotes(highlighted, footnoteDocument.definitions);
@@ -286,7 +302,7 @@ function normalizeFenceContent(content: string): string {
   return content.replace(/\n$/, '');
 }
 
-function normalizeTaskListShortcuts(text: string): string {
+function normalizeMarkdownInput(text: string): string {
   let inFence = false;
 
   return text
@@ -299,12 +315,117 @@ function normalizeTaskListShortcuts(text: string): string {
 
       if (inFence) return line;
 
-      return line
+      const normalized = line
         .replace(/^(\s*)-\[(x|X)\](\s*)/, '$1- [x] ')
         .replace(/^(\s*)-\[\](\s*)/, '$1- [ ] ')
         .replace(/^(\s*)-\[ \](\s*)/, '$1- [ ] ');
+
+      if (/^[ \t]*-[ \t]*$/.test(normalized)) {
+        return normalized.replace('-', '\\-');
+      }
+
+      return normalized;
     })
     .join('\n');
+}
+
+function normalizeArrowText(text: string): string {
+  return text
+    .replace(/(^|[^-])->/g, '$1→')
+    .replace(/<-(?!-)/g, '←')
+    .replace(/\^\|/g, '↑')
+    .replace(/v\|/g, '↓');
+}
+
+function isAsciiDiagramFence(content: string, lang: string): boolean {
+  if (lang && !['ascii', 'diagram', 'text', 'txt'].includes(lang.toLowerCase())) return false;
+
+  const lines = content.split('\n').filter((line) => line.trim().length > 0);
+  if (lines.length < 2) return false;
+
+  const diagramLines = lines.filter((line) => {
+    const diagramChars = (line.match(/[|+\-<>^v]/g) ?? []).length;
+    const visibleChars = line.replace(/\s/g, '').length;
+    return diagramChars >= 2 && visibleChars > 0 && diagramChars / visibleChars >= 0.35;
+  });
+
+  return diagramLines.length >= 2;
+}
+
+function renderAsciiDiagram(content: string): string {
+  const lines = normalizeArrowText(content).split('\n');
+  const width = Math.max(0, ...lines.map((line) => line.length));
+  const grid = lines.map((line) => line.padEnd(width, ' ').split(''));
+
+  return grid
+    .map((line, row) =>
+      line
+        .map((char, column) => {
+          if (char === '-') return '─';
+          if (char === '+') return junctionGlyph(grid, row, column);
+          if (char === '|') return verticalGlyph(grid, row, column);
+          return char;
+        })
+        .join('')
+        .trimEnd(),
+    )
+    .join('\n');
+}
+
+function junctionGlyph(grid: string[][], row: number, column: number): string {
+  return lineGlyph(hasLeft(grid, row, column), hasRight(grid, row, column), hasUp(grid, row, column), hasDown(grid, row, column));
+}
+
+function verticalGlyph(grid: string[][], row: number, column: number): string {
+  const left = hasLeft(grid, row, column);
+  const right = hasRight(grid, row, column);
+  const up = hasUp(grid, row, column);
+  const down = hasDown(grid, row, column);
+
+  if (left || right) return lineGlyph(left, right, up, down);
+  return '│';
+}
+
+function lineGlyph(left: boolean, right: boolean, up: boolean, down: boolean): string {
+  const key = `${left ? 'l' : ''}${right ? 'r' : ''}${up ? 'u' : ''}${down ? 'd' : ''}`;
+  const glyphs: Record<string, string> = {
+    lr: '─',
+    ud: '│',
+    rd: '┌',
+    ld: '┐',
+    ru: '└',
+    lu: '┘',
+    lrd: '┬',
+    lru: '┴',
+    rud: '├',
+    lud: '┤',
+    lrud: '┼',
+  };
+  return glyphs[key] ?? '┼';
+}
+
+function hasLeft(grid: string[][], row: number, column: number): boolean {
+  return isHorizontalConnector(grid[row]?.[column - 1]);
+}
+
+function hasRight(grid: string[][], row: number, column: number): boolean {
+  return isHorizontalConnector(grid[row]?.[column + 1]);
+}
+
+function hasUp(grid: string[][], row: number, column: number): boolean {
+  return isVerticalConnector(grid[row - 1]?.[column]);
+}
+
+function hasDown(grid: string[][], row: number, column: number): boolean {
+  return isVerticalConnector(grid[row + 1]?.[column]);
+}
+
+function isHorizontalConnector(char: string | undefined): boolean {
+  return char === '-' || char === '─' || char === '<' || char === '>' || char === '←' || char === '→';
+}
+
+function isVerticalConnector(char: string | undefined): boolean {
+  return char === '|' || char === '│' || char === '^' || char === 'v' || char === '↑' || char === '↓';
 }
 
 function copySourceLineAttributes(from: Element, to: HTMLElement): void {

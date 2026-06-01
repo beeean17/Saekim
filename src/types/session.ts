@@ -13,7 +13,6 @@ export interface WorkspaceSession {
 export interface UISession {
   sidebarMode: SidebarMode;
   sidebarViewMode?: SidebarViewMode;
-  toolbarExpanded: boolean;
   viewMode: ViewMode;
   sidebarWidth: number;
   splitRatio: number;

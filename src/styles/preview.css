@@ -158,6 +158,15 @@
   border: 0;
 }
 
+.preview-content pre.ascii-diagram {
+  line-height: 1.25;
+}
+
+.preview-content pre.ascii-diagram code {
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+}
+
 .preview-content .plain-text-preview {
   min-height: 100%;
   margin: 0;
@@ -521,9 +530,10 @@
 }
 
 .preview-content .shiki .line {
-  display: block;
+  display: inline-block;
   padding: 0 16px 0 52px;
   line-height: 1.08;
+  vertical-align: top;
 }
 
 .preview-content .shiki .line::before {

@@ -28,7 +28,6 @@ function restoreEditorWidth(ui: UISession): number {
 interface UIState {
   sidebarMode: SidebarMode;
   sidebarViewMode: SidebarViewMode;
-  toolbarExpanded: boolean;
   viewMode: ViewMode;
   sidebarWidth: number;
   splitRatio: number;
@@ -39,7 +38,6 @@ interface UIState {
   settingsOpen: boolean;
   toggleSidebar: () => void;
   setSidebarViewMode: (mode: SidebarViewMode) => void;
-  toggleToolbarExpanded: () => void;
   setViewMode: (mode: ViewMode) => void;
   setSidebarWidth: (width: number) => void;
   setSplitRatio: (ratio: number) => void;
@@ -56,7 +54,6 @@ interface UIState {
 export const useUIStore = create<UIState>()((set) => ({
   sidebarMode: 'expanded',
   sidebarViewMode: 'files',
-  toolbarExpanded: true,
   viewMode: 'split',
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   splitRatio: 0.5,
@@ -70,10 +67,6 @@ export const useUIStore = create<UIState>()((set) => ({
       sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
     })),
   setSidebarViewMode: (mode) => set({ sidebarViewMode: mode }),
-  toggleToolbarExpanded: () =>
-    set((state) => ({
-      toolbarExpanded: !state.toolbarExpanded,
-    })),
   setViewMode: (mode) => set({ viewMode: mode }),
   setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
   setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
@@ -85,5 +78,16 @@ export const useUIStore = create<UIState>()((set) => ({
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
   restoreUI: (ui) =>
-    set({ ...ui, sidebarViewMode: ui.sidebarViewMode ?? 'files', editorWidth: restoreEditorWidth(ui), pdfExportStatus: 'idle', findOpen: false, settingsOpen: false }),
+    set({
+      sidebarMode: ui.sidebarMode,
+      sidebarViewMode: ui.sidebarViewMode ?? 'files',
+      viewMode: ui.viewMode,
+      sidebarWidth: ui.sidebarWidth,
+      splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
+      editorWidth: restoreEditorWidth(ui),
+      syncScroll: ui.syncScroll ?? true,
+      pdfExportStatus: 'idle',
+      findOpen: false,
+      settingsOpen: false,
+    }),
 }));
