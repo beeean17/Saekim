@@ -153,11 +153,19 @@ md.renderer.rules.math_inline = (tokens, idx) =>
 
 md.renderer.rules.math_block = (tokens, idx) => {
   const attrs = sourceLineAttributes(tokens[idx]);
-  const html = katex.renderToString(tokens[idx].content.trim(), {
-    ...katexOptions,
-    displayMode: true,
-  });
-  return `<div class="math-block"${attrs}>${html}</div>\n`;
+  const equations = splitKatexBlockEquations(tokens[idx].content);
+  const equationCounts = new Map<string, number>();
+  const html = equations
+    .map((equation, index) => {
+      const equationHtml = katex.renderToString(equation, {
+        ...katexOptions,
+        displayMode: true,
+      });
+      const equationKey = stableEquationKey(equation, equationCounts);
+      return `<div class="math-equation" data-equation-index="${index}" data-equation-key="${escapeHtml(equationKey)}">${equationHtml}</div>`;
+    })
+    .join('');
+  return `<div class="math-block"${attrs} data-label="katex"><div class="math-equation-list">${html}</div></div>\n`;
 };
 
 md.renderer.rules.fence = (tokens, idx) => {
@@ -300,6 +308,35 @@ function sourceLineAttributes(token: Pick<Token, 'map'>): string {
 
 function normalizeFenceContent(content: string): string {
   return content.replace(/\n$/, '');
+}
+
+function splitKatexBlockEquations(content: string): string[] {
+  const normalized = content.replace(/\r\n?/g, '\n').trim();
+  if (!normalized) return [''];
+  if (/\\(?:begin|end)\s*\{/.test(normalized)) return [normalized];
+
+  const equations = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return equations.length > 0 ? equations : [normalized];
+}
+
+function stableEquationKey(equation: string, counts: Map<string, number>): string {
+  const hash = stableHash(equation);
+  const occurrence = counts.get(hash) ?? 0;
+  counts.set(hash, occurrence + 1);
+  return `${hash}:${occurrence}`;
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function normalizeMarkdownInput(text: string): string {

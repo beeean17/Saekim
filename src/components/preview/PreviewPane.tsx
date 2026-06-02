@@ -389,6 +389,7 @@ type LayoutChangeHandler = (layout: BlockLayout | BlockLayout[]) => void;
 
 const layoutWidths = [100, 75, 50, 33];
 const layoutAligns: LayoutAlign[] = ['left', 'center', 'right'];
+const equationAligns: LayoutAlign[] = ['left', 'center', 'right'];
 
 function enhancePreviewLayoutBlocks(
   root: HTMLElement,
@@ -399,6 +400,7 @@ function enhancePreviewLayoutBlocks(
   if (filePath.startsWith('~') || filePath.startsWith('browser://')) return;
 
   unwrapLayoutGroups(root);
+  unwrapUnsupportedLayoutWrappers(root);
 
   const layoutByKey = new Map(layouts.map((layout) => [layoutIdentity(layout), layout]));
   root.querySelectorAll<HTMLElement>('.preview-layout-block').forEach((wrapper) => {
@@ -435,6 +437,7 @@ function enhancePreviewLayoutBlocks(
     const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
     applyBlockLayout(wrapper, layout);
     renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
+    renderKatexEquationControls(wrapper, layout, root, onChange);
   });
 
   if (normalizedLayouts.length > 0) {
@@ -458,13 +461,13 @@ function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
   });
 
   root
-    .querySelectorAll<HTMLElement>('table, ul, ol, blockquote, pre, .mermaid-block, .math-block')
+    .querySelectorAll<HTMLElement>('table, pre, .mermaid-block, .math-block')
     .forEach((element) => {
       if (element.closest('.preview-layout-block')) return;
-      if ((element.tagName === 'UL' || element.tagName === 'OL') && element.closest('li')) return;
       if (element.classList.contains('mermaid-block') && !element.querySelector('svg')) return;
 
       const blockKind = blockKindForElement(element);
+      if (!blockKind) return;
       const blockKey = stableBlockKey(element, blockKind);
       const occurrenceIndex = nextOccurrence(genericCounts, `${blockKind}:${blockKey}`);
       targets.push({ element, blockKind, blockKey, occurrenceIndex });
@@ -595,6 +598,63 @@ function renderLayoutControls(
   wrapper.append(tools);
 }
 
+function renderKatexEquationControls(
+  wrapper: HTMLElement,
+  layout: BlockLayout,
+  root: HTMLElement,
+  onChange: LayoutChangeHandler,
+): void {
+  if (blockKindFromDataset(wrapper.dataset.blockKind) !== 'katex') return;
+
+  const equations = Array.from(wrapper.querySelectorAll<HTMLElement>('.math-equation'));
+  if (equations.length === 0) return;
+
+  const alignments = getKatexEquationAlignments(layout);
+
+  equations.forEach((equation, index) => {
+    const key = equation.dataset.equationKey || String(index);
+    const currentAlign = alignments[key] ?? 'center';
+    equation.dataset.align = currentAlign;
+    equation.querySelector('.math-equation-tools')?.remove();
+
+    if (!equation.dataset.equationSelectionBound) {
+      equation.dataset.equationSelectionBound = 'true';
+      equation.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target instanceof Element && target.closest('.math-equation-tools')) return;
+
+        clearSelectedKatexEquations(root);
+        equation.dataset.selected = 'true';
+      });
+    }
+
+    const tools = document.createElement('div');
+    tools.className = 'math-equation-tools';
+    tools.setAttribute('aria-label', '수식 정렬');
+
+    equationAligns.forEach((align) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
+      button.title = align === 'left' ? '수식 왼쪽 정렬' : align === 'center' ? '수식 가운데 정렬' : '수식 오른쪽 정렬';
+      button.className = currentAlign === align ? 'active' : '';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        clearSelectedLayoutBlocks(root);
+        clearSelectedKatexEquations(root);
+        wrapper.dataset.selected = 'true';
+        equation.dataset.selected = 'true';
+        equation.dataset.align = align;
+        onChange(withKatexEquationAlign(layout, key, align));
+      });
+      tools.append(button);
+    });
+
+    equation.append(tools);
+  });
+}
+
 function bindLayoutSelection(root: HTMLElement, wrapper: HTMLElement): void {
   if (!root.dataset.layoutSelectionBound) {
     root.dataset.layoutSelectionBound = 'true';
@@ -603,6 +663,7 @@ function bindLayoutSelection(root: HTMLElement, wrapper: HTMLElement): void {
       if (!(target instanceof Element)) return;
       if (target.closest('.preview-layout-block')) return;
       clearSelectedLayoutBlocks(root);
+      clearSelectedKatexEquations(root);
     });
   }
 
@@ -613,11 +674,15 @@ function bindLayoutSelection(root: HTMLElement, wrapper: HTMLElement): void {
     if (target instanceof Element && target.closest('.preview-layout-tools')) return;
     if (!(target instanceof Element) || !isLayoutSelectionTarget(wrapper, target)) {
       clearSelectedLayoutBlocks(root);
+      clearSelectedKatexEquations(root);
       return;
     }
 
     clearSelectedLayoutBlocks(root);
     wrapper.dataset.selected = 'true';
+    if (!target.closest('.math-equation')) {
+      clearSelectedKatexEquations(root);
+    }
   });
 }
 
@@ -629,8 +694,8 @@ function isLayoutSelectionTarget(wrapper: HTMLElement, target: Element): boolean
   const selectorByKind: Record<BlockKind, string> = {
     image: 'img',
     table: 'table',
-    list: 'ul, ol',
-    blockquote: 'blockquote',
+    list: '',
+    blockquote: '',
     code: 'pre, .shiki, code',
     mermaid: '.mermaid-block',
     katex: '.math-block',
@@ -644,6 +709,12 @@ function isLayoutSelectionTarget(wrapper: HTMLElement, target: Element): boolean
 
 function clearSelectedLayoutBlocks(root: HTMLElement): void {
   root.querySelectorAll<HTMLElement>('.preview-layout-block[data-selected="true"]').forEach((item) => {
+    delete item.dataset.selected;
+  });
+}
+
+function clearSelectedKatexEquations(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.math-equation[data-selected="true"]').forEach((item) => {
     delete item.dataset.selected;
   });
 }
@@ -786,7 +857,9 @@ function normalizeLayoutGroups(
 }
 
 function getLayoutWrappers(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>('.preview-layout-block'));
+  return Array.from(root.querySelectorAll<HTMLElement>('.preview-layout-block')).filter((wrapper) =>
+    isLayoutControlBlockKind(blockKindFromDataset(wrapper.dataset.blockKind)),
+  );
 }
 
 function contiguousLayoutWrappers(root: HTMLElement, wrapper: HTMLElement, columns: number): HTMLElement[] {
@@ -846,6 +919,28 @@ function withGroupIndex(layout: BlockLayout, index: number): BlockLayout {
   };
 }
 
+function withKatexEquationAlign(layout: BlockLayout, key: string, align: LayoutAlign): BlockLayout {
+  const layoutJson = { ...(layout.layoutJson ?? {}) };
+  const alignments = getKatexEquationAlignments(layout);
+
+  if (align === 'center') {
+    delete alignments[key];
+  } else {
+    alignments[key] = align;
+  }
+
+  if (Object.keys(alignments).length > 0) {
+    layoutJson.equationAlignments = alignments;
+  } else {
+    delete layoutJson.equationAlignments;
+  }
+
+  return {
+    ...layout,
+    layoutJson: Object.keys(layoutJson).length > 0 ? layoutJson : null,
+  };
+}
+
 function clearLayoutGroup(layout: BlockLayout): BlockLayout {
   const rest = { ...(layout.layoutJson ?? {}) };
   delete rest.groupId;
@@ -876,6 +971,22 @@ function getLayoutGroupIndex(layout: BlockLayout): number {
   return typeof value === 'number' && value >= 0 ? value : 0;
 }
 
+function getKatexEquationAlignments(layout: BlockLayout): Record<string, LayoutAlign> {
+  const value = layout.layoutJson?.equationAlignments;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  return Object.entries(value).reduce<Record<string, LayoutAlign>>((alignments, [key, align]) => {
+    if (typeof key === 'string' && isLayoutAlignValue(align)) {
+      alignments[key] = align;
+    }
+    return alignments;
+  }, {});
+}
+
+function isLayoutAlignValue(value: unknown): value is LayoutAlign {
+  return value === 'left' || value === 'center' || value === 'right';
+}
+
 function unwrapLayoutGroups(root: HTMLElement): void {
   root.querySelectorAll<HTMLElement>('.preview-layout-group').forEach((group) => {
     const parent = group.parentElement;
@@ -884,6 +995,25 @@ function unwrapLayoutGroups(root: HTMLElement): void {
       parent.insertBefore(child, group);
     });
     group.remove();
+  });
+}
+
+function unwrapUnsupportedLayoutWrappers(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.preview-layout-block').forEach((wrapper) => {
+    if (isLayoutControlBlockKind(blockKindFromDataset(wrapper.dataset.blockKind))) return;
+
+    const parent = wrapper.parentElement;
+    if (!parent) return;
+
+    const surface = wrapper.querySelector<HTMLElement>(':scope > .preview-layout-surface');
+    const nodes = surface
+      ? Array.from(surface.childNodes)
+      : Array.from(wrapper.childNodes).filter(
+          (node) => !(node instanceof HTMLElement && node.classList.contains('preview-layout-tools')),
+        );
+
+    nodes.forEach((node) => parent.insertBefore(node, wrapper));
+    wrapper.remove();
   });
 }
 
@@ -947,13 +1077,12 @@ function nextOccurrence(counts: Map<string, number>, key: string): number {
   return next;
 }
 
-function blockKindForElement(element: HTMLElement): BlockKind {
+function blockKindForElement(element: HTMLElement): BlockKind | null {
   if (element.classList.contains('mermaid-block')) return 'mermaid';
   if (element.classList.contains('math-block')) return 'katex';
   if (element.tagName === 'TABLE') return 'table';
-  if (element.tagName === 'BLOCKQUOTE') return 'blockquote';
   if (element.tagName === 'PRE') return 'code';
-  return 'list';
+  return null;
 }
 
 function blockKindFromDataset(value?: string): BlockKind | null {
@@ -969,6 +1098,10 @@ function blockKindFromDataset(value?: string): BlockKind | null {
     return value;
   }
   return null;
+}
+
+function isLayoutControlBlockKind(value: BlockKind | null): boolean {
+  return value === 'image' || value === 'table' || value === 'code' || value === 'mermaid' || value === 'katex';
 }
 
 function stableBlockKey(element: HTMLElement, kind: BlockKind): string {

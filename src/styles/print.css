@@ -116,6 +116,8 @@
 
 .pdf-export-root pre,
 .pdf-export-root .shiki {
+  --preview-code-line-height: 1.45;
+
   position: relative;
   margin: 14px 0;
   padding: 34px 0 14px;
@@ -126,7 +128,7 @@
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 12px;
-  line-height: 1.08;
+  line-height: var(--preview-code-line-height);
   white-space: pre-wrap;
 }
 
@@ -159,7 +161,7 @@
 .pdf-export-root .shiki .line {
   display: block;
   padding: 0 16px 0 52px;
-  line-height: 1.08;
+  line-height: var(--preview-code-line-height);
 }
 
 .pdf-export-root .shiki .line::before {
@@ -218,20 +220,75 @@
 }
 
 .pdf-export-root .math-block {
+  position: relative;
   margin: 16px 0;
-  padding: 16px;
+  padding: 38px 16px 16px;
   overflow: visible;
   color: #111827 !important;
-  background: #ffffff !important;
+  background: #f8fafc !important;
   border: 1px solid #d8dde8;
   border-radius: 6px;
+}
+
+.pdf-export-root .math-block::before {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 6px;
+  color: #687285;
+  background: #ffffff;
+  border: 1px solid #d8dde8;
+  border-radius: 4px;
+  content: attr(data-label);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
 }
 
 .pdf-export-root .math-block .katex-display {
   margin: 0;
 }
 
+.pdf-export-root .math-equation-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.pdf-export-root .math-equation {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  padding: 5px 16px;
+  box-sizing: border-box;
+}
+
+.pdf-export-root .math-equation[data-align="left"] {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.pdf-export-root .math-equation[data-align="center"] {
+  justify-content: center;
+  text-align: center;
+}
+
+.pdf-export-root .math-equation[data-align="right"] {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.pdf-export-root .math-equation .katex-display {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  text-align: inherit;
+}
+
 .pdf-export-root .preview-layout-tools,
+.pdf-export-root .math-equation-tools,
 .pdf-export-root .preview-mode-tabs {
   display: none !important;
 }
