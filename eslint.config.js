@@ -29,7 +29,7 @@ export default [
         {
           patterns: [
             {
-              group: ['../*/*', '../../features/*/*', 'src/features/*/*'],
+              group: ['../../features/*/*', 'src/features/*/*'],
               message: featureBoundaryMessage,
             },
           ],

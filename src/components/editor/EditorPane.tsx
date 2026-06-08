@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import katex from 'katex';
+import { enabledFeatures } from '../../app/featureRegistry';
+import { getFileTypeLabel } from '../../core/document/fileType';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { Backend } from '../../lib/backend';
-import { getFileTypeLabel } from '../../lib/fileType';
 import {
   katexHelperItems,
   markdownHelperItems,
@@ -190,7 +191,7 @@ function EditorToolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextA
   const openFind = useUIStore((state) => state.openFind);
   const [helperMode, setHelperMode] = useState<HelperMode | null>(null);
   const disabled = !activeFile;
-  const fileType = useMemo(() => (activeFile ? getFileTypeLabel(activeFile.name, activeFile.path) : '-'), [activeFile]);
+  const fileType = useMemo(() => (activeFile ? getFileTypeLabel(activeFile.name, activeFile.path, enabledFeatures) : '-'), [activeFile]);
 
   useEffect(() => {
     if (disabled) setHelperMode(null);

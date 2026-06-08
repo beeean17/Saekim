@@ -1,0 +1,120 @@
+.preview-content .math-block {
+  position: relative;
+  margin: 14px 0;
+  padding: 38px 18px 16px;
+  overflow-x: auto;
+  overflow-y: visible;
+  color: var(--text-primary);
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.preview-content .math-block::before {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 6px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  content: attr(data-label);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+.preview-content .math-block .katex-display {
+  margin: 0;
+}
+
+.preview-content .math-equation-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: max-content;
+}
+
+.preview-content .math-equation {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  padding: 5px 74px;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+
+.preview-content .math-equation[data-align="left"] {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.preview-content .math-equation[data-align="center"] {
+  justify-content: center;
+  text-align: center;
+}
+
+.preview-content .math-equation[data-align="right"] {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.preview-content .math-equation[data-selected="true"] {
+  background: color-mix(in srgb, var(--accent-soft) 48%, transparent);
+}
+
+.preview-content .math-equation .katex-display {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  text-align: inherit;
+}
+
+.math-equation-tools {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  z-index: 1;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  opacity: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 18%, transparent);
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.preview-content .math-equation:hover > .math-equation-tools,
+.preview-content .math-equation[data-selected="true"] > .math-equation-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.math-equation-tools button {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.math-equation-tools button:hover,
+.math-equation-tools button.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}

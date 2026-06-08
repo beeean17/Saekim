@@ -1,1 +1,3 @@
+import './katex.css';
+
 export {};

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { FileTypeInfo } from '../../core/document/fileType';
 import { isRecord, parseStructuredData, parseTabularData } from '../../lib/structured/parse';
-import type { FileTypeInfo } from '../../lib/fileType';
 
 type StructuredMode = 'tree' | 'api' | 'raw';
 type TabularMode = 'table' | 'raw';

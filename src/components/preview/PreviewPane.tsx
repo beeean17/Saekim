@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
+import type { PreviewRenderContext, PreviewResult } from '../../app/feature';
+import { enabledFeatures } from '../../app/featureRegistry';
+import { getFileTypeInfo } from '../../core/document/fileType';
+import { selectPreviewEnhancements, selectPreviewRenderer } from '../../core/preview/registry';
 import { Backend } from '../../lib/backend';
-import { getFileTypeInfo } from '../../lib/fileType';
-import { renderBrowserHtmlDocument, renderSafeHtmlDocument } from '../../lib/html/renderHtml';
-import { escapeHtml } from '../../lib/markdown/escape';
-import { renderMarkdown } from '../../lib/markdown/renderer';
 import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
@@ -12,35 +12,26 @@ import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { BlockKind, BlockLayout, LayoutAlign } from '../../types/metadata';
 import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../ui/feedback/EmptyState';
-import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { ToolbarButton } from '../ui/toolbar/Toolbar';
-import { StructuredDataPreview, TabularDataPreview } from './StructuredDataPreview';
 
 export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
   const activeFile = useWorkspaceStore(selectActiveFile);
+  const theme = useSettingsStore((state) => state.theme);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const setHtmlPreviewMode = useSettingsStore((state) => state.setHtmlPreviewMode);
-  const isHtmlPreview = getFileTypeInfo(activeFile?.name, activeFile?.path).previewKind === 'html';
+  const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path, enabledFeatures);
+  const previewContext = activeFile
+    ? ({ file: activeFile, fileType, theme, htmlPreviewMode, setHtmlPreviewMode } satisfies PreviewRenderContext)
+    : null;
+  const renderer = previewContext ? selectPreviewRenderer(enabledFeatures, previewContext) : null;
 
   return (
     <section className="preview-pane" data-disabled={!activeFile}>
       <div className="preview-head">
         <span className="label">미리보기</span>
-        {isHtmlPreview ? (
-          <SegmentedControl
-            ariaLabel="HTML 미리보기 모드"
-            className="html-preview-mode"
-            size="sm"
-            value={htmlPreviewMode}
-            options={[
-              { value: 'browser', label: '브라우저', title: '브라우저처럼 보기' },
-              { value: 'safe', label: '안전', title: '안전하게 보기' },
-            ]}
-            onChange={setHtmlPreviewMode}
-          />
-        ) : null}
+        {previewContext ? renderer?.head?.(previewContext) : null}
         <ToolbarButton
           className={`preview-action ${syncScroll ? 'active' : ''}`}
           disabled={!activeFile}
@@ -62,17 +53,27 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   const activeFile = useWorkspaceStore(selectActiveFile);
   const theme = useSettingsStore((state) => state.theme);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
-  const [html, setHtml] = useState('');
+  const setHtmlPreviewMode = useSettingsStore((state) => state.setHtmlPreviewMode);
+  const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
   const [blockLayouts, setBlockLayouts] = useState<BlockLayout[]>([]);
-  const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path);
-  const usesBrowserFrame = fileType.previewKind === 'html' && htmlPreviewMode === 'browser';
-  const usesStructuredPreview = fileType.previewKind === 'structured-data' || fileType.previewKind === 'tabular-data';
+  const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path, enabledFeatures);
+  const previewContext = useMemo<PreviewRenderContext | null>(
+    () =>
+      activeFile
+        ? { file: activeFile, fileType, theme, htmlPreviewMode, setHtmlPreviewMode }
+        : null,
+    [activeFile, fileType.label, fileType.language, fileType.previewKind, htmlPreviewMode, setHtmlPreviewMode, theme],
+  );
+  const renderer = previewContext ? selectPreviewRenderer(enabledFeatures, previewContext) : null;
+  const enhancements = previewContext ? selectPreviewEnhancements(enabledFeatures, previewContext) : [];
+  const enhancementIds = enhancements.map((contribution) => contribution.id).join('|');
+  const usesBrowserFrame = previewResult?.kind === 'html' && previewResult.renderMode === 'browser-frame';
 
   useEffect(() => {
     let alive = true;
     const filePath = activeFile?.path;
 
-    if (!filePath || filePath.startsWith('~') || filePath.startsWith('browser://') || fileType.previewKind !== 'markdown') {
+    if (!filePath || filePath.startsWith('~') || filePath.startsWith('browser://') || !renderer?.supportsBlockLayouts) {
       setBlockLayouts([]);
       return () => {
         alive = false;
@@ -91,7 +92,7 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     return () => {
       alive = false;
     };
-  }, [activeFile?.path, fileType.previewKind]);
+  }, [activeFile?.path, renderer?.id, renderer?.supportsBlockLayouts]);
 
   const saveBlockLayout = useCallback((layoutOrLayouts: BlockLayout | BlockLayout[]) => {
     const layouts = Array.isArray(layoutOrLayouts) ? layoutOrLayouts : [layoutOrLayouts];
@@ -102,48 +103,51 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   }, []);
 
   useEffect(() => {
-    let alive = true;
-    const content = activeFile?.content ?? '';
-
-    if (usesStructuredPreview) {
-      setHtml('');
-      return () => {
-        alive = false;
-      };
+    if (!previewContext || !renderer?.render) {
+      setPreviewResult(null);
+      return;
     }
 
-    if (fileType.previewKind === 'html') {
-      setHtml(
-        htmlPreviewMode === 'browser'
-          ? renderBrowserHtmlDocument(content, activeFile?.path)
-          : renderSafeHtmlDocument(content, activeFile?.path),
-      );
-      return () => {
-        alive = false;
-      };
-    }
+    const controller = new AbortController();
+    const renderContext = { ...previewContext, signal: controller.signal };
+    void Promise.resolve(renderer.render(renderContext))
+      .then((result) => {
+        if (!controller.signal.aborted) setPreviewResult(result);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.error(`failed to render preview contribution "${renderer.id}"`, error);
+          setPreviewResult({
+            kind: 'html',
+            html: '<div class="preview-error-panel compact"><strong>Preview failed</strong><pre>미리보기를 렌더링하지 못했습니다.</pre></div>',
+          });
+        }
+      });
 
-    if (fileType.previewKind !== 'markdown') {
-      setHtml(`<pre class="plain-text-preview">${escapeHtml(content)}</pre>`);
-      return () => {
-        alive = false;
-      };
-    }
-
-    const mode = theme === 'dark' || theme === 'nord' ? 'dark' : 'light';
-    void renderMarkdown(content, mode, activeFile?.path).then((nextHtml) => {
-      if (alive) setHtml(nextHtml);
-    });
     return () => {
-      alive = false;
+      controller.abort();
     };
-  }, [activeFile?.content, activeFile?.name, activeFile?.path, fileType.previewKind, htmlPreviewMode, theme, usesStructuredPreview]);
+  }, [
+    activeFile?.content,
+    activeFile?.id,
+    activeFile?.name,
+    activeFile?.path,
+    fileType.language,
+    fileType.previewKind,
+    htmlPreviewMode,
+    previewContext,
+    renderer,
+    theme,
+  ]);
 
-  const previewRenderKey = usesStructuredPreview ? activeFile?.content : html;
+  const previewRenderKey =
+    previewResult?.kind === 'react'
+      ? `${renderer?.id ?? 'react'}:${previewResult.renderKey ?? activeFile?.id ?? ''}:${activeFile?.content ?? ''}`
+      : previewResult?.html ?? '';
 
   useLayoutEffect(() => {
     notifyPreviewRendered(localRef.current);
-  }, [activeFile?.path, fileType.previewKind, previewRenderKey]);
+  }, [activeFile?.path, renderer?.id, previewRenderKey]);
 
   useEffect(
     () => () => {
@@ -174,7 +178,7 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
 
     root.addEventListener('click', onClick);
     return () => root.removeEventListener('click', onClick);
-  }, [html]);
+  }, [previewRenderKey]);
 
   useEffect(() => {
     const root = localRef.current;
@@ -207,62 +211,54 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
         image.removeEventListener('error', onError);
       });
     };
-  }, [html]);
+  }, [previewRenderKey]);
 
   useEffect(() => {
     const root = localRef.current;
-    if (!root) return;
+    if (!root || !previewContext || !renderer) return;
 
-    let alive = true;
+    const controller = new AbortController();
+    const renderContext = { ...previewContext, signal: controller.signal };
 
-    void import('mermaid').then(({ default: mermaid }) => {
-      if (!alive) return;
-      const blocks = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-block[data-source]'));
-      if (blocks.length === 0) return;
-
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: theme === 'default' ? 'default' : 'dark',
-        securityLevel: 'strict',
-      });
-
-      void Promise.all(
-        blocks.map(async (block, index) => {
-          try {
-            const source = decodeURIComponent(block.dataset.source || '');
-            const id = `mermaid-${Date.now()}-${index}`;
-            const { svg } = await mermaid.render(id, source);
-            if (alive) {
-              block.innerHTML = svg;
-              block.dataset.rendered = 'true';
-            }
-          } catch (error) {
-            console.error('failed to render mermaid block', error);
-            if (alive) block.dataset.rendered = 'false';
-          }
-        }),
-      ).finally(() => {
-        if (!alive) return;
-        const filePath = activeFile?.path;
-        if (filePath && fileType.previewKind === 'markdown') {
-          enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
+    void (async () => {
+      try {
+        await renderer.afterRender?.(root, renderContext, controller.signal);
+        for (const enhancement of enhancements) {
+          if (controller.signal.aborted) return;
+          await enhancement.afterRender?.(root, renderContext, controller.signal);
         }
-        notifyPreviewRendered(root);
-      });
-    });
+        if (!controller.signal.aborted && renderer.supportsBlockLayouts) {
+          const filePath = activeFile?.path;
+          if (filePath) enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
+        }
+        if (!controller.signal.aborted) notifyPreviewRendered(root);
+      } catch (error) {
+        if (!controller.signal.aborted) console.error('failed to run preview lifecycle', error);
+      }
+    })();
 
     return () => {
-      alive = false;
+      controller.abort();
+      renderer.cleanup?.(root);
+      enhancements.forEach((enhancement) => enhancement.cleanup?.(root));
     };
-  }, [activeFile?.path, blockLayouts, fileType.previewKind, html, saveBlockLayout, theme]);
+  }, [
+    activeFile?.path,
+    blockLayouts,
+    enhancementIds,
+    previewContext,
+    previewRenderKey,
+    renderer,
+    saveBlockLayout,
+  ]);
 
   useEffect(() => {
     const root = localRef.current;
     const filePath = activeFile?.path;
-    if (!root || !filePath || fileType.previewKind !== 'markdown') return;
+    if (!root || !filePath || !renderer?.supportsBlockLayouts) return;
 
     enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
-  }, [activeFile?.path, blockLayouts, fileType.previewKind, html, saveBlockLayout]);
+  }, [activeFile?.path, blockLayouts, previewRenderKey, renderer?.id, renderer?.supportsBlockLayouts, saveBlockLayout]);
 
   const className = usesBrowserFrame ? 'preview-content html-preview-browser' : 'preview-content';
   const setPreviewElement = (element: HTMLDivElement | null) => {
@@ -282,14 +278,18 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     );
   }
 
-  if (usesBrowserFrame) {
+  if (!previewResult) {
+    return <div className={className} ref={setPreviewElement} />;
+  }
+
+  if (usesBrowserFrame && previewResult.kind === 'html') {
     return (
       <div className={className} ref={setPreviewElement}>
         <iframe
           ref={frameRef}
           className="html-preview-frame"
           sandbox="allow-same-origin"
-          srcDoc={html}
+          srcDoc={previewResult.html}
           title="HTML 미리보기"
           onLoad={() => bindHtmlPreviewFrame(frameRef.current, localRef.current, frameCleanupRef)}
         />
@@ -297,18 +297,10 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     );
   }
 
-  if (fileType.previewKind === 'structured-data') {
+  if (previewResult.kind === 'react') {
     return (
       <div className={className} ref={setPreviewElement}>
-        <StructuredDataPreview content={activeFile?.content ?? ''} fileType={fileType} fileKey={activeFile?.id} />
-      </div>
-    );
-  }
-
-  if (fileType.previewKind === 'tabular-data') {
-    return (
-      <div className={className} ref={setPreviewElement}>
-        <TabularDataPreview content={activeFile?.content ?? ''} fileType={fileType} />
+        {previewResult.node}
       </div>
     );
   }
@@ -317,7 +309,7 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     <div
       className={className}
       ref={setPreviewElement}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: previewResult.html }}
     />
   );
 }
