@@ -7,8 +7,10 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function IconButton({ children, label, className = 'ui-icon-button', ...props }: IconButtonProps) {
+  const classes = className === 'ui-icon-button' ? className : `ui-icon-button ${className}`;
+
   return (
-    <button className={className} title={label} aria-label={label} type="button" {...props}>
+    <button className={classes} title={label} aria-label={label} type="button" {...props}>
       {children}
     </button>
   );

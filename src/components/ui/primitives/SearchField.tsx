@@ -15,8 +15,10 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
   { value, placeholder, autoFocus, className = 'ui-search-field', onChange, onEscape, onKeyDown },
   ref,
 ) {
+  const classes = className === 'ui-search-field' ? className : `ui-search-field ${className}`;
+
   return (
-    <div className={className}>
+    <div className={classes}>
       <Icon name="search" />
       <input
         ref={ref}

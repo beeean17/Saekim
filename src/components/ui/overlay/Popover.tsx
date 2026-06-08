@@ -22,6 +22,7 @@ export function Popover({
   onClose,
 }: PopoverProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const classes = className === 'ui-popover' ? className : `ui-popover ${className}`;
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +48,7 @@ export function Popover({
 
   return (
     <div
-      className={className}
+      className={classes}
       data-align={align}
       ref={ref}
       role={role}

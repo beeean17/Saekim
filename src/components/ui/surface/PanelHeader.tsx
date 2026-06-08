@@ -17,11 +17,16 @@ export function PanelHeader({
   titleClassName = 'ui-panel-title',
   descriptionClassName = 'ui-panel-description',
 }: PanelHeaderProps) {
+  const classes = className === 'ui-panel-header' ? className : `ui-panel-header ${className}`;
+  const titleClasses = titleClassName === 'ui-panel-title' ? titleClassName : `ui-panel-title ${titleClassName}`;
+  const descriptionClasses =
+    descriptionClassName === 'ui-panel-description' ? descriptionClassName : `ui-panel-description ${descriptionClassName}`;
+
   return (
-    <div className={className}>
+    <div className={classes}>
       <div>
-        <div className={titleClassName}>{title}</div>
-        {description ? <div className={descriptionClassName}>{description}</div> : null}
+        <div className={titleClasses}>{title}</div>
+        {description ? <div className={descriptionClasses}>{description}</div> : null}
       </div>
       {actions}
     </div>

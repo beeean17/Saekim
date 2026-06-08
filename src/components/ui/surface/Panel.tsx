@@ -5,8 +5,10 @@ interface PanelProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export function Panel({ children, className = 'ui-panel', ...props }: PanelProps) {
+  const classes = className === 'ui-panel' ? className : `ui-panel ${className}`;
+
   return (
-    <div className={className} {...props}>
+    <div className={classes} {...props}>
       {children}
     </div>
   );

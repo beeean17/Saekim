@@ -21,6 +21,9 @@ export function Dialog({
   onClose,
   children,
 }: DialogProps) {
+  const dialogClassName = className === 'ui-dialog' ? className : `ui-dialog ${className}`;
+  const backdropClasses = backdropClassName === 'ui-dialog-backdrop' ? backdropClassName : `ui-dialog-backdrop ${backdropClassName}`;
+
   useEffect(() => {
     if (!open) return;
 
@@ -36,11 +39,11 @@ export function Dialog({
 
   return (
     <div
-      className={backdropClassName}
+      className={backdropClasses}
       role="presentation"
       onMouseDown={closeOnBackdrop ? onClose : undefined}
     >
-      <div className={className} role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
+      <div className={dialogClassName} role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -53,5 +56,6 @@ interface DialogActionsProps {
 }
 
 export function DialogActions({ children, className = 'ui-dialog-actions' }: DialogActionsProps) {
-  return <div className={className}>{children}</div>;
+  const classes = className === 'ui-dialog-actions' ? className : `ui-dialog-actions ${className}`;
+  return <div className={classes}>{children}</div>;
 }
