@@ -3,7 +3,7 @@ import './helper.css';
 import type { EditorContribution, EditorHelperPreviewContext } from '../../app/feature';
 import { Button } from '../../components/ui/primitives/Button';
 import type { MarkdownHelperItem } from '../../core/editor/helperTypes';
-import { renderMarkdown } from '../../lib/markdown/renderer';
+import { renderMarkdown } from '../../core/markdown/renderer';
 import { markdownHelperItems } from './helperCatalog';
 
 export const markdownEditorContribution: EditorContribution = {

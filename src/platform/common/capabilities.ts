@@ -1,4 +1,4 @@
-import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { isTauriRuntime } from './tauri/invoke';
 import { androidCapabilities } from '../android/androidCapabilities';
 import { browserCapabilities } from '../browser/browserCapabilities';
 import { desktopCapabilities } from '../desktop/desktopCapabilities';

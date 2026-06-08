@@ -1,5 +1,5 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
-import type { BlockLayout } from '../../types/metadata';
+import type { BlockLayout } from '../../../types/metadata';
 
 export async function loadSession<T>(): Promise<T | null> {
   if (!isTauriRuntime()) return null;

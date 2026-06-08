@@ -4,9 +4,9 @@ import {
   readFile,
   saveFile,
   saveFileAs,
-} from '../../lib/tauri/fs';
-import { isTauriRuntime } from '../../lib/tauri/invoke';
-import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../../lib/tauri/session';
+} from '../common/tauri/fs';
+import { isTauriRuntime } from '../common/tauri/invoke';
+import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../common/tauri/session';
 import type { BackendAdapter } from '../common/BackendAdapter';
 
 export const androidBackend: BackendAdapter = {

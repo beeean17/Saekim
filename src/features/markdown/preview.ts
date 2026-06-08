@@ -1,5 +1,5 @@
 import type { PreviewContribution } from '../../app/feature';
-import { renderMarkdown } from '../../lib/markdown/renderer';
+import { renderMarkdown } from '../../core/markdown/renderer';
 import { Backend } from '../../platform/common/backend';
 
 export const markdownPreviewContribution: PreviewContribution = {

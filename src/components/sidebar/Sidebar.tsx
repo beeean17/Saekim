@@ -1,5 +1,5 @@
 import { useMemo, useState, type RefObject } from 'react';
-import { relativeTime } from '../../lib/format/relativeTime';
+import { relativeTime } from '../../core/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';

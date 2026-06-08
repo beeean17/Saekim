@@ -1,4 +1,4 @@
-import { countKoreanAwareWords, readingTime } from '../../lib/format/readingTime';
+import { countKoreanAwareWords, readingTime } from '../../core/format/readingTime';
 import { pdfExportStatusText, usePdfExportStore } from '../../features/pdf-export';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 

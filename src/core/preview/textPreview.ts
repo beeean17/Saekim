@@ -1,6 +1,6 @@
 import './textPreview.css';
 import type { PreviewContribution } from '../../app/feature';
-import { escapeHtml } from '../../lib/markdown/escape';
+import { escapeHtml } from '../markdown/escape';
 
 export const textPreviewContribution: PreviewContribution = {
   id: 'core.text-preview',

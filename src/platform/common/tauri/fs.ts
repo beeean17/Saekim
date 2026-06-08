@@ -1,5 +1,5 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
-import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../../types/workspace';
 
 export async function openFileDialog(): Promise<boolean> {
   if (!isTauriRuntime()) return false;

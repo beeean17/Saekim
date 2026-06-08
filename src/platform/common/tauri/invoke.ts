@@ -1,5 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import type { CommandResult } from '../../types/workspace';
+import type { CommandResult } from '../../../types/workspace';
 
 export async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const result = await invoke<CommandResult<T>>(command, args);

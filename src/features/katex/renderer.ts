@@ -1,7 +1,7 @@
 import katex from 'katex';
 import markdownItKatex from 'markdown-it-katex';
-import { registerMarkdownItPlugin, setMarkdownMathRenderer } from '../../lib/markdown/extensions';
-import { escapeHtml } from '../../lib/markdown/escape';
+import { registerMarkdownItPlugin, setMarkdownMathRenderer } from '../../core/markdown/extensions';
+import { escapeHtml } from '../../core/markdown/escape';
 
 const katexOptions = {
   throwOnError: false,

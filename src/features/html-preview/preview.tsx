@@ -1,5 +1,5 @@
 import type { PreviewContribution } from '../../app/feature';
-import { renderBrowserHtmlDocument, renderSafeHtmlDocument } from '../../lib/html/renderHtml';
+import { renderBrowserHtmlDocument, renderSafeHtmlDocument } from './renderHtml';
 import { Backend } from '../../platform/common/backend';
 import { SegmentedControl } from '../../components/ui/primitives/SegmentedControl';
 

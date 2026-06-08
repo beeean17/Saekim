@@ -18,9 +18,9 @@ import {
   saveFileAs,
   takePendingOpenFiles,
   writePdfExport,
-} from '../../lib/tauri/fs';
-import { isTauriRuntime } from '../../lib/tauri/invoke';
-import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../../lib/tauri/session';
+} from '../common/tauri/fs';
+import { isTauriRuntime } from '../common/tauri/invoke';
+import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../common/tauri/session';
 import type { BackendAdapter, ImageDownloadProgressPayload, NativeMenuCommandHandlers, WindowAction } from '../common/BackendAdapter';
 
 const externalOpenEvent = 'saekim-open-external-files';

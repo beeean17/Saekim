@@ -1,5 +1,5 @@
 import type { PreviewContribution } from '../../app/feature';
-import { registerMarkdownFenceRenderer } from '../../lib/markdown/extensions';
+import { registerMarkdownFenceRenderer } from '../../core/markdown/extensions';
 
 registerMarkdownFenceRenderer({
   id: 'mermaid',
