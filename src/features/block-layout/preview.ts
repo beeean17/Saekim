@@ -1,6 +1,50 @@
+import type { PreviewContribution } from '../../app/feature';
 import { Backend } from '../../platform/common/backend';
 import type { BlockKind, BlockLayout, LayoutAlign } from '../../types/metadata';
 import './blockLayout.css';
+
+type BlockLayoutChange = BlockLayout | BlockLayout[];
+type LayoutChangeHandler = (layout: BlockLayoutChange) => void;
+
+const blockLayoutCache = new Map<string, BlockLayout[]>();
+
+export const blockLayoutPreviewEnhancement: PreviewContribution = {
+  id: 'block-layout.preview-enhancement',
+  priority: 30,
+  match: ({ file, fileType }) => canUseBlockLayouts(file.path, fileType.previewKind === 'markdown'),
+  async afterRender(root, { file }, signal) {
+    const filePath = file.path;
+    if (!canUseBlockLayouts(filePath, true)) return;
+
+    let layouts = blockLayoutCache.get(filePath);
+    if (!layouts) {
+      try {
+        layouts = await readBlockLayouts(filePath);
+      } catch (error) {
+        console.error('failed to load block layouts', error);
+        layouts = [];
+      }
+      if (signal.aborted) return;
+      blockLayoutCache.set(filePath, layouts);
+    }
+
+    const saveBlockLayout: LayoutChangeHandler = (layoutOrLayouts) => {
+      const changes = Array.isArray(layoutOrLayouts) ? layoutOrLayouts : [layoutOrLayouts];
+      const nextLayouts = changes.reduce(upsertBlockLayout, blockLayoutCache.get(filePath) ?? []);
+      blockLayoutCache.set(filePath, nextLayouts);
+
+      queueMicrotask(() => {
+        if (root.isConnected) enhancePreviewLayoutBlocks(root, filePath, nextLayouts, saveBlockLayout);
+      });
+
+      void writeBlockLayouts(changes).catch((error) => {
+        console.error('failed to save block layouts', error);
+      });
+    };
+
+    enhancePreviewLayoutBlocks(root, filePath, layouts, saveBlockLayout);
+  },
+};
 
 export function canUseBlockLayouts(filePath: string | null | undefined, supportsBlockLayouts: boolean | undefined): filePath is string {
   return Boolean(filePath && !filePath.startsWith('~') && !filePath.startsWith('browser://') && supportsBlockLayouts);
@@ -20,8 +64,6 @@ type LayoutTarget = {
   blockKey: string;
   occurrenceIndex: number;
 };
-
-type LayoutChangeHandler = (layout: BlockLayout | BlockLayout[]) => void;
 
 const layoutWidths = [100, 75, 50, 33];
 const layoutAligns: LayoutAlign[] = ['left', 'center', 'right'];

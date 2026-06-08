@@ -1,2 +1,8 @@
 export { blockLayoutMetadataContribution } from './metadata';
-export { canUseBlockLayouts, enhancePreviewLayoutBlocks, readBlockLayouts, writeBlockLayouts } from './preview';
+export {
+  blockLayoutPreviewEnhancement,
+  canUseBlockLayouts,
+  enhancePreviewLayoutBlocks,
+  readBlockLayouts,
+  writeBlockLayouts,
+} from './preview';

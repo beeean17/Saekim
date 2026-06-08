@@ -1,5 +1,8 @@
 import type { PreviewContribution, PreviewMatchContext, SaekimFeature } from '../../app/feature';
+import { externalLinkPreviewEnhancement, imageLoadPreviewEnhancement } from './domLifecycle';
 import { textPreviewContribution } from './textPreview';
+
+const corePreviewEnhancements = [externalLinkPreviewEnhancement, imageLoadPreviewEnhancement];
 
 export function selectPreviewRenderer(features: SaekimFeature[], ctx: PreviewMatchContext): PreviewContribution {
   return previewContributions(features)
@@ -8,7 +11,7 @@ export function selectPreviewRenderer(features: SaekimFeature[], ctx: PreviewMat
 }
 
 export function selectPreviewEnhancements(features: SaekimFeature[], ctx: PreviewMatchContext): PreviewContribution[] {
-  return previewContributions(features)
+  return [...corePreviewEnhancements, ...previewContributions(features)]
     .filter((contribution) => contribution.afterRender && contribution.match(ctx))
     .sort(byPriorityDescending);
 }

@@ -4,7 +4,7 @@ import { imageAssetsEditorContribution } from '../features/image-assets';
 import { katexEditorContribution } from '../features/katex';
 import { markdownEditorContribution, markdownPreviewContribution } from '../features/markdown';
 import { mermaidEditorContribution, mermaidPreviewEnhancement } from '../features/mermaid';
-import { blockLayoutMetadataContribution } from '../features/block-layout';
+import { blockLayoutMetadataContribution, blockLayoutPreviewEnhancement } from '../features/block-layout';
 import { pdfExportCommands, pdfExportContribution } from '../features/pdf-export';
 import { searchCommands, searchEditorContribution } from '../features/search';
 import { structuredDataPreviewContribution, tabularDataPreviewContribution } from '../features/structured-data';
@@ -77,6 +77,7 @@ const featureCatalog: SaekimFeature[] = [
     label: 'Block Layout',
     dependsOn: ['markdown', 'metadata'],
     requiresCapabilities: { required: ['metadata.sqlite'] },
+    preview: blockLayoutPreviewEnhancement,
     metadata: blockLayoutMetadataContribution,
   },
   {
