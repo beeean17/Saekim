@@ -11,6 +11,9 @@ import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { BlockKind, BlockLayout, LayoutAlign } from '../../types/metadata';
 import { Icon } from '../primitives/Icon';
+import { EmptyState } from '../ui/feedback/EmptyState';
+import { SegmentedControl } from '../ui/primitives/SegmentedControl';
+import { ToolbarButton } from '../ui/toolbar/Toolbar';
 import { StructuredDataPreview, TabularDataPreview } from './StructuredDataPreview';
 
 export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
@@ -26,34 +29,26 @@ export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject
       <div className="preview-head">
         <span className="label">미리보기</span>
         {isHtmlPreview ? (
-          <div className="html-preview-mode" aria-label="HTML 미리보기 모드">
-            <button
-              className={htmlPreviewMode === 'browser' ? 'active' : ''}
-              type="button"
-              title="브라우저처럼 보기"
-              onClick={() => setHtmlPreviewMode('browser')}
-            >
-              브라우저
-            </button>
-            <button
-              className={htmlPreviewMode === 'safe' ? 'active' : ''}
-              type="button"
-              title="안전하게 보기"
-              onClick={() => setHtmlPreviewMode('safe')}
-            >
-              안전
-            </button>
-          </div>
+          <SegmentedControl
+            ariaLabel="HTML 미리보기 모드"
+            className="html-preview-mode"
+            size="sm"
+            value={htmlPreviewMode}
+            options={[
+              { value: 'browser', label: '브라우저', title: '브라우저처럼 보기' },
+              { value: 'safe', label: '안전', title: '안전하게 보기' },
+            ]}
+            onChange={setHtmlPreviewMode}
+          />
         ) : null}
-        <button
+        <ToolbarButton
           className={`preview-action ${syncScroll ? 'active' : ''}`}
           disabled={!activeFile}
           title={syncScroll ? '스크롤 동기화 풀기' : '스크롤 동기화'}
-          type="button"
           onClick={toggleSyncScroll}
         >
           <Icon name={syncScroll ? 'link' : 'unlink'} />
-        </button>
+        </ToolbarButton>
       </div>
       <PreviewContent previewRef={previewRef} />
     </section>
@@ -278,7 +273,11 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   if (!activeFile) {
     return (
       <div className={`${className} empty-document-content`} ref={setPreviewElement}>
-        <EmptyDocumentState />
+        <EmptyState
+          className="empty-document-state"
+          title="열린 문서가 없습니다"
+          description="워크스페이스에서 파일을 선택하거나 파일을 열어주세요."
+        />
       </div>
     );
   }
@@ -320,15 +319,6 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
       ref={setPreviewElement}
       dangerouslySetInnerHTML={{ __html: html }}
     />
-  );
-}
-
-function EmptyDocumentState() {
-  return (
-    <div className="empty-document-state" role="status">
-      <strong>열린 문서가 없습니다</strong>
-      <span>워크스페이스에서 파일을 선택하거나 파일을 열어주세요.</span>
-    </div>
   );
 }
 

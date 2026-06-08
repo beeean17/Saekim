@@ -18,6 +18,11 @@ import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { OpenFile } from '../../types/workspace';
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
+import { EmptyState } from '../ui/feedback/EmptyState';
+import { Dialog } from '../ui/overlay/Dialog';
+import { CloseButton } from '../ui/primitives/CloseButton';
+import { SearchField } from '../ui/primitives/SearchField';
+import { Toolbar as UiToolbar, ToolbarButton, ToolbarGroup } from '../ui/toolbar/Toolbar';
 
 type HelperMode = 'markdown' | 'mermaid' | 'katex';
 type HelperItem = MarkdownHelperItem | KatexHelperItem | MermaidHelperItem;
@@ -82,7 +87,7 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
 
   return (
     <section className="editor-pane" data-disabled={!activeFile}>
-      <Toolbar textareaRef={textareaRef} />
+      <EditorToolbar textareaRef={textareaRef} />
       {activeFile ? (
         <>
           {findOpen ? <FindBar content={activeFile.content} textareaRef={textareaRef} onClose={closeFind} /> : null}
@@ -95,7 +100,11 @@ export function EditorPane({ textareaRef }: { textareaRef: React.RefObject<HTMLT
           />
         </>
       ) : (
-        <EmptyDocumentState />
+        <EmptyState
+          className="empty-document-state"
+          title="열린 문서가 없습니다"
+          description="워크스페이스에서 파일을 선택하거나 파일을 열어주세요."
+        />
       )}
     </section>
   );
@@ -142,18 +151,17 @@ function FindBar({
 
   return (
     <div className="find-bar">
-      <Icon name="search" />
-      <input
+      <SearchField
         ref={inputRef}
+        className="find-search-field"
         value={query}
         placeholder="현재 문서 찾기"
-        onChange={(event) => setQuery(event.currentTarget.value)}
+        onChange={setQuery}
+        onEscape={() => {
+          onClose();
+          textareaRef.current?.focus();
+        }}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            onClose();
-            textareaRef.current?.focus();
-          }
           if (event.key === 'Enter') {
             event.preventDefault();
             go(event.shiftKey ? -1 : 1);
@@ -176,7 +184,7 @@ function FindBar({
   );
 }
 
-function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
+function EditorToolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement> }) {
   const activeFile = useWorkspaceStore(selectActiveFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const openFind = useUIStore((state) => state.openFind);
@@ -190,18 +198,18 @@ function Toolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaEle
 
   return (
     <>
-      <div className="toolbar">
+      <UiToolbar className="toolbar">
         <div className="toolbar-line-indicator" title={`현재 파일 형식: ${fileType}`} aria-label={`현재 파일 형식: ${fileType}`}>
           {fileType}
         </div>
-        <div className="tool-group">
+        <ToolbarGroup className="tool-group">
           <ToolButton disabled={disabled} label="Markdown" special="markdown" tooltip="Markdown 문법 찾기" onClick={() => setHelperMode('markdown')} />
           <ToolButton disabled={disabled} label="◇ Mermaid" special="mermaid" tooltip="Mermaid 다이어그램 문법 찾기" onClick={() => setHelperMode('mermaid')} />
           <ToolButton disabled={disabled} label="ƒx KaTeX" special="katex" tooltip="KaTeX 수식 문법 찾기" onClick={() => setHelperMode('katex')} />
-        </div>
+        </ToolbarGroup>
         <div className="tool-spacer" />
         <ToolButton disabled={disabled} icon="search" tooltip="문서 내 탐색" onClick={openFind} />
-      </div>
+      </UiToolbar>
       {helperMode ? (
         <MarkdownHelperModal
           mode={helperMode}
@@ -233,19 +241,10 @@ interface ToolButtonProps {
 
 function ToolButton({ icon, label, tooltip, special, disabled, onClick }: ToolButtonProps) {
   return (
-    <button className="tool-btn" data-special={special} disabled={disabled} title={tooltip} aria-label={tooltip} type="button" onClick={onClick}>
+    <ToolbarButton className="tool-btn" data-special={special} disabled={disabled} title={tooltip} aria-label={tooltip} onClick={onClick}>
       {icon ? <Icon name={icon} /> : null}
       {label ? <span className="label">{label}</span> : null}
-    </button>
-  );
-}
-
-function EmptyDocumentState() {
-  return (
-    <div className="empty-document-state" role="status">
-      <strong>열린 문서가 없습니다</strong>
-      <span>워크스페이스에서 파일을 선택하거나 파일을 열어주세요.</span>
-    </div>
+    </ToolbarButton>
   );
 }
 
@@ -277,31 +276,16 @@ function MarkdownHelperModal({
     setSelectedId(filteredItems[0]?.id ?? '');
   }, [filteredItems]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
   return (
-    <div className="helper-modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <div className="helper-modal" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
+    <Dialog open title={title} className="helper-modal" backdropClassName="helper-modal-backdrop" onClose={onClose}>
         <div className="helper-modal-head">
           <div>
             <h2>{title}</h2>
             <p>{helperDescription(mode)}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="닫기">
-            ×
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
-        <div className="helper-search">
-          <Icon name="search" />
-          <input ref={inputRef} value={query} placeholder={placeholder} onChange={(event) => setQuery(event.currentTarget.value)} />
-        </div>
+        <SearchField ref={inputRef} className="helper-search" value={query} placeholder={placeholder} onChange={setQuery} />
         <div className="helper-modal-body">
           <div className="helper-results" role="listbox" aria-label={`${title} 결과`}>
             {filteredItems.length === 0 ? (
@@ -348,8 +332,7 @@ function MarkdownHelperModal({
             ) : null}
           </div>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

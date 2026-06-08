@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useMemo, useState, type RefObject } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
 import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { useUIStore } from '../../store/ui';
@@ -7,6 +7,10 @@ import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile, RecentFile, SidebarViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
+import { Dialog } from '../ui/overlay/Dialog';
+import { CloseButton } from '../ui/primitives/CloseButton';
+import { SearchField } from '../ui/primitives/SearchField';
+import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 
 export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaElement> }) {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
@@ -83,20 +87,14 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
       <SidebarViewSwitch mode={sidebarViewMode} onChange={setSidebarViewMode} />
       {sidebarViewMode === 'files' ? <FolderPath path={rootPath} /> : null}
       {searchOpen ? (
-        <div className="sidebar-search">
-          <Icon name="search" />
-          <input
-            autoFocus
-            value={searchQuery}
-            placeholder={sidebarViewMode === 'files' ? '워크스페이스에서 찾기' : '최근 파일에서 찾기'}
-            onChange={(event) => setSearchQuery(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                closeSearch();
-              }
-            }}
-          />
-        </div>
+        <SearchField
+          autoFocus
+          className="sidebar-search"
+          value={searchQuery}
+          placeholder={sidebarViewMode === 'files' ? '워크스페이스에서 찾기' : '최근 파일에서 찾기'}
+          onChange={setSearchQuery}
+          onEscape={closeSearch}
+        />
       ) : null}
       {sidebarViewMode === 'files' ? (
         <div className="file-tree">
@@ -134,14 +132,18 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
 
 function SidebarViewSwitch({ mode, onChange }: { mode: SidebarViewMode; onChange: (mode: SidebarViewMode) => void }) {
   return (
-    <div className="sidebar-view-switch" role="tablist" aria-label="사이드바 보기">
-      <button className={mode === 'files' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'files'} onClick={() => onChange('files')}>
-        워크스페이스
-      </button>
-      <button className={mode === 'recent' ? 'active' : ''} type="button" role="tab" aria-selected={mode === 'recent'} onClick={() => onChange('recent')}>
-        최근
-      </button>
-    </div>
+    <SegmentedControl
+      ariaLabel="사이드바 보기"
+      className="sidebar-view-switch"
+      optionRole="tab"
+      size="sm"
+      value={mode}
+      options={[
+        { value: 'files', label: '워크스페이스' },
+        { value: 'recent', label: '최근' },
+      ]}
+      onChange={onChange}
+    />
   );
 }
 
@@ -421,18 +423,14 @@ function ImagePreviewModal({
   onAddToDocument: () => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
   return (
-    <div className="image-preview-backdrop" role="presentation" onMouseDown={onClose}>
-      <div className="image-preview-modal" role="dialog" aria-modal="true" aria-label={`${image.name} 미리보기`} onMouseDown={(event) => event.stopPropagation()}>
+    <Dialog
+      open
+      title={`${image.name} 미리보기`}
+      className="image-preview-modal"
+      backdropClassName="image-preview-backdrop"
+      onClose={onClose}
+    >
         <div className="image-preview-head">
           <div>
             <strong>{image.name}</strong>
@@ -448,16 +446,15 @@ function ImagePreviewModal({
             >
               문서에 추가
             </button>
-            <button className="image-preview-close" type="button" title="닫기" onClick={onClose}>
+            <CloseButton className="image-preview-close" onClick={onClose}>
               x
-            </button>
+            </CloseButton>
           </div>
         </div>
         <div className="image-preview-body">
           <img alt={image.name} src={localImagePreviewSrc(image.path)} />
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

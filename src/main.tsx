@@ -14,6 +14,7 @@ import './styles/themes/default.css';
 import './styles/themes/dark.css';
 import './styles/themes/nord.css';
 import './styles/globals.css';
+import './styles/ui.css';
 import './styles/app.css';
 import './styles/preview.css';
 import './styles/print.css';

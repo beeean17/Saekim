@@ -1,15 +1,8 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { IconButton as UiIconButton } from '../ui/primitives/IconButton';
+import type { ComponentProps } from 'react';
 
-interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  children: ReactNode;
-  label: string;
-  className?: string;
-}
+type IconButtonProps = ComponentProps<typeof UiIconButton>;
 
-export function IconButton({ children, label, className = 'icon-btn', ...props }: IconButtonProps) {
-  return (
-    <button className={className} title={label} aria-label={label} type="button" {...props}>
-      {children}
-    </button>
-  );
+export function IconButton({ className = 'icon-btn', ...props }: IconButtonProps) {
+  return <UiIconButton className={className} {...props} />;
 }

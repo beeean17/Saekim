@@ -5,6 +5,8 @@ import { useUIStore } from '../../store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
+import { SegmentedControl } from '../ui/primitives/SegmentedControl';
+import { MenuSurface } from '../ui/surface/MenuSurface';
 
 export interface AppMenuHandlers {
   onNewFile: () => void;
@@ -83,20 +85,18 @@ function ViewToggle() {
   const setViewMode = useUIStore((state) => state.setViewMode);
 
   return (
-    <div className="view-toggle header-view-toggle" aria-label="보기 모드">
-      <button className={viewMode === 'edit' ? 'active' : ''} title="편집기만" type="button" onClick={() => setViewMode('edit')}>
-        <Icon name="edit" />
-        편집
-      </button>
-      <button className={viewMode === 'split' ? 'active' : ''} title="분할 보기" type="button" onClick={() => setViewMode('split')}>
-        <Icon name="split" />
-        분할
-      </button>
-      <button className={viewMode === 'preview' ? 'active' : ''} title="미리보기만" type="button" onClick={() => setViewMode('preview')}>
-        <Icon name="eye" />
-        보기
-      </button>
-    </div>
+    <SegmentedControl
+      ariaLabel="보기 모드"
+      className="view-toggle header-view-toggle"
+      size="sm"
+      value={viewMode}
+      options={[
+        { value: 'edit', label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
+        { value: 'split', label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
+        { value: 'preview', label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
+      ]}
+      onChange={setViewMode}
+    />
   );
 }
 
@@ -213,7 +213,7 @@ function AppMenu({ handlers }: { handlers: AppMenuHandlers }) {
             {menu.label}
           </button>
           {openMenu === menu.id ? (
-            <div className="app-menu-panel" role="menu">
+            <MenuSurface className="app-menu-panel" role="menu">
               {menu.items.map((item, index) =>
                 item.separator ? (
                   <div className="app-menu-separator" key={`${menu.id}-separator-${index}`} role="separator" />
@@ -234,7 +234,7 @@ function AppMenu({ handlers }: { handlers: AppMenuHandlers }) {
                   </button>
                 ),
               )}
-            </div>
+            </MenuSurface>
           ) : null}
         </div>
       ))}

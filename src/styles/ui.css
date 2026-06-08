@@ -1,0 +1,32 @@
+.ui-button,
+.ui-icon-button,
+.ui-close-button,
+.ui-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ui-segmented button.active {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.ui-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.find-search-field {
+  display: contents;
+}
