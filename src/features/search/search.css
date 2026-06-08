@@ -8,27 +8,9 @@
   border-bottom: 1px solid var(--border);
 }
 
-.find-bar .ic {
-  width: 14px;
-  height: 14px;
-  color: var(--text-muted);
-}
-
 .find-bar input {
   width: min(280px, 100%);
-  min-width: 0;
-  height: 28px;
   padding: 0 9px;
-  color: var(--text-primary);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 12px;
-}
-
-.find-bar input:focus {
-  border-color: var(--accent-border);
-  outline: none;
 }
 
 .find-count {

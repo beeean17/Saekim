@@ -53,6 +53,29 @@
   gap: 8px;
 }
 
+.ui-search-field .ic {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.ui-search-field input {
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.ui-search-field input:focus {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
 .find-search-field {
   display: contents;
 }
