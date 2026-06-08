@@ -1,7 +1,6 @@
 import type { EditorContribution, EditorHandlerContext, EditorImageInsertMode } from '../../app/feature';
 import { insertTextAtSelection, escapeRegExp, replaceTextRange } from '../../core/editor/textEditing';
-import { Backend } from '../../lib/backend';
-import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { Backend } from '../../platform/common/backend';
 import type { OpenFile } from '../../types/workspace';
 
 type DroppedImage =
@@ -89,7 +88,7 @@ export async function insertSelectedImage(
     }
   }
 
-  const path = await Backend.pickImagePath();
+  const path = await Backend.images.pickImagePath();
   if (!path) {
     textarea.focus();
     return;
@@ -101,7 +100,7 @@ export async function insertSelectedImage(
   }
 
   try {
-    const assetPath = await Backend.copyImageToAssets(path, currentFilePath);
+    const assetPath = await Backend.images.copyImageToAssets(path, currentFilePath);
     insertTextAtSelection(textarea, markdownImageSnippet(assetPath));
   } catch (error) {
     console.error('이미지 복사 실패:', error);
@@ -132,7 +131,7 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
 
   let unlisten: (() => void) | null = null;
   try {
-    if (isTauriRuntime()) {
+    if (Backend.runtime.isTauriRuntime()) {
       const { listen } = await import('@tauri-apps/api/event');
       unlisten = await listen<ImageDownloadProgressPayload>('image-download-progress', (event) => {
         if (event.payload.id !== id || event.payload.status !== 'progress') return;
@@ -140,7 +139,7 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
       });
     }
 
-    const assetPath = await Backend.downloadImageToAssets(id, imageUrl, currentFilePath);
+    const assetPath = await Backend.images.downloadImageToAssets(id, imageUrl, currentFilePath);
     replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
   } catch (error) {
     const message = error instanceof Error ? error.message : '이미지 다운로드에 실패했습니다.';
@@ -201,7 +200,7 @@ async function insertImageFileFromBytes(
 
   try {
     const bytes = await fileToByteArray(file);
-    const assetPath = await Backend.importImageBytesToAssets(bytes, options.fileName, file.type || null, currentFilePath);
+    const assetPath = await Backend.images.importImageBytesToAssets(bytes, options.fileName, file.type || null, currentFilePath);
     if (options.selectAltAfterInsert) {
       replacePendingImageMarkerWithSelectedAlt(textarea, id, assetPath);
     } else {

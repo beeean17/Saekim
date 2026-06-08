@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Backend } from '../lib/backend';
+import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
 import type { FileTreeNode, OpenFile, RecentFile } from '../types/workspace';
 
@@ -105,10 +105,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   history: { back: [], forward: [], current: initialFile.path },
   openFolder: async () => {
     try {
-      const rootPath = await Backend.openFolderDialog();
+      const rootPath = await Backend.folders.openFolderDialog();
       if (!rootPath) return;
       set({ rootPath, tree: [] });
-      const folder = await Backend.readFolder(rootPath);
+      const folder = await Backend.folders.readFolder(rootPath);
       set({ rootPath: folder.rootPath, tree: folder.tree });
     } catch (error) {
       console.error('폴더 열기 실패:', error);
@@ -117,7 +117,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFile: async (path) => {
     if (!path) {
       try {
-        await Backend.openFileDialog();
+        await Backend.files.openFileDialog();
       } catch (error) {
         console.error('파일 열기 실패:', error);
       }
@@ -140,7 +140,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     try {
-      const opened = await Backend.readFile(path);
+      const opened = await Backend.files.readFile(path);
       const file = toOpenFile(opened.path, opened.name, opened.content);
       set((state) => upsertOpenFile(state, file));
       const folderPatch = await workspaceFolderPatchForFile(opened.path);
@@ -151,7 +151,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   createFile: async () => {
     try {
-      const savedPath = await Backend.saveFileAs('', 'untitled.md');
+      const savedPath = await Backend.files.saveFileAs('', 'untitled.md');
       if (!savedPath) return;
 
       const file = toOpenFile(savedPath, fileNameFromPath(savedPath), '');
@@ -169,7 +169,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     if (!node.isOpen && !node.isLoaded && !isPlaceholderPath(path)) {
       try {
-        const children = await Backend.readFolderChildren(path);
+        const children = await Backend.folders.readFolderChildren(path);
         set((state) => ({
           tree: updateTreeFolder(state.tree, path, { children, isLoaded: true, isOpen: true }),
         }));
@@ -231,7 +231,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await Backend.saveFile(file.path.startsWith('~') ? null : file.path, file.content);
+    const savedPath = await Backend.files.saveFile(file.path.startsWith('~') ? null : file.path, file.content);
     if (!savedPath) return;
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
@@ -265,7 +265,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await Backend.saveFileAs(file.content, file.name);
+    const savedPath = await Backend.files.saveFileAs(file.content, file.name);
     if (!savedPath) return;
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
@@ -300,7 +300,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!rootPath || isPlaceholderPath(rootPath)) return;
 
     try {
-      const folder = await Backend.readFolder(rootPath);
+      const folder = await Backend.folders.readFolder(rootPath);
       set({ rootPath: folder.rootPath, tree: folder.tree });
     } catch (error) {
       console.error('폴더 새로고침 실패:', error);
@@ -394,7 +394,7 @@ async function workspaceFolderPatchForFile(path: string): Promise<Pick<Workspace
   if (!folderPath) return null;
 
   try {
-    const folder = await Backend.readFolder(folderPath);
+    const folder = await Backend.folders.readFolder(folderPath);
     return { rootPath: folder.rootPath, tree: folder.tree };
   } catch (error) {
     console.error('워크스페이스 경로 동기화 실패:', error);

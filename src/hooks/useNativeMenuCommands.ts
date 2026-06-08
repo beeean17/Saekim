@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { isTauriRuntime } from '../lib/tauri/invoke';
+import { Backend } from '../platform/common/backend';
 
 interface NativeMenuHandlers {
   onNewFile: () => void;
@@ -21,7 +21,7 @@ const menuEvents = {
 
 export function useNativeMenuCommands(handlers: NativeMenuHandlers): void {
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    if (!Backend.runtime.isTauriRuntime()) return;
 
     let disposed = false;
     const unlisteners: Array<() => void> = [];

@@ -1,5 +1,4 @@
-import { Backend } from '../../lib/backend';
-import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { Backend } from '../../platform/common/backend';
 
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
 const PAGE_SPACER_CLASS = 'pdf-page-spacer';
@@ -43,7 +42,7 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
   const title = options.title || getDocumentTitle(preview, options.suggestedName);
   const suggestedName = toPdfFileName(options.suggestedName || title);
   const targetPath = await pickExportTarget(suggestedName);
-  if (isTauriRuntime() && !targetPath) return false;
+  if (Backend.runtime.isTauriRuntime() && !targetPath) return false;
 
   const exportRoot = createPdfTemplate(preview);
   document.body.appendChild(exportRoot);
@@ -303,16 +302,16 @@ function pageHeightFallback(canvasWidth: number): number {
 }
 
 async function pickExportTarget(suggestedName: string): Promise<string | null> {
-  if (!isTauriRuntime()) {
+  if (!Backend.runtime.isTauriRuntime()) {
     return null;
   }
 
-  return Backend.pickPdfExportPath(suggestedName);
+  return Backend.export.pickPdfExportPath(suggestedName);
 }
 
 async function savePdfBytes(bytes: Uint8Array, suggestedName: string, targetPath: string | null): Promise<void> {
   if (targetPath) {
-    await Backend.writePdfExport(targetPath, Array.from(bytes));
+    await Backend.export.writePdfExport(targetPath, Array.from(bytes));
     return;
   }
 

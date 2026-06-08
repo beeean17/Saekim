@@ -1,3 +1,7 @@
+import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { browserCapabilities } from '../browser/browserCapabilities';
+import { desktopCapabilities } from '../desktop/desktopCapabilities';
+
 export type PlatformCapability =
   | 'file.open'
   | 'file.save'
@@ -12,3 +16,7 @@ export type PlatformCapability =
   | 'externalFile.open'
   | 'window.chrome'
   | 'native.menu';
+
+export function currentPlatformCapabilities(): ReadonlySet<PlatformCapability> {
+  return isTauriRuntime() ? desktopCapabilities : browserCapabilities;
+}

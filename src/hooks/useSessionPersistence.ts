@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Backend } from '../lib/backend';
-import { isTauriRuntime } from '../lib/tauri/invoke';
+import { Backend } from '../platform/common/backend';
 import { useSettingsStore } from '../store/settings';
 import { useUIStore } from '../store/ui';
 import { useWorkspaceStore } from '../store/workspace';
@@ -57,7 +56,7 @@ function readLegacyMetadata(): LegacyMetadata {
 }
 
 function clearLegacyLocalStorage(): void {
-  if (!isTauriRuntime()) return;
+  if (!Backend.runtime.isTauriRuntime()) return;
   for (const key of legacyLocalStorageKeys) {
     window.localStorage.removeItem(key);
   }
@@ -91,10 +90,10 @@ export function useSessionPersistence(): boolean {
 
   useEffect(() => {
     let alive = true;
-    const legacyMetadata = isTauriRuntime() ? readLegacyMetadata() : null;
+    const legacyMetadata = Backend.runtime.isTauriRuntime() ? readLegacyMetadata() : null;
     clearLegacyLocalStorage();
 
-    void Backend.loadSession<AppSession>()
+    void Backend.metadata.loadSession<AppSession>()
       .then((session) => {
         if (!alive) return;
         if (!session) {
@@ -149,7 +148,7 @@ export function useSessionPersistence(): boolean {
         },
       };
 
-      void Backend.saveSession(session);
+      void Backend.metadata.saveSession(session);
     }, 400);
 
     return () => {

@@ -10,7 +10,7 @@ import {
   readBlockLayouts,
   writeBlockLayouts,
 } from '../../features/block-layout';
-import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
+import { Backend } from '../../platform/common/backend';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -177,10 +177,10 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
 
       const rawHref = anchor.getAttribute('href') ?? '';
       if (!rawHref || rawHref.startsWith('#')) return;
-      if (!isExternalUrl(anchor.href)) return;
+      if (!Backend.runtime.isExternalUrl(anchor.href)) return;
 
       event.preventDefault();
-      void openExternalUrl(anchor.href);
+      void Backend.runtime.openExternalUrl(anchor.href);
     };
 
     root.addEventListener('click', onClick);
@@ -352,8 +352,10 @@ function bindHtmlPreviewFrame(
     const rawHref = anchor.getAttribute('href') ?? '';
     if (!rawHref || rawHref.startsWith('#')) return;
 
+    if (!Backend.runtime.isExternalUrl(anchor.href)) return;
+
     event.preventDefault();
-    void openExternalUrl(anchor.href);
+    void Backend.runtime.openExternalUrl(anchor.href);
   };
 
   const observer = new ResizeObserver(syncHeight);

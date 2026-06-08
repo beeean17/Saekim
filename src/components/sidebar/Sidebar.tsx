@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useMemo, useState, type RefObject } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
-import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { Backend } from '../../platform/common/backend';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile, RecentFile, SidebarViewMode } from '../../types/workspace';
@@ -467,7 +467,7 @@ function isWorkspaceImageAsset(path: string): boolean {
 }
 
 function localImagePreviewSrc(path: string): string {
-  if (isTauriRuntime()) return convertFileSrc(path);
+  if (Backend.runtime.isTauriRuntime()) return convertFileSrc(path);
   const normalized = path.replace(/\\/g, '/');
   return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : encodeURI(normalized);
 }

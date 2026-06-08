@@ -1,4 +1,4 @@
-import { Backend } from '../../lib/backend';
+import { Backend } from '../../platform/common/backend';
 import type { BlockKind, BlockLayout, LayoutAlign } from '../../types/metadata';
 import './blockLayout.css';
 
@@ -7,11 +7,11 @@ export function canUseBlockLayouts(filePath: string | null | undefined, supports
 }
 
 export async function readBlockLayouts(filePath: string): Promise<BlockLayout[]> {
-  return Backend.loadBlockLayouts(filePath);
+  return Backend.metadata.loadBlockLayouts(filePath);
 }
 
 export async function writeBlockLayouts(layouts: BlockLayout[]): Promise<void> {
-  await Promise.all(layouts.map((layout) => Backend.saveBlockLayout(layout)));
+  await Promise.all(layouts.map((layout) => Backend.metadata.saveBlockLayout(layout)));
 }
 
 type LayoutTarget = {

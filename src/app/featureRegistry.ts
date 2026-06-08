@@ -8,9 +8,17 @@ import { blockLayoutMetadataContribution } from '../features/block-layout';
 import { pdfExportCommands, pdfExportContribution } from '../features/pdf-export';
 import { searchCommands, searchEditorContribution } from '../features/search';
 import { structuredDataPreviewContribution, tabularDataPreviewContribution } from '../features/structured-data';
+import { currentPlatformCapabilities, type PlatformCapability } from '../platform/common/capabilities';
 
 export const enabledFeatures: SaekimFeature[] = [
-  { id: 'file-workspace', label: 'File Workspace' },
+  {
+    id: 'file-workspace',
+    label: 'File Workspace',
+    requiresCapabilities: {
+      required: ['file.open', 'file.save'],
+      optional: ['folder.open', 'folder.tree', 'externalFile.open'],
+    },
+  },
   {
     id: 'markdown',
     label: 'Markdown',
@@ -54,16 +62,39 @@ export const enabledFeatures: SaekimFeature[] = [
       previewKind: 'html',
     },
   },
-  { id: 'image-assets', label: 'Image Assets', dependsOn: ['markdown'], editor: imageAssetsEditorContribution },
-  { id: 'metadata', label: 'Metadata' },
-  { id: 'block-layout', label: 'Block Layout', dependsOn: ['markdown', 'metadata'], metadata: blockLayoutMetadataContribution },
-  { id: 'pdf-export', label: 'PDF Export', commands: pdfExportCommands, pdf: pdfExportContribution },
+  {
+    id: 'image-assets',
+    label: 'Image Assets',
+    dependsOn: ['markdown'],
+    requiresCapabilities: {
+      required: ['image.pick', 'image.copyToAssets', 'image.importBytesToAssets', 'image.downloadToAssets'],
+    },
+    editor: imageAssetsEditorContribution,
+  },
+  { id: 'metadata', label: 'Metadata', requiresCapabilities: { required: ['metadata.sqlite'] } },
+  {
+    id: 'block-layout',
+    label: 'Block Layout',
+    dependsOn: ['markdown', 'metadata'],
+    requiresCapabilities: { required: ['metadata.sqlite'] },
+    metadata: blockLayoutMetadataContribution,
+  },
+  {
+    id: 'pdf-export',
+    label: 'PDF Export',
+    requiresCapabilities: { required: ['pdf.save'] },
+    commands: pdfExportCommands,
+    pdf: pdfExportContribution,
+  },
   { id: 'search', label: 'Search', editor: searchEditorContribution, commands: searchCommands },
 ];
 
-validateFeatureGraph(enabledFeatures);
+validateFeatureGraph(enabledFeatures, currentPlatformCapabilities());
 
-export function validateFeatureGraph(features: SaekimFeature[]): void {
+export function validateFeatureGraph(
+  features: SaekimFeature[],
+  capabilities: ReadonlySet<PlatformCapability> = currentPlatformCapabilities(),
+): void {
   const ids = new Set(features.map((feature) => feature.id));
 
   for (const feature of features) {
@@ -71,6 +102,15 @@ export function validateFeatureGraph(features: SaekimFeature[]): void {
       if (!ids.has(dependency)) {
         throw new Error(`Feature "${feature.id}" requires "${dependency}", which is not enabled.`);
       }
+    }
+
+    const missingCapabilities = (feature.requiresCapabilities?.required ?? []).filter(
+      (capability) => !capabilities.has(capability),
+    );
+    if (missingCapabilities.length > 0) {
+      throw new Error(
+        `Feature "${feature.id}" requires unsupported platform capabilities: ${missingCapabilities.join(', ')}`,
+      );
     }
   }
 

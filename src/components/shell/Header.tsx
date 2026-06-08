@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { commandMenuItems, dispatchCommand, formatShortcut, type CommandRegistry } from '../../app/commands';
-import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { Backend } from '../../platform/common/backend';
 import { useUIStore } from '../../store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
@@ -282,7 +282,7 @@ async function runPasteCommand(target: HTMLElement | null): Promise<void> {
 }
 
 async function runWindowAction(action: 'minimize' | 'toggleMaximize' | 'close'): Promise<void> {
-  if (!isTauriRuntime()) return;
+  if (!Backend.runtime.isTauriRuntime()) return;
   const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
   const window = getCurrentWebviewWindow();
   await window[action]();
