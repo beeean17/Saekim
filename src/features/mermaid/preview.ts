@@ -1,4 +1,12 @@
 import type { PreviewContribution } from '../../app/feature';
+import { registerMarkdownFenceRenderer } from '../../lib/markdown/extensions';
+
+registerMarkdownFenceRenderer({
+  id: 'mermaid',
+  priority: 100,
+  match: ({ lang }) => lang === 'mermaid',
+  render: ({ attrs, content }) => `<div class="mermaid-block"${attrs} data-source="${encodeURIComponent(content)}"></div>`,
+});
 
 export const mermaidPreviewEnhancement: PreviewContribution = {
   id: 'mermaid.preview-enhancement',

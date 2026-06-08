@@ -1,17 +1,9 @@
 import MarkdownIt from 'markdown-it';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import katex from 'katex';
-import markdownItKatex from 'markdown-it-katex';
 import type StateCore from 'markdown-it/lib/rules_core/state_core.mjs';
 import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import type Token from 'markdown-it/lib/token.mjs';
-import { isTauriRuntime } from '../tauri/invoke';
 import { escapeHtml } from './escape';
-
-const katexOptions = {
-  throwOnError: false,
-  errorColor: '#cc3344',
-};
+import { getMarkdownFenceRenderers, getMarkdownItPlugins, getMarkdownMathRenderer } from './extensions';
 
 interface FootnoteDefinition {
   id: string;
@@ -29,9 +21,9 @@ const md = new MarkdownIt({
   typographer: true,
   breaks: false,
 });
+let markdownPluginsApplied = false;
 
 md.disable('code');
-md.use(markdownItKatex, katexOptions);
 
 md.inline.ruler.before('text', 'saekim_safe_br_tag', brTagRule);
 md.inline.ruler.before('emphasis', 'saekim_mark', markRule);
@@ -145,27 +137,11 @@ function trimTaskListMarker(children: Token[], markerLength: number): void {
   }
 }
 
-md.renderer.rules.math_inline = (tokens, idx) =>
-  katex.renderToString(tokens[idx].content, {
-    ...katexOptions,
-    displayMode: false,
-  });
+md.renderer.rules.math_inline = (tokens, idx) => getMarkdownMathRenderer()?.renderInline(tokens[idx].content) ?? escapeHtml(tokens[idx].content);
 
 md.renderer.rules.math_block = (tokens, idx) => {
   const attrs = sourceLineAttributes(tokens[idx]);
-  const equations = splitKatexBlockEquations(tokens[idx].content);
-  const equationCounts = new Map<string, number>();
-  const html = equations
-    .map((equation, index) => {
-      const equationHtml = katex.renderToString(equation, {
-        ...katexOptions,
-        displayMode: true,
-      });
-      const equationKey = stableEquationKey(equation, equationCounts);
-      return `<div class="math-equation" data-equation-index="${index}" data-equation-key="${escapeHtml(equationKey)}">${equationHtml}</div>`;
-    })
-    .join('');
-  return `<div class="math-block"${attrs} data-label="katex"><div class="math-equation-list">${html}</div></div>\n`;
+  return getMarkdownMathRenderer()?.renderBlock(tokens[idx].content, attrs) ?? `<pre${attrs}><code>${escapeHtml(tokens[idx].content)}</code></pre>`;
 };
 
 md.renderer.rules.fence = (tokens, idx) => {
@@ -175,9 +151,8 @@ md.renderer.rules.fence = (tokens, idx) => {
   const attrs = sourceLineAttributes(token);
   const content = normalizeFenceContent(token.content);
 
-  if (lang === 'mermaid') {
-    return `<div class="mermaid-block"${attrs} data-source="${encodeURIComponent(content)}"></div>`;
-  }
+  const customRenderer = getMarkdownFenceRenderers().find((renderer) => renderer.match({ attrs, content, info, lang }));
+  if (customRenderer) return customRenderer.render({ attrs, content, info, lang });
 
   if (isAsciiDiagramFence(content, lang)) {
     return `<pre${attrs} class="ascii-diagram"><code>${escapeHtml(renderAsciiDiagram(content))}</code></pre>`;
@@ -192,12 +167,34 @@ md.renderer.rules.fence = (tokens, idx) => {
 
 let shikiModulePromise: Promise<typeof import('shiki')> | null = null;
 
-export async function renderMarkdown(text: string, theme: 'light' | 'dark' = 'light', basePath?: string): Promise<string> {
+export interface RenderMarkdownOptions {
+  basePath?: string;
+  theme?: 'light' | 'dark';
+  toFileSrc?: (path: string) => string;
+}
+
+export async function renderMarkdown(
+  text: string,
+  themeOrOptions: 'light' | 'dark' | RenderMarkdownOptions = 'light',
+  basePath?: string,
+): Promise<string> {
+  const options =
+    typeof themeOrOptions === 'string'
+      ? { theme: themeOrOptions, basePath }
+      : themeOrOptions;
+  const theme = options.theme ?? 'light';
+  ensureMarkdownPluginsApplied();
   const footnoteDocument = extractFootnotes(normalizeMarkdownInput(text));
   const raw = md.render(footnoteDocument.text);
   const highlighted = await highlightCode(raw, theme);
   const withFootnotes = renderFootnotes(highlighted, footnoteDocument.definitions);
-  return normalizeImageSources(withFootnotes, basePath);
+  return normalizeImageSources(withFootnotes, options.basePath, options.toFileSrc);
+}
+
+function ensureMarkdownPluginsApplied(): void {
+  if (markdownPluginsApplied) return;
+  getMarkdownItPlugins().forEach((plugin) => plugin.apply(md));
+  markdownPluginsApplied = true;
 }
 
 async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<string> {
@@ -314,35 +311,6 @@ function sourceLineAttributes(token: Pick<Token, 'map'>): string {
 
 function normalizeFenceContent(content: string): string {
   return content.replace(/\n$/, '');
-}
-
-function splitKatexBlockEquations(content: string): string[] {
-  const normalized = content.replace(/\r\n?/g, '\n').trim();
-  if (!normalized) return [''];
-  if (/\\(?:begin|end)\s*\{/.test(normalized)) return [normalized];
-
-  const equations = normalized
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return equations.length > 0 ? equations : [normalized];
-}
-
-function stableEquationKey(equation: string, counts: Map<string, number>): string {
-  const hash = stableHash(equation);
-  const occurrence = counts.get(hash) ?? 0;
-  counts.set(hash, occurrence + 1);
-  return `${hash}:${occurrence}`;
-}
-
-function stableHash(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 function normalizeMarkdownInput(text: string): string {
@@ -657,7 +625,7 @@ function footnoteSlug(id: string): string {
   return encodeURIComponent(id).replace(/%/g, '');
 }
 
-function normalizeImageSources(html: string, basePath?: string): string {
+function normalizeImageSources(html: string, basePath?: string, toFileSrc: (path: string) => string = toFileHref): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<main>${html}</main>`, 'text/html');
   doc.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
@@ -678,7 +646,7 @@ function normalizeImageSources(html: string, basePath?: string): string {
     image.setAttribute('data-original-src', src);
     image.loading = 'lazy';
     image.decoding = 'async';
-    image.src = localPathToImageSrc(localPath);
+    image.src = toFileSrc(localPath);
   });
 
   return doc.querySelector('main')?.innerHTML ?? html;
@@ -732,10 +700,6 @@ function resolveRelativeImagePath(src: string, basePath?: string): string | null
   const documentDir = basePath.replace(/[\\/][^\\/]*$/, '');
   if (!documentDir || documentDir === basePath) return null;
   return normalizeLocalPath(`${documentDir}/${decodeUrlPath(src)}`);
-}
-
-function localPathToImageSrc(path: string): string {
-  return isTauriRuntime() ? convertFileSrc(path) : toFileHref(path);
 }
 
 function isFileUrl(src: string): boolean {

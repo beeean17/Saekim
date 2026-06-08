@@ -36,7 +36,7 @@ function MarkdownSyntaxPreview({ item, ctx }: { item: MarkdownHelperItem; ctx: E
 
   useEffect(() => {
     let alive = true;
-    void renderMarkdown(item.example, 'light').then((nextHtml) => {
+    void renderMarkdown(item.example, { theme: 'light' }).then((nextHtml) => {
       if (alive) setHtml(nextHtml);
     });
     return () => {
