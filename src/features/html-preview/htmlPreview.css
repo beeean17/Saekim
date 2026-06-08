@@ -1,17 +1,13 @@
 .html-preview-mode {
-  display: inline-flex;
   gap: 1px;
   margin-left: auto;
-  padding: 2px;
-  background: var(--bg-elevated);
-  border-radius: var(--radius);
+  border: 0;
 }
 
 .html-preview-mode button {
   height: 22px;
   padding: 0 9px;
   color: var(--text-muted);
-  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
 }
@@ -24,6 +20,7 @@
 .html-preview-mode button.active {
   color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: none;
 }
 
 .html-preview-mode + .preview-action {

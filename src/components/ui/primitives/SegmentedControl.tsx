@@ -22,12 +22,14 @@ export function SegmentedControl<T extends string>({
   options,
   ariaLabel,
   size = 'md',
-  className = 'ui-segmented',
+  className,
   optionRole,
   onChange,
 }: SegmentedControlProps<T>) {
+  const rootClassName = className ? `ui-segmented ${className}` : 'ui-segmented';
+
   return (
-    <div className={className} data-size={size} role={optionRole ? 'tablist' : undefined} aria-label={ariaLabel}>
+    <div className={rootClassName} data-size={size} role={optionRole ? 'tablist' : undefined} aria-label={ariaLabel}>
       {options.map((option) => {
         const active = value === option.value;
         return (
