@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import {
   openFileDialog,
   readFile,
@@ -41,7 +41,12 @@ export const androidBackend: BackendAdapter = {
   runtime: {
     isTauriRuntime,
     isExternalUrl,
+    toFileSrc: convertFileSrc,
     openExternalUrl,
+    takePendingOpenFiles: async () => [],
+    listenExternalOpenFiles: listenNoop,
+    listenImageDownloadProgress: listenNoop,
+    listenNativeMenuCommands: listenNoop,
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
@@ -50,6 +55,10 @@ export const androidBackend: BackendAdapter = {
 };
 
 async function noop(): Promise<void> {}
+
+async function listenNoop(): Promise<() => void> {
+  return () => {};
+}
 
 function unsupported<T>(capability: string): (..._args: unknown[]) => Promise<T> {
   return async () => {

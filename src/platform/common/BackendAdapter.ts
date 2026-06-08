@@ -46,7 +46,12 @@ export interface ExportBackend {
 export interface RuntimeBackend {
   isTauriRuntime(): boolean;
   isExternalUrl(url: string): boolean;
+  toFileSrc(path: string): string;
   openExternalUrl(url: string): Promise<void>;
+  takePendingOpenFiles(): Promise<string[]>;
+  listenExternalOpenFiles(handler: (paths: string[]) => void): Promise<() => void>;
+  listenImageDownloadProgress(handler: (payload: ImageDownloadProgressPayload) => void): Promise<() => void>;
+  listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void>;
   setWindowMinSize(width: number, height: number): Promise<void>;
   startWindowDrag(): Promise<void>;
   setWindowBackgroundColor(color: string): Promise<void>;
@@ -54,3 +59,19 @@ export interface RuntimeBackend {
 }
 
 export type WindowAction = 'minimize' | 'toggleMaximize' | 'close';
+
+export interface ImageDownloadProgressPayload {
+  id: string;
+  status: 'started' | 'progress' | 'completed' | 'failed';
+  progress: number | null;
+  message?: string;
+}
+
+export interface NativeMenuCommandHandlers {
+  onNewFile(): void;
+  onOpen(): void;
+  onOpenFolder(): void;
+  onSave(): void;
+  onSaveAs(): void;
+  onExportPdf(): void;
+}

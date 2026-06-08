@@ -1,5 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   copyImageToAssets,
   downloadImageToAssets,
@@ -14,11 +16,23 @@ import {
   readFolderChildren,
   saveFile,
   saveFileAs,
+  takePendingOpenFiles,
   writePdfExport,
 } from '../../lib/tauri/fs';
 import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../../lib/tauri/session';
-import type { BackendAdapter, WindowAction } from '../common/BackendAdapter';
+import type { BackendAdapter, ImageDownloadProgressPayload, NativeMenuCommandHandlers, WindowAction } from '../common/BackendAdapter';
+
+const externalOpenEvent = 'saekim-open-external-files';
+const imageDownloadProgressEvent = 'image-download-progress';
+const menuEvents = {
+  newFile: 'saekim-menu-new-file',
+  openFile: 'saekim-menu-open-file',
+  openFolder: 'saekim-menu-open-folder',
+  save: 'saekim-menu-save',
+  saveAs: 'saekim-menu-save-as',
+  exportPdf: 'saekim-menu-export-pdf',
+} as const;
 
 export const tauriDesktopBackend: BackendAdapter = {
   files: {
@@ -52,7 +66,12 @@ export const tauriDesktopBackend: BackendAdapter = {
   runtime: {
     isTauriRuntime,
     isExternalUrl,
+    toFileSrc: convertFileSrc,
     openExternalUrl,
+    takePendingOpenFiles,
+    listenExternalOpenFiles,
+    listenImageDownloadProgress,
+    listenNativeMenuCommands,
     setWindowMinSize,
     startWindowDrag,
     setWindowBackgroundColor,
@@ -63,6 +82,29 @@ export const tauriDesktopBackend: BackendAdapter = {
 async function openExternalUrl(url: string): Promise<void> {
   if (!isExternalUrl(url)) return;
   await invoke('open_external_url', { url });
+}
+
+async function listenExternalOpenFiles(handler: (paths: string[]) => void): Promise<() => void> {
+  const unlisteners: Array<() => void> = [];
+  unlisteners.push(await listen<string[]>(externalOpenEvent, (event) => handler(event.payload)));
+  unlisteners.push(await getCurrentWindow().listen<string[]>(externalOpenEvent, (event) => handler(event.payload)));
+  return () => unlisteners.forEach((unlisten) => unlisten());
+}
+
+async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgressPayload) => void): Promise<() => void> {
+  return listen<ImageDownloadProgressPayload>(imageDownloadProgressEvent, (event) => handler(event.payload));
+}
+
+async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void> {
+  const registrations = await Promise.all([
+    listen(menuEvents.newFile, handlers.onNewFile),
+    listen(menuEvents.openFile, handlers.onOpen),
+    listen(menuEvents.openFolder, handlers.onOpenFolder),
+    listen(menuEvents.save, handlers.onSave),
+    listen(menuEvents.saveAs, handlers.onSaveAs),
+    listen(menuEvents.exportPdf, handlers.onExportPdf),
+  ]);
+  return () => registrations.forEach((unlisten) => unlisten());
 }
 
 async function setWindowMinSize(width: number, height: number): Promise<void> {

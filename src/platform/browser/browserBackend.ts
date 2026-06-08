@@ -37,7 +37,12 @@ export const browserBackend: BackendAdapter = {
   runtime: {
     isTauriRuntime: () => false,
     isExternalUrl,
+    toFileSrc: toFileHref,
     openExternalUrl,
+    takePendingOpenFiles: async () => [],
+    listenExternalOpenFiles: listenNoop,
+    listenImageDownloadProgress: listenNoop,
+    listenNativeMenuCommands: listenNoop,
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
@@ -46,6 +51,10 @@ export const browserBackend: BackendAdapter = {
 };
 
 async function noop(): Promise<void> {}
+
+async function listenNoop(): Promise<() => void> {
+  return () => {};
+}
 
 async function openFileDialog(): Promise<boolean> {
   return false;
@@ -150,6 +159,12 @@ async function saveBlockLayout(layout: BlockLayout): Promise<void> {
 async function openExternalUrl(url: string): Promise<void> {
   if (!isExternalUrl(url)) return;
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function toFileHref(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  if (/^[a-zA-Z]:\//.test(normalized)) return `file:///${encodeURI(normalized)}`;
+  return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : encodeURI(normalized);
 }
 
 function isExternalUrl(url: string): boolean {

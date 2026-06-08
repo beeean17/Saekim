@@ -1,6 +1,3 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { isTauriRuntime } from '../tauri/invoke';
-
 const allowedTags = new Set([
   'a',
   'abbr',
@@ -111,33 +108,37 @@ const tableAttributes = new Set(['align', 'colspan', 'rowspan', 'scope']);
 const imageAttributes = new Set(['alt', 'decoding', 'height', 'loading', 'src', 'width']);
 const anchorAttributes = new Set(['href', 'rel', 'target']);
 
-export function renderSafeHtmlDocument(source: string, ownerPath?: string): string {
+export interface HtmlRenderOptions {
+  toFileSrc?: (path: string) => string;
+}
+
+export function renderSafeHtmlDocument(source: string, ownerPath?: string, options: HtmlRenderOptions = {}): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(source, 'text/html');
   const root = doc.createElement('div');
   root.className = 'html-preview';
 
   Array.from(doc.body.childNodes).forEach((node) => root.append(node.cloneNode(true)));
-  sanitizeChildren(root, ownerPath);
+  sanitizeChildren(root, ownerPath, options.toFileSrc ?? toFileHref);
 
   return root.outerHTML;
 }
 
-export function renderBrowserHtmlDocument(source: string, ownerPath?: string): string {
+export function renderBrowserHtmlDocument(source: string, ownerPath?: string, options: HtmlRenderOptions = {}): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(source, 'text/html');
 
-  sanitizeBrowserElement(doc.documentElement, ownerPath);
+  sanitizeBrowserElement(doc.documentElement, ownerPath, options.toFileSrc ?? toFileHref);
   ensureBrowserPreviewBaseStyles(doc);
 
   return `<!doctype html>${doc.documentElement.outerHTML}`;
 }
 
-function sanitizeChildren(parent: Element, ownerPath?: string): void {
-  Array.from(parent.children).forEach((child) => sanitizeElement(child, ownerPath));
+function sanitizeChildren(parent: Element, ownerPath: string | undefined, toFileSrc: (path: string) => string): void {
+  Array.from(parent.children).forEach((child) => sanitizeElement(child, ownerPath, toFileSrc));
 }
 
-function sanitizeElement(element: Element, ownerPath?: string): void {
+function sanitizeElement(element: Element, ownerPath: string | undefined, toFileSrc: (path: string) => string): void {
   const tagName = element.tagName.toLowerCase();
 
   if (safeRemovedTags.has(tagName)) {
@@ -145,17 +146,17 @@ function sanitizeElement(element: Element, ownerPath?: string): void {
     return;
   }
 
-  sanitizeChildren(element, ownerPath);
+  sanitizeChildren(element, ownerPath, toFileSrc);
 
   if (!allowedTags.has(tagName)) {
     element.replaceWith(...Array.from(element.childNodes));
     return;
   }
 
-  sanitizeAttributes(element, ownerPath);
+  sanitizeAttributes(element, ownerPath, toFileSrc);
 }
 
-function sanitizeBrowserElement(element: Element, ownerPath?: string): void {
+function sanitizeBrowserElement(element: Element, ownerPath: string | undefined, toFileSrc: (path: string) => string): void {
   const tagName = element.tagName.toLowerCase();
 
   if (browserRemovedTags.has(tagName)) {
@@ -163,11 +164,11 @@ function sanitizeBrowserElement(element: Element, ownerPath?: string): void {
     return;
   }
 
-  Array.from(element.children).forEach((child) => sanitizeBrowserElement(child, ownerPath));
-  sanitizeBrowserAttributes(element, ownerPath);
+  Array.from(element.children).forEach((child) => sanitizeBrowserElement(child, ownerPath, toFileSrc));
+  sanitizeBrowserAttributes(element, ownerPath, toFileSrc);
 }
 
-function sanitizeBrowserAttributes(element: Element, ownerPath?: string): void {
+function sanitizeBrowserAttributes(element: Element, ownerPath: string | undefined, toFileSrc: (path: string) => string): void {
   const tagName = element.tagName.toLowerCase();
 
   if (tagName === 'link' && !isAllowedBrowserLink(element)) {
@@ -185,7 +186,7 @@ function sanitizeBrowserAttributes(element: Element, ownerPath?: string): void {
     }
 
     if (name === 'href') {
-      const href = tagName === 'link' ? sanitizeResourceSource(value, ownerPath) : sanitizeHref(value, ownerPath);
+      const href = tagName === 'link' ? sanitizeResourceSource(value, ownerPath, toFileSrc) : sanitizeHref(value, ownerPath);
       if (!href) {
         element.removeAttribute(attribute.name);
         return;
@@ -196,7 +197,7 @@ function sanitizeBrowserAttributes(element: Element, ownerPath?: string): void {
     }
 
     if (name === 'src' || name === 'poster') {
-      const src = sanitizeResourceSource(value, ownerPath);
+      const src = sanitizeResourceSource(value, ownerPath, toFileSrc);
       if (!src) {
         element.removeAttribute(attribute.name);
         return;
@@ -231,7 +232,7 @@ function ensureBrowserPreviewBaseStyles(doc: Document): void {
   doc.head.prepend(style);
 }
 
-function sanitizeAttributes(element: Element, ownerPath?: string): void {
+function sanitizeAttributes(element: Element, ownerPath: string | undefined, toFileSrc: (path: string) => string): void {
   const tagName = element.tagName.toLowerCase();
 
   Array.from(element.attributes).forEach((attribute) => {
@@ -260,7 +261,7 @@ function sanitizeAttributes(element: Element, ownerPath?: string): void {
     }
 
     if (name === 'src') {
-      const src = sanitizeImageSource(value, ownerPath);
+      const src = sanitizeImageSource(value, ownerPath, toFileSrc);
       if (!src) {
         element.removeAttribute(attribute.name);
         return;
@@ -295,26 +296,26 @@ function sanitizeHref(value: string, ownerPath?: string): string | null {
   return isSafeUrl(trimmed, ['http:', 'https:', 'mailto:', 'tel:', 'file:']) ? trimmed : null;
 }
 
-function sanitizeImageSource(value: string, ownerPath?: string): string | null {
+function sanitizeImageSource(value: string, ownerPath: string | undefined, toFileSrc: (path: string) => string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
   if (isSafeDataImage(trimmed)) return trimmed;
 
   const localPath = resolveLocalPath(trimmed, ownerPath);
-  if (localPath) return isTauriRuntime() ? convertFileSrc(localPath) : toFileHref(localPath);
+  if (localPath) return toFileSrc(localPath);
 
   return isSafeUrl(trimmed, ['http:', 'https:', 'file:', 'asset:']) ? trimmed : null;
 }
 
-function sanitizeResourceSource(value: string, ownerPath?: string): string | null {
+function sanitizeResourceSource(value: string, ownerPath: string | undefined, toFileSrc: (path: string) => string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
   if (isSafeDataImage(trimmed)) return trimmed;
 
   const localPath = resolveLocalPath(trimmed, ownerPath);
-  if (localPath) return isTauriRuntime() ? convertFileSrc(localPath) : toFileHref(localPath);
+  if (localPath) return toFileSrc(localPath);
 
   return isSafeUrl(trimmed, ['http:', 'https:', 'file:', 'asset:']) ? trimmed : null;
 }

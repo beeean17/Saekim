@@ -1,5 +1,6 @@
 import type { EditorContribution, EditorHandlerContext, EditorImageInsertMode } from '../../app/feature';
 import { insertTextAtSelection, escapeRegExp, replaceTextRange } from '../../core/editor/textEditing';
+import type { ImageDownloadProgressPayload } from '../../platform/common/BackendAdapter';
 import { Backend } from '../../platform/common/backend';
 import type { OpenFile } from '../../types/workspace';
 
@@ -8,13 +9,6 @@ type DroppedImage =
   | { type: 'file'; file: File };
 
 const MAX_DROPPED_IMAGE_BYTES = 20 * 1024 * 1024;
-
-interface ImageDownloadProgressPayload {
-  id: string;
-  status: 'started' | 'progress' | 'completed' | 'failed';
-  progress: number | null;
-  message?: string;
-}
 
 export const imageAssetsEditorContribution: EditorContribution = {
   handlers: {
@@ -132,10 +126,9 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
   let unlisten: (() => void) | null = null;
   try {
     if (Backend.runtime.isTauriRuntime()) {
-      const { listen } = await import('@tauri-apps/api/event');
-      unlisten = await listen<ImageDownloadProgressPayload>('image-download-progress', (event) => {
-        if (event.payload.id !== id || event.payload.status !== 'progress') return;
-        replacePendingImageMarker(textarea, id, pendingImageSnippet(id, event.payload.progress));
+      unlisten = await Backend.runtime.listenImageDownloadProgress((payload: ImageDownloadProgressPayload) => {
+        if (payload.id !== id || payload.status !== 'progress') return;
+        replacePendingImageMarker(textarea, id, pendingImageSnippet(id, payload.progress));
       });
     }
 

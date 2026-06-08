@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { takePendingOpenFiles } from '../lib/tauri/fs';
 import { Backend } from '../platform/common/backend';
 import { currentPlatformCapabilities } from '../platform/common/capabilities';
-
-const externalOpenEvent = 'saekim-open-external-files';
 
 export function useExternalFileOpen(openFile: (path: string) => Promise<void>, enabled: boolean): void {
   const enabledRef = useRef(enabled);
@@ -23,7 +20,7 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
 
     openingRef.current = true;
     try {
-      const pendingPaths = await takePendingOpenFiles();
+      const pendingPaths = await Backend.runtime.takePendingOpenFiles();
       if (disposedRef.current || !enabledRef.current) return;
       const uniquePaths = [...new Set([...queuedPathsRef.current, ...pendingPaths].filter(Boolean))];
       queuedPathsRef.current = [];
@@ -52,29 +49,18 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
 
     disposedRef.current = false;
     let unlisten: (() => void) | null = null;
-    let unlistenWindow: (() => void) | null = null;
 
-    void import('@tauri-apps/api/event')
-      .then(async ({ listen }) => {
-        unlisten = await listen<string[]>(externalOpenEvent, (event) => {
-          queuedPathsRef.current.push(...event.payload);
-          void flushQueuedPaths();
-        });
+    void Backend.runtime
+      .listenExternalOpenFiles((paths) => {
+        queuedPathsRef.current.push(...paths);
+        void flushQueuedPaths();
+      })
+      .then(async (nextUnlisten) => {
+        unlisten = nextUnlisten;
         await flushQueuedPaths();
       })
       .catch((error) => {
         console.error('외부 파일 열기 이벤트 연결 실패:', error);
-      });
-
-    void import('@tauri-apps/api/window')
-      .then(async ({ getCurrentWindow }) => {
-        unlistenWindow = await getCurrentWindow().listen<string[]>(externalOpenEvent, (event) => {
-          queuedPathsRef.current.push(...event.payload);
-          void flushQueuedPaths();
-        });
-      })
-      .catch((error) => {
-        console.error('외부 파일 열기 창 이벤트 연결 실패:', error);
       });
 
     const flushOnFocus = () => {
@@ -97,7 +83,6 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
     return () => {
       disposedRef.current = true;
       unlisten?.();
-      unlistenWindow?.();
       window.removeEventListener('focus', flushOnFocus);
       document.removeEventListener('visibilitychange', flushOnVisible);
       window.clearInterval(pendingPoll);

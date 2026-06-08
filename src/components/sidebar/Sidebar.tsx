@@ -1,4 +1,3 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { useMemo, useState, type RefObject } from 'react';
 import { relativeTime } from '../../lib/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
@@ -467,9 +466,7 @@ function isWorkspaceImageAsset(path: string): boolean {
 }
 
 function localImagePreviewSrc(path: string): string {
-  if (Backend.runtime.isTauriRuntime()) return convertFileSrc(path);
-  const normalized = path.replace(/\\/g, '/');
-  return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : encodeURI(normalized);
+  return Backend.runtime.toFileSrc(path);
 }
 
 function insertImageSnippetIntoDocument(

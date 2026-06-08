@@ -1,5 +1,6 @@
 import type { PreviewContribution } from '../../app/feature';
 import { renderBrowserHtmlDocument, renderSafeHtmlDocument } from '../../lib/html/renderHtml';
+import { Backend } from '../../platform/common/backend';
 import { SegmentedControl } from '../../components/ui/primitives/SegmentedControl';
 
 export const htmlPreviewContribution: PreviewContribution = {
@@ -12,8 +13,8 @@ export const htmlPreviewContribution: PreviewContribution = {
       renderMode: htmlPreviewMode === 'browser' ? 'browser-frame' : 'default',
       html:
         htmlPreviewMode === 'browser'
-          ? renderBrowserHtmlDocument(file.content, file.path)
-          : renderSafeHtmlDocument(file.content, file.path),
+          ? renderBrowserHtmlDocument(file.content, file.path, { toFileSrc: Backend.runtime.toFileSrc })
+          : renderSafeHtmlDocument(file.content, file.path, { toFileSrc: Backend.runtime.toFileSrc }),
     };
   },
   head({ htmlPreviewMode, setHtmlPreviewMode }) {
