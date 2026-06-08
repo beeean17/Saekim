@@ -28,7 +28,7 @@
   margin-top: 10px;
 }
 
-.markdown-image-actions button {
+.markdown-image-action {
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -40,7 +40,7 @@
   text-align: left;
 }
 
-.markdown-image-actions button:hover {
+.markdown-image-action:hover {
   border-color: var(--accent-border);
   background: var(--accent-soft);
 }

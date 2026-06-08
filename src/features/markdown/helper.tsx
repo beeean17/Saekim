@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './helper.css';
 import type { EditorContribution, EditorHelperPreviewContext } from '../../app/feature';
+import { Button } from '../../components/ui/primitives/Button';
 import type { MarkdownHelperItem } from '../../core/editor/helperTypes';
 import { renderMarkdown } from '../../lib/markdown/renderer';
 import { markdownHelperItems } from './helperCatalog';
@@ -55,14 +56,14 @@ function MarkdownSyntaxPreview({ item, ctx }: { item: MarkdownHelperItem; ctx: E
 function MarkdownImageActions({ onImageInsert }: { onImageInsert: NonNullable<EditorHelperPreviewContext['onImageInsert']> }) {
   return (
     <div className="markdown-image-actions" aria-label="이미지 파일 삽입 방식">
-      <button type="button" onClick={() => onImageInsert('link')}>
+      <Button className="markdown-image-action" onClick={() => onImageInsert('link')}>
         <span>원본 경로로 연결</span>
         <small>파일을 이동하지 않고 현재 경로를 삽입</small>
-      </button>
-      <button type="button" onClick={() => onImageInsert('copy')}>
+      </Button>
+      <Button className="markdown-image-action" onClick={() => onImageInsert('copy')}>
         <span>문서 assets로 복사</span>
         <small>.assets 폴더에 복사 후 상대 경로 삽입</small>
-      </button>
+      </Button>
     </div>
   );
 }
