@@ -68,10 +68,10 @@ fn load_session_from_metadata() -> Result<Option<Value>, String> {
         return Ok(None);
     }
 
-    let workspace_id =
-        metadata_value(&connection, "active_workspace_id")?.unwrap_or_else(|| DEFAULT_WORKSPACE_ID.to_string());
-    let view_id =
-        metadata_value(&connection, "active_view_id")?.unwrap_or_else(|| DEFAULT_VIEW_ID.to_string());
+    let workspace_id = metadata_value(&connection, "active_workspace_id")?
+        .unwrap_or_else(|| DEFAULT_WORKSPACE_ID.to_string());
+    let view_id = metadata_value(&connection, "active_view_id")?
+        .unwrap_or_else(|| DEFAULT_VIEW_ID.to_string());
     let active_file_id = metadata_value(&connection, "active_file_id")?;
     let settings = parse_json_value(
         metadata_value(&connection, "settings_json")?.as_deref(),
@@ -180,8 +180,8 @@ fn save_session_to_metadata(session: &Value) -> Result<(), String> {
     let display_name = workspace_display_name(&canonical_root_path);
     let tree_json = serde_json::to_string(workspace.get("tree").unwrap_or(&json!([])))
         .map_err(|error| format!("failed to serialize workspace tree: {error}"))?;
-    let ui_json =
-        serde_json::to_string(&ui).map_err(|error| format!("failed to serialize UI metadata: {error}"))?;
+    let ui_json = serde_json::to_string(&ui)
+        .map_err(|error| format!("failed to serialize UI metadata: {error}"))?;
     let settings_json = serde_json::to_string(&settings)
         .map_err(|error| format!("failed to serialize settings metadata: {error}"))?;
 
@@ -316,12 +316,16 @@ fn load_block_layouts_from_metadata(file_path: &str) -> Result<Vec<BlockLayoutPa
 }
 
 fn save_block_layout_to_metadata(layout: &BlockLayoutPayload) -> Result<(), String> {
-    if layout.file_path.trim().is_empty() || layout.file_path.starts_with('~') || layout.file_path.starts_with("browser://") {
+    if layout.file_path.trim().is_empty()
+        || layout.file_path.starts_with('~')
+        || layout.file_path.starts_with("browser://")
+    {
         return Err("block layout requires a saved local file path".to_string());
     }
 
     let connection = open_metadata_connection()?;
-    let (workspace_id, canonical_root_path) = workspace_context_for_file(&connection, &layout.file_path)?;
+    let (workspace_id, canonical_root_path) =
+        workspace_context_for_file(&connection, &layout.file_path)?;
     ensure_workspace(&connection, &workspace_id, &canonical_root_path)?;
     let display_name = file_name_from_path(&layout.file_path);
     let file_id = upsert_file(
@@ -795,7 +799,8 @@ fn load_recent_files(connection: &Connection, workspace_id: &str) -> Result<Valu
 
     let mut queued_files = Vec::new();
     for row in queue_rows {
-        queued_files.push(row.map_err(|error| format!("failed to read recent file queue row: {error}"))?);
+        queued_files
+            .push(row.map_err(|error| format!("failed to read recent file queue row: {error}"))?);
     }
 
     if !queued_files.is_empty() {
@@ -946,7 +951,8 @@ fn relative_path(root_path: &str, path: &str) -> String {
 
 fn parent_path(path: &str) -> Option<String> {
     let path = Path::new(path);
-    path.parent().map(|parent| parent.to_string_lossy().to_string())
+    path.parent()
+        .map(|parent| parent.to_string_lossy().to_string())
 }
 
 fn workspace_display_name(path: &str) -> String {

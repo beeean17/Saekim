@@ -1,8 +1,7 @@
 mod app_state;
 mod commands;
-#[cfg(target_os = "macos")]
-mod macos_open_documents;
-mod text_file;
+mod core;
+mod platform;
 
 use app_state::AppState;
 use std::path::{Path, PathBuf};
@@ -45,7 +44,7 @@ pub fn run() {
         .manage(AppState::default())
         .setup(|app| {
             #[cfg(target_os = "macos")]
-            macos_open_documents::install(app.handle());
+            platform::macos::open_documents::install(app.handle());
             queue_open_files(app.handle(), startup_document_args());
             Ok(())
         });
@@ -208,7 +207,10 @@ fn document_path_from_arg(arg: &str, cwd: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{env, fs, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        env, fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     #[test]
     fn document_args_accepts_single_file_arg_without_program_name() {
@@ -229,7 +231,10 @@ mod tests {
         fs::write(&document, "opened from default app").unwrap();
 
         let paths = document_args_from_strings(
-            vec![exe.to_string_lossy().to_string(), document.to_string_lossy().to_string()],
+            vec![
+                exe.to_string_lossy().to_string(),
+                document.to_string_lossy().to_string(),
+            ],
             None,
         );
 
@@ -276,7 +281,7 @@ fn document_paths_from_pathbufs(paths: Vec<PathBuf>) -> Vec<String> {
 }
 
 pub(crate) fn is_supported_document_path(path: &Path) -> bool {
-    text_file::is_supported_document_path(path)
+    core::text_file::is_supported_document_path(path)
 }
 
 pub(crate) fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {

@@ -18,8 +18,8 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::{
     app_state::AppState,
+    core::text_file::{is_known_text_document_path, read_text_file, TEXT_DIALOG_EXTENSIONS},
     is_supported_document_path, queue_open_files,
-    text_file::{is_known_text_document_path, read_text_file, TEXT_DIALOG_EXTENSIONS},
 };
 
 #[derive(Serialize)]

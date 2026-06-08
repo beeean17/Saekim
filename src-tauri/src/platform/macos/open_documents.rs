@@ -12,7 +12,9 @@ use objc2::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{app_state::AppState, is_supported_document_path, EVENT_OPEN_EXTERNAL_FILES};
+use crate::{
+    app_state::AppState, core::text_file::is_supported_document_path, EVENT_OPEN_EXTERNAL_FILES,
+};
 
 const K_CORE_EVENT_CLASS: u32 = u32::from_be_bytes(*b"aevt");
 const K_AE_OPEN_DOCUMENTS: u32 = u32::from_be_bytes(*b"odoc");
