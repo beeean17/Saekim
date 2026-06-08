@@ -1,6 +1,6 @@
 use std::{fs, io::Read, path::Path};
 
-const MAX_TEXT_FILE_BYTES: u64 = 20 * 1024 * 1024;
+pub(crate) const MAX_TEXT_FILE_BYTES: u64 = 20 * 1024 * 1024;
 const SNIFF_BYTES: usize = 8192;
 
 pub(crate) const TEXT_DIALOG_EXTENSIONS: &[&str] = &[
@@ -63,6 +63,7 @@ pub(crate) fn is_known_text_document_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg_attr(target_os = "android", allow(dead_code))]
 pub(crate) fn read_text_file(path: &Path) -> Result<String, String> {
     let metadata =
         fs::metadata(path).map_err(|error| format!("failed to read metadata: {error}"))?;
@@ -110,7 +111,7 @@ fn is_known_binary_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn decode_text_bytes(bytes: Vec<u8>) -> Result<String, String> {
+pub(crate) fn decode_text_bytes(bytes: Vec<u8>) -> Result<String, String> {
     if bytes.is_empty() {
         return Ok(String::new());
     }

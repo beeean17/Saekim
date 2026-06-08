@@ -39,7 +39,12 @@ const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(single_instance_plugin())
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_fs::init());
+
+    let builder = builder
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {

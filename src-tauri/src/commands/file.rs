@@ -18,9 +18,16 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::{
     app_state::AppState,
-    core::text_file::{is_known_text_document_path, read_text_file, TEXT_DIALOG_EXTENSIONS},
-    is_supported_document_path, queue_open_files,
+    core::text_file::{is_known_text_document_path, TEXT_DIALOG_EXTENSIONS},
+    queue_open_files,
 };
+
+#[cfg(target_os = "android")]
+use crate::core::text_file::{decode_text_bytes, MAX_TEXT_FILE_BYTES};
+#[cfg(not(target_os = "android"))]
+use crate::{core::text_file::read_text_file, is_supported_document_path};
+#[cfg(target_os = "android")]
+use tauri_plugin_fs::{FilePath, FsExt, OpenOptions as FsOpenOptions};
 
 #[derive(Serialize)]
 pub struct CommandResult<T>
@@ -83,12 +90,7 @@ pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
             return Ok(None);
         };
 
-        let path = path.into_path().unwrap_or_default();
-        if !is_supported_document_path(&path) {
-            return Err("unsupported document type".to_string());
-        }
-
-        Ok(Some(path.to_string_lossy().to_string()))
+        selected_document_path(path)
     })
     .await;
 
@@ -243,8 +245,12 @@ pub fn read_folder_children(path: String) -> CommandResult<Vec<FileTreeNode>> {
 }
 
 #[tauri::command]
-pub fn read_file(path: String, state: tauri::State<AppState>) -> CommandResult<OpenFilePayload> {
-    match read_file_payload(PathBuf::from(path)) {
+pub fn read_file(
+    app: AppHandle,
+    path: String,
+    state: tauri::State<AppState>,
+) -> CommandResult<OpenFilePayload> {
+    match read_file_payload(&app, path) {
         Ok(payload) => {
             if let Ok(mut active_file) = state.active_file.lock() {
                 *active_file = Some(payload.path.clone());
@@ -263,23 +269,21 @@ pub async fn save_file(
 ) -> CommandResult<Option<String>> {
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let target_path = match path {
-            Some(path) if !path.is_empty() => Some(PathBuf::from(path)),
+            Some(path) if !path.is_empty() => Some(selected_file_path_from_string(path)),
             _ => app
                 .dialog()
                 .file()
                 .add_filter("Text Documents", TEXT_DIALOG_EXTENSIONS)
                 .set_file_name("untitled.md")
-                .blocking_save_file()
-                .map(|path| path.into_path().unwrap_or_default()),
+                .blocking_save_file(),
         };
 
         let Some(target_path) = target_path else {
             return Ok(None);
         };
 
-        fs::write(&target_path, content)
-            .map_err(|error| format!("failed to save file: {error}"))?;
-        Ok(Some(target_path.to_string_lossy().to_string()))
+        write_selected_file(&app, &target_path, content)?;
+        Ok(Some(target_path.to_string()))
     })
     .await;
 
@@ -309,9 +313,8 @@ pub async fn save_file_as(
             return Ok(None);
         };
 
-        let path = path.into_path().unwrap_or_default();
-        fs::write(&path, content).map_err(|error| format!("failed to save file: {error}"))?;
-        Ok(Some(path.to_string_lossy().to_string()))
+        write_selected_file(&app, &path, content)?;
+        Ok(Some(path.to_string()))
     })
     .await;
 
@@ -370,7 +373,9 @@ pub fn write_pdf_export(path: String, bytes: Vec<u8>) -> CommandResult<String> {
     }
 }
 
-fn read_file_payload(path: PathBuf) -> Result<OpenFilePayload, String> {
+#[cfg(not(target_os = "android"))]
+fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
+    let path = PathBuf::from(path);
     let content = read_text_file(&path)?;
     let name = path
         .file_name()
@@ -383,6 +388,96 @@ fn read_file_payload(path: PathBuf) -> Result<OpenFilePayload, String> {
         name,
         content,
     })
+}
+
+#[cfg(target_os = "android")]
+fn read_file_payload(app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
+    read_selected_file_payload(app, selected_file_path_from_string(path))
+}
+
+fn selected_document_path(path: tauri_plugin_dialog::FilePath) -> Result<Option<String>, String> {
+    #[cfg(target_os = "android")]
+    {
+        return Ok(Some(path.to_string()));
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let path = path.into_path().unwrap_or_default();
+        if !is_supported_document_path(&path) {
+            return Err("unsupported document type".to_string());
+        }
+
+        Ok(Some(path.to_string_lossy().to_string()))
+    }
+}
+
+fn selected_file_path_from_string(path: String) -> tauri_plugin_dialog::FilePath {
+    path.parse::<tauri_plugin_dialog::FilePath>()
+        .unwrap_or_else(|never| match never {})
+}
+
+#[cfg(target_os = "android")]
+fn read_selected_file_payload(app: &AppHandle, path: FilePath) -> Result<OpenFilePayload, String> {
+    let bytes = app
+        .fs()
+        .read(path.clone())
+        .map_err(|error| format!("failed to read file: {error}"))?;
+    if bytes.len() as u64 > MAX_TEXT_FILE_BYTES {
+        return Err(format!(
+            "file is too large to open as text (limit: {} MB)",
+            MAX_TEXT_FILE_BYTES / 1024 / 1024
+        ));
+    }
+
+    let content = decode_text_bytes(bytes)?;
+    Ok(OpenFilePayload {
+        path: path.to_string(),
+        name: selected_file_name(&path),
+        content,
+    })
+}
+
+#[cfg(target_os = "android")]
+fn selected_file_name(path: &FilePath) -> String {
+    match path {
+        FilePath::Path(path) => path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("untitled.md")
+            .to_string(),
+        FilePath::Url(url) => url
+            .path_segments()
+            .and_then(|mut segments| segments.next_back())
+            .filter(|segment| !segment.is_empty())
+            .unwrap_or("untitled.md")
+            .to_string(),
+    }
+}
+
+fn write_selected_file(
+    _app: &AppHandle,
+    path: &tauri_plugin_dialog::FilePath,
+    content: String,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        let mut options = FsOpenOptions::new();
+        options.read(false).write(true).truncate(true).create(true);
+        let mut file = _app
+            .fs()
+            .open(path.clone(), options)
+            .map_err(|error| format!("failed to save file: {error}"))?;
+        file.write_all(content.as_bytes())
+            .map_err(|error| format!("failed to save file: {error}"))?;
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let path = path.clone().into_path().unwrap_or_default();
+        fs::write(&path, content).map_err(|error| format!("failed to save file: {error}"))
+    }
 }
 
 fn read_folder_payload(path: PathBuf) -> Result<FolderPayload, String> {
