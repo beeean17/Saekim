@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import './search.css';
 import { Icon } from '../../components/primitives/Icon';
+import { CloseButton } from '../../components/ui/primitives/CloseButton';
+import { IconButton } from '../../components/ui/primitives/IconButton';
 import { SearchField } from '../../components/ui/primitives/SearchField';
 
 export function FindBar({
@@ -64,15 +66,15 @@ export function FindBar({
       <span className="find-count">
         {matches.length > 0 ? `${(activeIndex % matches.length) + 1}/${matches.length}` : query ? '0/0' : '-'}
       </span>
-      <button type="button" title="이전 결과" onClick={() => go(-1)}>
+      <IconButton label="이전 결과" onClick={() => go(-1)}>
         <Icon name="chevronUp" />
-      </button>
-      <button type="button" title="다음 결과" onClick={() => go(1)}>
+      </IconButton>
+      <IconButton label="다음 결과" onClick={() => go(1)}>
         <Icon name="chevronDown" />
-      </button>
-      <button className="find-close" type="button" onClick={onClose}>
+      </IconButton>
+      <CloseButton className="find-close" onClick={onClose}>
         닫기
-      </button>
+      </CloseButton>
     </div>
   );
 }
