@@ -1,4 +1,4 @@
-import type { ClipboardEvent as ReactClipboardEvent, DragEvent as ReactDragEvent, ReactNode, RefObject } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, ComponentType, DragEvent as ReactDragEvent, ReactNode, RefObject } from 'react';
 import type { EditorHelperItemBase } from '../core/editor/helperTypes';
 import type { FileTypeContribution, FileTypeInfo } from '../core/document/fileType';
 import type { PlatformCapability } from '../platform/common/capabilities';
@@ -49,9 +49,20 @@ export interface PreviewRenderContext extends PreviewMatchContext {
 
 export interface EditorContribution {
   toolbar?: EditorToolbarItem[];
+  overlays?: EditorOverlayContribution[];
   helpers?: EditorHelperContribution[];
   handlers?: EditorEventHandlers;
   imageActions?: EditorImageActions;
+}
+
+export interface EditorOverlayContribution {
+  id: string;
+  component: ComponentType<EditorOverlayProps>;
+}
+
+export interface EditorOverlayProps {
+  activeFile: OpenFile | null;
+  textareaRef: RefObject<HTMLTextAreaElement>;
 }
 
 export interface EditorToolbarItem {

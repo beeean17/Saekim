@@ -7,7 +7,6 @@ import type { EditorHelperItemBase } from '../../core/editor/helperTypes';
 import { selectEditorContributions } from '../../core/editor/registry';
 import { getLineIndentChange, indentSelectedLines, insertHardLineBreak, insertTextAtSelection, setTextareaValue } from '../../core/editor/textEditing';
 import { getFileTypeLabel } from '../../core/document/fileType';
-import { FindBar, useSearchStore } from '../../features/search';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { useSettingsStore } from '../../store/settings';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -22,8 +21,6 @@ export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefO
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef.current);
-  const findOpen = useSearchStore((state) => state.findOpen);
-  const closeFind = useSearchStore((state) => state.closeFind);
   const editorContributions = useMemo(() => selectEditorContributions(enabledFeatures), []);
   const handlerContext = useMemo<EditorHandlerContext>(
     () => ({
@@ -33,10 +30,6 @@ export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefO
     }),
     [activeFile, refresh, textareaRef],
   );
-
-  useEffect(() => {
-    if (!activeFile && findOpen) closeFind();
-  }, [activeFile, closeFind, findOpen]);
 
   useEffect(() => {
     const onDragOver = (event: DragEvent) => {
@@ -64,9 +57,9 @@ export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefO
   return (
     <section className="editor-pane" data-disabled={!activeFile}>
       <EditorToolbar commandRegistry={commandRegistry} contributions={editorContributions} textareaRef={textareaRef} />
+      <EditorOverlays activeFile={activeFile} contributions={editorContributions} textareaRef={textareaRef} />
       {activeFile ? (
         <>
-          {findOpen ? <FindBar content={activeFile.content} textareaRef={textareaRef} onClose={closeFind} /> : null}
           <EditorContent
             activeLine={cursor.row}
             value={activeFile.content}
@@ -84,6 +77,25 @@ export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefO
         />
       )}
     </section>
+  );
+}
+
+function EditorOverlays({
+  activeFile,
+  contributions,
+  textareaRef,
+}: {
+  activeFile: ReturnType<typeof selectActiveFile>;
+  contributions: ReturnType<typeof selectEditorContributions>;
+  textareaRef: RefObject<HTMLTextAreaElement>;
+}) {
+  return (
+    <>
+      {contributions.overlays.map((overlay) => {
+        const Overlay = overlay.component;
+        return <Overlay activeFile={activeFile} key={overlay.id} textareaRef={textareaRef} />;
+      })}
+    </>
   );
 }
 
