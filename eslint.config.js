@@ -29,7 +29,11 @@ export default [
         {
           patterns: [
             {
-              group: ['../../features/*/*', 'src/features/*/*'],
+              regex: '^\\.\\./(?!\\.\\.)[^/]+/.+',
+              message: featureBoundaryMessage,
+            },
+            {
+              group: ['../../features/*/*', '../../../features/*/*', 'src/features/*/*'],
               message: featureBoundaryMessage,
             },
           ],
@@ -45,7 +49,24 @@ export default [
         {
           patterns: [
             {
-              group: ['../features/*', '../features/*/*', '../platform/*', '../platform/*/*'],
+              group: [
+                '../features/*',
+                '../features/*/*',
+                '../../features/*',
+                '../../features/*/*',
+                '../../../features/*',
+                '../../../features/*/*',
+                '../platform/*',
+                '../platform/*/*',
+                '../../platform/*',
+                '../../platform/*/*',
+                '../../../platform/*',
+                '../../../platform/*/*',
+                'src/features/*',
+                'src/features/*/*',
+                'src/platform/*',
+                'src/platform/*/*',
+              ],
               message: coreBoundaryMessage,
             },
           ],

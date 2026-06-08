@@ -8,8 +8,8 @@ type CleanupRef = {
 const externalLinkCleanups = new WeakMap<HTMLElement, () => void>();
 const imageLoadCleanups = new WeakMap<HTMLElement, () => void>();
 
-export const externalLinkPreviewEnhancement: PreviewContribution = {
-  id: 'core.preview.external-links',
+const externalLinkPreviewEnhancement: PreviewContribution = {
+  id: 'preview-dom.external-links',
   priority: -80,
   match: () => true,
   afterRender(root) {
@@ -38,8 +38,8 @@ export const externalLinkPreviewEnhancement: PreviewContribution = {
   },
 };
 
-export const imageLoadPreviewEnhancement: PreviewContribution = {
-  id: 'core.preview.image-loads',
+const imageLoadPreviewEnhancement: PreviewContribution = {
+  id: 'preview-dom.image-loads',
   priority: -90,
   match: () => true,
   afterRender(root) {
@@ -77,6 +77,11 @@ export const imageLoadPreviewEnhancement: PreviewContribution = {
     cleanupImageLoads(root);
   },
 };
+
+export const previewDomEnhancements: PreviewContribution[] = [
+  externalLinkPreviewEnhancement,
+  imageLoadPreviewEnhancement,
+];
 
 export function notifyPreviewRendered(root: HTMLElement | null): void {
   root?.dispatchEvent(new CustomEvent('saekim-preview-rendered', { bubbles: false }));

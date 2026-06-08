@@ -3,7 +3,6 @@ import type { MutableRefObject } from 'react';
 import type { PreviewRenderContext, PreviewResult } from '../../app/feature';
 import { enabledFeatures } from '../../app/featureRegistry';
 import { getFileTypeInfo } from '../../core/document/fileType';
-import { bindHtmlPreviewFrame, notifyPreviewRendered } from '../../core/preview/domLifecycle';
 import { selectPreviewEnhancements, selectPreviewRenderer } from '../../core/preview/registry';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
@@ -11,6 +10,7 @@ import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../ui/feedback/EmptyState';
 import { ToolbarButton } from '../ui/toolbar/Toolbar';
+import { bindHtmlPreviewFrame, notifyPreviewRendered, previewDomEnhancements } from './domLifecycle';
 
 export function PreviewPane({ previewRef }: { previewRef: MutableRefObject<HTMLDivElement | null> }) {
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -62,7 +62,7 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
     [activeFile, fileType.label, fileType.language, fileType.previewKind, htmlPreviewMode, setHtmlPreviewMode, theme],
   );
   const renderer = previewContext ? selectPreviewRenderer(enabledFeatures, previewContext) : null;
-  const enhancements = previewContext ? selectPreviewEnhancements(enabledFeatures, previewContext) : [];
+  const enhancements = previewContext ? selectPreviewEnhancements(enabledFeatures, previewContext, previewDomEnhancements) : [];
   const enhancementIds = enhancements.map((contribution) => contribution.id).join('|');
   const usesBrowserFrame = previewResult?.kind === 'html' && previewResult.renderMode === 'browser-frame';
 

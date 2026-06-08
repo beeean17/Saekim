@@ -128,18 +128,21 @@ function EditorToolbar({
         </div>
         <ToolbarGroup className="tool-group">
           {contributions.toolbar.map((item) => (
-            <ToolButton
+            <ToolbarButton
+              className="tool-btn"
+              data-special={item.helperMode}
               disabled={disabled}
-              icon={item.icon as IconName | undefined}
               key={item.id}
-              label={item.label}
-              special={item.helperMode}
-              tooltip={item.tooltip}
+              title={item.tooltip}
+              aria-label={item.tooltip}
               onClick={() => {
                 if (item.helperMode) setHelperMode(item.helperMode);
                 if (item.commandId) dispatchCommand(commandRegistry, item.commandId);
               }}
-            />
+            >
+              {item.icon ? <Icon name={item.icon as IconName} /> : null}
+              {item.label ? <span className="label">{item.label}</span> : null}
+            </ToolbarButton>
           ))}
         </ToolbarGroup>
       </UiToolbar>
@@ -160,24 +163,6 @@ function EditorToolbar({
         />
       ) : null}
     </>
-  );
-}
-
-interface ToolButtonProps {
-  icon?: IconName;
-  label?: string;
-  tooltip: string;
-  special?: string;
-  disabled?: boolean;
-  onClick: () => void;
-}
-
-function ToolButton({ icon, label, tooltip, special, disabled, onClick }: ToolButtonProps) {
-  return (
-    <ToolbarButton className="tool-btn" data-special={special} disabled={disabled} title={tooltip} aria-label={tooltip} onClick={onClick}>
-      {icon ? <Icon name={icon} /> : null}
-      {label ? <span className="label">{label}</span> : null}
-    </ToolbarButton>
   );
 }
 
