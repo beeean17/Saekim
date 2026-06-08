@@ -1,0 +1,452 @@
+.pdf-export-root {
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #687285;
+  --bg-code: #f3f4f6;
+  --bg-elevated: #ffffff;
+  --border: #d8dde8;
+  --accent: #5f6bff;
+  --accent-soft: #f3f5ff;
+
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 794px;
+  min-height: 1123px;
+  box-sizing: border-box;
+  padding: 72px 76px 84px;
+  overflow: visible;
+  background: #fff;
+  color: #20242c;
+  font-family: var(--editor-font-family, var(--font-ui));
+  font-size: 14px;
+  line-height: 1.72;
+  color-scheme: light;
+  pointer-events: none;
+}
+
+.pdf-export-root :where(.pdf-content, h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, th, td, hr, img, .shiki, .math-block, .mermaid-block, .pdf-page-spacer) {
+  box-sizing: border-box;
+}
+
+.pdf-export-root h1 {
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  color: #111827;
+  border-bottom: 1px solid #d8dde8;
+  font-size: 26px;
+  line-height: 1.3;
+}
+
+.pdf-export-root h1:not(:first-child) {
+  margin-top: 26px;
+}
+
+.pdf-export-root h2 {
+  margin: 24px 0 10px;
+  color: #1f2937;
+  font-size: 21px;
+  line-height: 1.35;
+}
+
+.pdf-export-root h3 {
+  margin: 18px 0 8px;
+  color: #374151;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.pdf-export-root p {
+  margin: 8px 0 12px;
+  color: #374151;
+  line-height: 1.72;
+}
+
+.pdf-export-root strong {
+  color: #111827;
+  font-weight: 700;
+}
+
+.pdf-export-root em {
+  color: #4f5dff;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.pdf-export-root mark {
+  padding: 0 3px;
+  color: #111827;
+  background: #eef0ff !important;
+  border-radius: 3px;
+}
+
+.pdf-export-root ul,
+.pdf-export-root ol {
+  margin: 8px 0 14px;
+  padding-left: 24px;
+}
+
+.pdf-export-root li {
+  margin: 4px 0;
+  color: #374151;
+}
+
+.pdf-export-root blockquote {
+  margin: 16px 0;
+  padding: 8px 14px;
+  color: #4b5563;
+  background: #f3f5ff;
+  border-left: 4px solid #5f6bff;
+}
+
+.pdf-export-root code {
+  padding: 2px 5px;
+  color: #111827;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.pdf-export-root pre,
+.pdf-export-root .shiki {
+  --preview-code-line-height: 1.45;
+
+  position: relative;
+  margin: 14px 0;
+  padding: 34px 0 14px;
+  overflow: hidden;
+  color: #111827 !important;
+  background: #f8fafc !important;
+  border: 1px solid #d8dde8;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: var(--preview-code-line-height);
+  white-space: pre-wrap;
+}
+
+.pdf-export-root pre code,
+.pdf-export-root .shiki code {
+  display: block;
+  min-width: max-content;
+  padding: 0;
+  color: #111827 !important;
+  background: transparent !important;
+  border: 0;
+}
+
+.pdf-export-root .shiki::before {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 6px;
+  color: #687285;
+  background: #ffffff;
+  border: 1px solid #d8dde8;
+  border-radius: 4px;
+  content: attr(data-label);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.pdf-export-root .shiki .line {
+  display: block;
+  padding: 0 16px 0 52px;
+  line-height: var(--preview-code-line-height);
+}
+
+.pdf-export-root .shiki .line::before {
+  display: inline-block;
+  width: 28px;
+  margin-left: -42px;
+  margin-right: 14px;
+  color: #9ca3af;
+  content: attr(data-line);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pdf-export-root .shiki .line.diff-add {
+  background: #ecfdf3;
+}
+
+.pdf-export-root .shiki .line.diff-remove {
+  background: #fff1f2;
+}
+
+.pdf-export-root table {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.pdf-export-root th,
+.pdf-export-root td {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  text-align: left;
+}
+
+.pdf-export-root th {
+  color: #111827;
+  background: #eef0ff;
+  font-weight: 700;
+}
+
+.pdf-export-root tbody tr:nth-child(even) {
+  background: #f8fafc !important;
+}
+
+.pdf-export-root hr {
+  height: 1px;
+  margin: 24px 0;
+  background: #d8dde8;
+  border: 0;
+}
+
+.pdf-export-root img {
+  max-width: 100%;
+  height: auto;
+}
+
+.pdf-export-root .math-block {
+  position: relative;
+  margin: 16px 0;
+  padding: 38px 16px 16px;
+  overflow: visible;
+  color: #111827 !important;
+  background: #f8fafc !important;
+  border: 1px solid #d8dde8;
+  border-radius: 6px;
+}
+
+.pdf-export-root .math-block::before {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 6px;
+  color: #687285;
+  background: #ffffff;
+  border: 1px solid #d8dde8;
+  border-radius: 4px;
+  content: attr(data-label);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.pdf-export-root .math-block .katex-display {
+  margin: 0;
+}
+
+.pdf-export-root .math-equation-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.pdf-export-root .math-equation {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  padding: 5px 16px;
+  box-sizing: border-box;
+}
+
+.pdf-export-root .math-equation[data-align="left"] {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.pdf-export-root .math-equation[data-align="center"] {
+  justify-content: center;
+  text-align: center;
+}
+
+.pdf-export-root .math-equation[data-align="right"] {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.pdf-export-root .math-equation .katex-display {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  text-align: inherit;
+}
+
+.pdf-export-root .preview-layout-tools,
+.pdf-export-root .math-equation-tools,
+.pdf-export-root .preview-mode-tabs {
+  display: none !important;
+}
+
+.pdf-export-root .preview-layout-group {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(var(--preview-layout-columns, 2), minmax(0, 1fr));
+  margin: 16px 0;
+}
+
+.pdf-export-root .preview-layout-block {
+  display: block;
+  grid-column: var(--preview-layout-column, auto);
+  width: var(--block-layout-width, 100%);
+  max-width: 100%;
+  margin: 16px 0;
+}
+
+.pdf-export-root .preview-layout-block[data-align="center"] {
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.pdf-export-root .preview-layout-block[data-align="right"] {
+  margin-left: auto;
+}
+
+.pdf-export-root .preview-layout-group .preview-layout-block {
+  width: 100%;
+  margin: 0;
+}
+
+.pdf-export-root .preview-layout-surface {
+  display: block;
+  width: 100%;
+}
+
+.pdf-export-root .preview-error-panel,
+.pdf-export-root .failed-image-block {
+  color: #991b1b;
+  background: #fff1f2 !important;
+  border: 1px solid #fecdd3 !important;
+}
+
+.pdf-export-root .mermaid-block {
+  display: grid;
+  place-items: center;
+  margin: 16px 0;
+  padding: 16px;
+  overflow: hidden;
+  color: #111827 !important;
+  background: #ffffff !important;
+  border: 1px solid #d8dde8;
+  border-radius: 6px;
+}
+
+.pdf-export-root .katex,
+.pdf-export-root .katex * {
+  box-sizing: content-box;
+}
+
+.pdf-export-root .katex,
+.pdf-export-root .katex .katex-html,
+.pdf-export-root .katex .base,
+.pdf-export-root .katex .mord,
+.pdf-export-root .katex .mop,
+.pdf-export-root .katex .mbin,
+.pdf-export-root .katex .mrel,
+.pdf-export-root .katex .mopen,
+.pdf-export-root .katex .mclose,
+.pdf-export-root .katex .mpunct,
+.pdf-export-root .katex .minner,
+.pdf-export-root .katex .mfrac,
+.pdf-export-root .katex .msupsub,
+.pdf-export-root .katex .mspace,
+.pdf-export-root .katex .accent-body,
+.pdf-export-root .katex .sqrt > .root {
+  color: #111827 !important;
+}
+
+.pdf-export-root .katex .frac-line,
+.pdf-export-root .katex .sqrt-line {
+  border-color: #111827 !important;
+}
+
+.pdf-export-root .katex svg,
+.pdf-export-root .katex svg path {
+  fill: #111827 !important;
+}
+
+.pdf-export-root .mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+.pdf-export-root .mermaid-block svg text,
+.pdf-export-root .mermaid-block svg tspan,
+.pdf-export-root .mermaid-block svg .label,
+.pdf-export-root .mermaid-block svg .nodeLabel,
+.pdf-export-root .mermaid-block svg .edgeLabel,
+.pdf-export-root .mermaid-block svg .cluster-label {
+  fill: #111827 !important;
+  color: #111827 !important;
+}
+
+.pdf-export-root .mermaid-block svg .node rect,
+.pdf-export-root .mermaid-block svg .node circle,
+.pdf-export-root .mermaid-block svg .node ellipse,
+.pdf-export-root .mermaid-block svg .node polygon,
+.pdf-export-root .mermaid-block svg .node path {
+  fill: #f8fafc !important;
+  stroke: #64748b !important;
+}
+
+.pdf-export-root .mermaid-block svg .edgePath path,
+.pdf-export-root .mermaid-block svg .flowchart-link,
+.pdf-export-root .mermaid-block svg .messageLine0,
+.pdf-export-root .mermaid-block svg .messageLine1 {
+  stroke: #64748b !important;
+}
+
+.pdf-export-root .mermaid-block svg marker,
+.pdf-export-root .mermaid-block svg marker path,
+.pdf-export-root .mermaid-block svg .arrowheadPath {
+  fill: #64748b !important;
+  stroke: #64748b !important;
+}
+
+.pdf-export-root .mermaid-block svg .edgeLabel,
+.pdf-export-root .mermaid-block svg .edgeLabel rect {
+  background: #ffffff !important;
+  fill: #ffffff !important;
+}
+
+.pdf-export-root .pdf-page-spacer {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+@media print {
+  body.pdf-exporting .app {
+    display: none !important;
+  }
+
+  body.pdf-exporting .pdf-export-root {
+    --text-primary: #111;
+    --text-secondary: #3f4652;
+    --bg-code: #f6f7f9;
+    --bg-elevated: #fff;
+    --border: #d6dbe3;
+    --accent: #5f6bff;
+    --accent-soft: #eef0ff;
+
+    display: block !important;
+    background: white !important;
+    color: #111 !important;
+    font-family: var(--editor-font-family, var(--font-ui));
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+}

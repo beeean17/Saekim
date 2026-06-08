@@ -7,7 +7,6 @@ interface ShortcutHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
-  onExportPdf: () => void;
   onClose: () => void;
 }
 
@@ -39,8 +38,7 @@ export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegist
         if (dispatchShortcut(commands, 'mod+f')) event.preventDefault();
       }
       if (event.key.toLowerCase() === 'p') {
-        event.preventDefault();
-        handlers.onExportPdf();
+        if (dispatchShortcut(commands, 'mod+p')) event.preventDefault();
       }
       if (event.key.toLowerCase() === 'w') {
         event.preventDefault();

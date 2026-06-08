@@ -66,6 +66,14 @@ export const browserBackend: BackendAdapter = {
     return path;
   },
 
+  async pickPdfExportPath(_suggestedName: string): Promise<string | null> {
+    return null;
+  },
+
+  async writePdfExport(_path: string, _bytes: number[]): Promise<string> {
+    throw new Error('Native PDF export is only available in the desktop app.');
+  },
+
   async loadSession<T>(): Promise<T | null> {
     const raw = localStorage.getItem(sessionKey);
     return raw ? (JSON.parse(raw) as T) : null;

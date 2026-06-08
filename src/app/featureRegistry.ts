@@ -4,6 +4,8 @@ import { imageAssetsEditorContribution } from '../features/image-assets';
 import { katexEditorContribution } from '../features/katex';
 import { markdownEditorContribution, markdownPreviewContribution } from '../features/markdown';
 import { mermaidEditorContribution, mermaidPreviewEnhancement } from '../features/mermaid';
+import { blockLayoutMetadataContribution } from '../features/block-layout';
+import { pdfExportCommands, pdfExportContribution } from '../features/pdf-export';
 import { searchCommands, searchEditorContribution } from '../features/search';
 import { structuredDataPreviewContribution, tabularDataPreviewContribution } from '../features/structured-data';
 
@@ -53,8 +55,9 @@ export const enabledFeatures: SaekimFeature[] = [
     },
   },
   { id: 'image-assets', label: 'Image Assets', dependsOn: ['markdown'], editor: imageAssetsEditorContribution },
-  { id: 'block-layout', label: 'Block Layout', dependsOn: ['markdown'] },
-  { id: 'pdf-export', label: 'PDF Export' },
+  { id: 'metadata', label: 'Metadata' },
+  { id: 'block-layout', label: 'Block Layout', dependsOn: ['markdown', 'metadata'], metadata: blockLayoutMetadataContribution },
+  { id: 'pdf-export', label: 'PDF Export', commands: pdfExportCommands, pdf: pdfExportContribution },
   { id: 'search', label: 'Search', editor: searchEditorContribution, commands: searchCommands },
 ];
 

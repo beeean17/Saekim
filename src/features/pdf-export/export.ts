@@ -1,5 +1,5 @@
-import { pickPdfExportPath, writePdfExport } from '../tauri/fs';
-import { isTauriRuntime } from '../tauri/invoke';
+import { Backend } from '../../lib/backend';
+import { isTauriRuntime } from '../../lib/tauri/invoke';
 
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
 const PAGE_SPACER_CLASS = 'pdf-page-spacer';
@@ -307,12 +307,12 @@ async function pickExportTarget(suggestedName: string): Promise<string | null> {
     return null;
   }
 
-  return pickPdfExportPath(suggestedName);
+  return Backend.pickPdfExportPath(suggestedName);
 }
 
 async function savePdfBytes(bytes: Uint8Array, suggestedName: string, targetPath: string | null): Promise<void> {
   if (targetPath) {
-    await writePdfExport(targetPath, Array.from(bytes));
+    await Backend.writePdfExport(targetPath, Array.from(bytes));
     return;
   }
 
@@ -387,4 +387,3 @@ function toPdfFileName(value: string): string {
   const baseName = value.trim().replace(/\.(md|markdown|txt|pdf)$/i, '') || 'document';
   return `${baseName}.pdf`;
 }
-

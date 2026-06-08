@@ -5,12 +5,14 @@ import {
   importPdf,
   openFileDialog,
   openFolderDialog,
+  pickPdfExportPath,
   pickImagePath,
   readFile,
   readFolder,
   readFolderChildren,
   saveFile,
   saveFileAs,
+  writePdfExport,
 } from '../tauri/fs';
 import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../tauri/session';
 import type { BackendAdapter } from './types';
@@ -28,6 +30,8 @@ export const tauriBackend: BackendAdapter = {
   readFolderChildren,
   saveFile,
   saveFileAs,
+  pickPdfExportPath,
+  writePdfExport,
   loadSession,
   saveSession,
   loadBlockLayouts,

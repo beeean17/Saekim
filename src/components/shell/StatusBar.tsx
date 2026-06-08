@@ -1,14 +1,14 @@
 import { countKoreanAwareWords, readingTime } from '../../lib/format/readingTime';
-import { useUIStore } from '../../store/ui';
+import { pdfExportStatusText, usePdfExportStore } from '../../features/pdf-export';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 
 export function StatusBar() {
   const activeFile = useWorkspaceStore(selectActiveFile);
-  const pdfExportStatus = useUIStore((state) => state.pdfExportStatus);
+  const pdfExportStatus = usePdfExportStore((state) => state.status);
   const dirty = isDirty(activeFile);
   const content = activeFile?.content ?? '';
   const language = activeFile?.name.endsWith('.txt') ? 'Text' : 'Markdown';
-  const pdfStatusText = getPdfExportStatusText(pdfExportStatus);
+  const pdfStatusText = pdfExportStatusText(pdfExportStatus);
 
   return (
     <footer className="statusbar">
@@ -35,11 +35,4 @@ export function StatusBar() {
       </div>
     </footer>
   );
-}
-
-function getPdfExportStatusText(status: 'idle' | 'exporting' | 'done' | 'error'): string | null {
-  if (status === 'exporting') return 'PDF export 진행중';
-  if (status === 'done') return 'PDF export 완료';
-  if (status === 'error') return 'PDF export 실패';
-  return null;
 }

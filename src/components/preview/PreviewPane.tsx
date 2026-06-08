@@ -4,17 +4,24 @@ import type { PreviewRenderContext, PreviewResult } from '../../app/feature';
 import { enabledFeatures } from '../../app/featureRegistry';
 import { getFileTypeInfo } from '../../core/document/fileType';
 import { selectPreviewEnhancements, selectPreviewRenderer } from '../../core/preview/registry';
-import { Backend } from '../../lib/backend';
+import {
+  canUseBlockLayouts,
+  enhancePreviewLayoutBlocks,
+  readBlockLayouts,
+  writeBlockLayouts,
+} from '../../features/block-layout';
 import { isExternalUrl, openExternalUrl } from '../../lib/tauri/opener';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import type { BlockKind, BlockLayout, LayoutAlign } from '../../types/metadata';
+import type { BlockLayout } from '../../types/metadata';
 import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../ui/feedback/EmptyState';
 import { ToolbarButton } from '../ui/toolbar/Toolbar';
 
-export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
+type BlockLayoutChange = BlockLayout | BlockLayout[];
+
+export function PreviewPane({ previewRef }: { previewRef: MutableRefObject<HTMLDivElement | null> }) {
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -46,7 +53,7 @@ export function PreviewPane({ previewRef }: { previewRef: React.MutableRefObject
   );
 }
 
-function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTMLDivElement | null> }) {
+function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivElement | null> }) {
   const localRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const frameCleanupRef = useRef<(() => void) | null>(null);
@@ -73,14 +80,14 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     let alive = true;
     const filePath = activeFile?.path;
 
-    if (!filePath || filePath.startsWith('~') || filePath.startsWith('browser://') || !renderer?.supportsBlockLayouts) {
+    if (!canUseBlockLayouts(filePath, renderer?.supportsBlockLayouts)) {
       setBlockLayouts([]);
       return () => {
         alive = false;
       };
     }
 
-    void Backend.loadBlockLayouts(filePath)
+    void readBlockLayouts(filePath)
       .then((layouts) => {
         if (alive) setBlockLayouts(layouts);
       })
@@ -94,10 +101,10 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     };
   }, [activeFile?.path, renderer?.id, renderer?.supportsBlockLayouts]);
 
-  const saveBlockLayout = useCallback((layoutOrLayouts: BlockLayout | BlockLayout[]) => {
+  const saveBlockLayout = useCallback((layoutOrLayouts: BlockLayoutChange) => {
     const layouts = Array.isArray(layoutOrLayouts) ? layoutOrLayouts : [layoutOrLayouts];
     setBlockLayouts((current) => layouts.reduce(upsertBlockLayout, current));
-    void Promise.all(layouts.map((layout) => Backend.saveBlockLayout(layout))).catch((error) => {
+    void writeBlockLayouts(layouts).catch((error) => {
       console.error('failed to save block layouts', error);
     });
   }, []);
@@ -227,9 +234,8 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
           if (controller.signal.aborted) return;
           await enhancement.afterRender?.(root, renderContext, controller.signal);
         }
-        if (!controller.signal.aborted && renderer.supportsBlockLayouts) {
-          const filePath = activeFile?.path;
-          if (filePath) enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
+        if (!controller.signal.aborted && canUseBlockLayouts(activeFile?.path, renderer.supportsBlockLayouts)) {
+          enhancePreviewLayoutBlocks(root, activeFile.path, blockLayouts, saveBlockLayout);
         }
         if (!controller.signal.aborted) notifyPreviewRendered(root);
       } catch (error) {
@@ -255,7 +261,7 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
   useEffect(() => {
     const root = localRef.current;
     const filePath = activeFile?.path;
-    if (!root || !filePath || !renderer?.supportsBlockLayouts) return;
+    if (!root || !canUseBlockLayouts(filePath, renderer?.supportsBlockLayouts)) return;
 
     enhancePreviewLayoutBlocks(root, filePath, blockLayouts, saveBlockLayout);
   }, [activeFile?.path, blockLayouts, previewRenderKey, renderer?.id, renderer?.supportsBlockLayouts, saveBlockLayout]);
@@ -362,421 +368,6 @@ function bindHtmlPreviewFrame(
   };
 }
 
-type LayoutTarget = {
-  element: HTMLElement;
-  blockKind: BlockKind;
-  blockKey: string;
-  occurrenceIndex: number;
-};
-
-type LayoutChangeHandler = (layout: BlockLayout | BlockLayout[]) => void;
-
-const layoutWidths = [100, 75, 50, 33];
-const layoutAligns: LayoutAlign[] = ['left', 'center', 'right'];
-const equationAligns: LayoutAlign[] = ['left', 'center', 'right'];
-
-function enhancePreviewLayoutBlocks(
-  root: HTMLElement,
-  filePath: string,
-  layouts: BlockLayout[],
-  onChange: LayoutChangeHandler,
-): void {
-  if (filePath.startsWith('~') || filePath.startsWith('browser://')) return;
-
-  unwrapLayoutGroups(root);
-  unwrapUnsupportedLayoutWrappers(root);
-
-  const layoutByKey = new Map(layouts.map((layout) => [layoutIdentity(layout), layout]));
-  root.querySelectorAll<HTMLElement>('.preview-layout-block').forEach((wrapper) => {
-    const blockKind = blockKindFromDataset(wrapper.dataset.blockKind);
-    const blockKey = wrapper.dataset.blockKey;
-    const occurrenceIndex = Number.parseInt(wrapper.dataset.occurrenceIndex ?? '', 10);
-    if (!blockKind || !blockKey || !Number.isFinite(occurrenceIndex)) return;
-
-    const identity = { blockKind, blockKey, occurrenceIndex };
-    const layout =
-      layoutByKey.get(layoutIdentity(identity)) ??
-      defaultBlockLayout(filePath, blockKind, blockKey, occurrenceIndex);
-    ensureLayoutSurface(wrapper);
-    applyBlockLayout(wrapper, layout);
-  });
-
-  const targets = collectLayoutTargets(root);
-
-  targets.forEach((target) => {
-    const wrapper = ensureLayoutWrapper(target);
-    const layout =
-      layoutByKey.get(layoutIdentity(target)) ??
-      defaultBlockLayout(filePath, target.blockKind, target.blockKey, target.occurrenceIndex);
-
-    applyBlockLayout(wrapper, layout);
-  });
-
-  const normalizedLayouts = normalizeLayoutGroups(root, filePath, layoutByKey);
-  normalizedLayouts.forEach((layout) => {
-    layoutByKey.set(layoutIdentity(layout), layout);
-  });
-
-  getLayoutWrappers(root).forEach((wrapper) => {
-    const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
-    applyBlockLayout(wrapper, layout);
-    renderLayoutControls(wrapper, layout, root, filePath, layoutByKey, onChange);
-    renderKatexEquationControls(wrapper, layout, root, onChange);
-  });
-
-  if (normalizedLayouts.length > 0) {
-    onChange(normalizedLayouts);
-  }
-
-  arrangeLayoutGroups(root);
-}
-
-function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
-  const targets: LayoutTarget[] = [];
-  const imageCounts = new Map<string, number>();
-  const genericCounts = new Map<string, number>();
-
-  root.querySelectorAll<HTMLImageElement>('img').forEach((image) => {
-    if (image.closest('.preview-layout-block, .pending-image-block, .failed-image-block')) return;
-
-    const blockKey = image.getAttribute('data-original-src') || image.getAttribute('src') || image.alt || 'image';
-    const occurrenceIndex = nextOccurrence(imageCounts, blockKey);
-    targets.push({ element: image, blockKind: 'image', blockKey, occurrenceIndex });
-  });
-
-  root
-    .querySelectorAll<HTMLElement>('table, pre, .mermaid-block, .math-block')
-    .forEach((element) => {
-      if (element.closest('.preview-layout-block')) return;
-      if (element.classList.contains('mermaid-block') && !element.querySelector('svg')) return;
-
-      const blockKind = blockKindForElement(element);
-      if (!blockKind) return;
-      const blockKey = stableBlockKey(element, blockKind);
-      const occurrenceIndex = nextOccurrence(genericCounts, `${blockKind}:${blockKey}`);
-      targets.push({ element, blockKind, blockKey, occurrenceIndex });
-    });
-
-  return targets;
-}
-
-function ensureLayoutWrapper(target: LayoutTarget): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.className = `preview-layout-block preview-${target.blockKind}-layout`;
-  wrapper.dataset.blockKind = target.blockKind;
-  wrapper.dataset.blockKey = target.blockKey;
-  wrapper.dataset.occurrenceIndex = String(target.occurrenceIndex);
-
-  const parent = target.element.parentElement;
-  const sourceElement = target.blockKind === 'image' && parent?.tagName === 'P' ? parent : target.element;
-  copySourceLineDataset(sourceElement, wrapper);
-
-  if (target.blockKind === 'image' && parent?.tagName === 'P' && isSingleImageParagraph(parent)) {
-    parent.replaceWith(wrapper);
-  } else {
-    target.element.replaceWith(wrapper);
-  }
-
-  const surface = document.createElement('div');
-  surface.className = 'preview-layout-surface';
-  surface.append(target.element);
-  wrapper.append(surface);
-  return wrapper;
-}
-
-function ensureLayoutSurface(wrapper: HTMLElement): HTMLElement {
-  const existing = wrapper.querySelector<HTMLElement>(':scope > .preview-layout-surface');
-  if (existing) return existing;
-
-  const surface = document.createElement('div');
-  surface.className = 'preview-layout-surface';
-  Array.from(wrapper.childNodes).forEach((node) => {
-    if (node instanceof HTMLElement && node.classList.contains('preview-layout-tools')) return;
-    surface.append(node);
-  });
-  wrapper.prepend(surface);
-  return surface;
-}
-
-function renderLayoutControls(
-  wrapper: HTMLElement,
-  layout: BlockLayout,
-  root: HTMLElement,
-  filePath: string,
-  layoutByKey: Map<string, BlockLayout>,
-  onChange: LayoutChangeHandler,
-): void {
-  wrapper.querySelector('.preview-layout-tools')?.remove();
-
-  const tools = document.createElement('div');
-  tools.className = 'preview-layout-tools';
-  tools.setAttribute('aria-label', '블록 레이아웃');
-  tools.addEventListener('mousedown', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-  });
-  bindLayoutSelection(root, wrapper);
-
-  layoutWidths.forEach((width) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = `${width}%`;
-    button.title = `너비 ${width}%`;
-    button.className = layout.widthValue === width && layout.widthUnit === '%' ? 'active' : '';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onChange(clearLayoutGroup({ ...layout, widthValue: width, widthUnit: '%' }));
-    });
-    tools.append(button);
-  });
-
-  if (isGroupedLayout(layout)) {
-    renderGroupPositionButtons(tools, layout, onChange);
-  } else {
-    layoutAligns.forEach((align) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
-      button.title = align === 'left' ? '왼쪽 정렬' : align === 'center' ? '가운데 정렬' : '오른쪽 정렬';
-      button.className = layout.align === align ? 'active' : '';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onChange({ ...layout, align });
-      });
-      tools.append(button);
-    });
-  }
-
-  const twoColumnCandidates = contiguousLayoutWrappers(root, wrapper, 2);
-  const threeColumnCandidates = contiguousLayoutWrappers(root, wrapper, 3);
-  const groupColumns = getLayoutGroupColumns(layout);
-
-  [2, 3].forEach((columns) => {
-    const candidates = columns === 2 ? twoColumnCandidates : threeColumnCandidates;
-    const active = isGroupedLayout(layout) && groupColumns === columns;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = `${columns}열`;
-    button.title = active ? `${columns}열 묶기 해제` : `${columns}열로 묶기`;
-    button.className = active ? 'active' : '';
-    button.disabled = !active && candidates.length !== columns;
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (active) {
-        onChange(groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' })));
-        return;
-      }
-
-      if (candidates.length !== columns) return;
-
-      const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      onChange(
-        candidates.map((item, index) =>
-          withColumnGroup(layoutForWrapper(item, filePath, layoutByKey), groupId, columns, index),
-        ),
-      );
-    });
-    tools.append(button);
-  });
-
-  wrapper.append(tools);
-}
-
-function renderKatexEquationControls(
-  wrapper: HTMLElement,
-  layout: BlockLayout,
-  root: HTMLElement,
-  onChange: LayoutChangeHandler,
-): void {
-  if (blockKindFromDataset(wrapper.dataset.blockKind) !== 'katex') return;
-
-  const equations = Array.from(wrapper.querySelectorAll<HTMLElement>('.math-equation'));
-  if (equations.length === 0) return;
-
-  const alignments = getKatexEquationAlignments(layout);
-
-  equations.forEach((equation, index) => {
-    const key = equation.dataset.equationKey || String(index);
-    const currentAlign = alignments[key] ?? 'center';
-    equation.dataset.align = currentAlign;
-    equation.querySelector('.math-equation-tools')?.remove();
-
-    if (!equation.dataset.equationSelectionBound) {
-      equation.dataset.equationSelectionBound = 'true';
-      equation.addEventListener('click', (event) => {
-        const target = event.target;
-        if (target instanceof Element && target.closest('.math-equation-tools')) return;
-
-        clearSelectedKatexEquations(root);
-        equation.dataset.selected = 'true';
-      });
-    }
-
-    const tools = document.createElement('div');
-    tools.className = 'math-equation-tools';
-    tools.setAttribute('aria-label', '수식 정렬');
-    tools.addEventListener('mousedown', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    });
-
-    equationAligns.forEach((align) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
-      button.title = align === 'left' ? '수식 왼쪽 정렬' : align === 'center' ? '수식 가운데 정렬' : '수식 오른쪽 정렬';
-      button.className = currentAlign === align ? 'active' : '';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        clearSelectedLayoutBlocks(root);
-        clearSelectedKatexEquations(root);
-        wrapper.dataset.selected = 'true';
-        equation.dataset.selected = 'true';
-        equation.dataset.align = align;
-        onChange(withKatexEquationAlign(layout, key, align));
-      });
-      tools.append(button);
-    });
-
-    equation.append(tools);
-  });
-}
-
-function bindLayoutSelection(root: HTMLElement, wrapper: HTMLElement): void {
-  if (!root.dataset.layoutSelectionBound) {
-    root.dataset.layoutSelectionBound = 'true';
-    root.addEventListener('click', (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest('.preview-layout-block')) return;
-      clearSelectedLayoutBlocks(root);
-      clearSelectedKatexEquations(root);
-    });
-  }
-
-  if (wrapper.dataset.layoutSelectionBound) return;
-  wrapper.dataset.layoutSelectionBound = 'true';
-  wrapper.addEventListener('click', (event) => {
-    const target = event.target;
-    if (target instanceof Element && target.closest('.preview-layout-tools')) return;
-    if (!(target instanceof Element) || !isLayoutSelectionTarget(wrapper, target)) {
-      clearSelectedLayoutBlocks(root);
-      clearSelectedKatexEquations(root);
-      return;
-    }
-
-    clearSelectedLayoutBlocks(root);
-    wrapper.dataset.selected = 'true';
-    if (!target.closest('.math-equation')) {
-      clearSelectedKatexEquations(root);
-    }
-  });
-}
-
-function isLayoutSelectionTarget(wrapper: HTMLElement, target: Element): boolean {
-  const surface = wrapper.querySelector<HTMLElement>(':scope > .preview-layout-surface');
-  if (!surface || !surface.contains(target)) return false;
-
-  const blockKind = blockKindFromDataset(wrapper.dataset.blockKind);
-  const selectorByKind: Record<BlockKind, string> = {
-    image: 'img',
-    table: 'table',
-    list: '',
-    blockquote: '',
-    code: 'pre, .shiki, code',
-    mermaid: '.mermaid-block',
-    katex: '.math-block',
-  };
-  const selector = blockKind ? selectorByKind[blockKind] : null;
-  if (!selector) return false;
-
-  const selected = target.closest<HTMLElement>(selector);
-  return Boolean(selected && surface.contains(selected));
-}
-
-function clearSelectedLayoutBlocks(root: HTMLElement): void {
-  root.querySelectorAll<HTMLElement>('.preview-layout-block[data-selected="true"]').forEach((item) => {
-    delete item.dataset.selected;
-  });
-}
-
-function clearSelectedKatexEquations(root: HTMLElement): void {
-  root.querySelectorAll<HTMLElement>('.math-equation[data-selected="true"]').forEach((item) => {
-    delete item.dataset.selected;
-  });
-}
-
-function renderGroupPositionButtons(
-  tools: HTMLElement,
-  layout: BlockLayout,
-  onChange: LayoutChangeHandler,
-): void {
-  const columns = getLayoutGroupColumns(layout);
-  const labels = columns === 2 ? ['L/C', 'R'] : ['L', 'C', 'R'];
-  const currentIndex = getLayoutGroupIndex(layout);
-
-  labels.forEach((label, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.title = `${columns}열 위치: ${label}`;
-    button.className = currentIndex === index ? 'active' : '';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onChange(withGroupIndex(layout, index));
-    });
-    tools.append(button);
-  });
-}
-
-function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
-  const width =
-    layout.widthUnit === 'auto' || layout.widthValue === null
-      ? 'auto'
-      : `${Math.max(10, Math.min(100, layout.widthValue))}${layout.widthUnit}`;
-
-  wrapper.style.setProperty('--block-layout-width', width);
-  wrapper.dataset.align = layout.align;
-  wrapper.dataset.widthUnit = layout.widthUnit;
-  wrapper.dataset.widthValue = layout.widthValue === null ? 'auto' : String(layout.widthValue);
-  wrapper.dataset.flow = getLayoutGroupColumns(layout) > 1 ? 'columns' : 'block';
-  wrapper.dataset.groupColumns = String(getLayoutGroupColumns(layout));
-  wrapper.dataset.groupIndex = String(getLayoutGroupIndex(layout));
-  wrapper.style.setProperty('--preview-layout-column', String(getLayoutGroupIndex(layout) + 1));
-  const groupId = getLayoutGroupId(layout);
-  if (groupId) {
-    wrapper.dataset.groupId = groupId;
-  } else {
-    delete wrapper.dataset.groupId;
-  }
-}
-
-function defaultBlockLayout(
-  filePath: string,
-  blockKind: BlockKind,
-  blockKey: string,
-  occurrenceIndex: number,
-): BlockLayout {
-  return {
-    filePath,
-    blockKind,
-    blockKey,
-    occurrenceIndex,
-    widthValue: 100,
-    widthUnit: '%',
-    heightValue: null,
-    heightUnit: 'auto',
-    align: blockKind === 'list' || blockKind === 'blockquote' ? 'left' : 'center',
-    layoutJson: null,
-  };
-}
-
 function upsertBlockLayout(layouts: BlockLayout[], next: BlockLayout): BlockLayout[] {
   return [
     ...layouts.filter((layout) => layoutIdentity(layout) !== layoutIdentity(next)),
@@ -784,342 +375,6 @@ function upsertBlockLayout(layouts: BlockLayout[], next: BlockLayout): BlockLayo
   ];
 }
 
-function layoutForWrapper(
-  wrapper: HTMLElement,
-  filePath: string,
-  layoutByKey: Map<string, BlockLayout>,
-): BlockLayout {
-  const blockKind = blockKindFromDataset(wrapper.dataset.blockKind) ?? 'image';
-  const blockKey = wrapper.dataset.blockKey ?? 'block';
-  const occurrenceIndex = Number.parseInt(wrapper.dataset.occurrenceIndex ?? '0', 10);
-  const identity = { blockKind, blockKey, occurrenceIndex };
-  return (
-    layoutByKey.get(layoutIdentity(identity)) ??
-    defaultBlockLayout(filePath, blockKind, blockKey, Number.isFinite(occurrenceIndex) ? occurrenceIndex : 0)
-  );
-}
-
-function groupLayoutsForWrapper(
-  root: HTMLElement,
-  wrapper: HTMLElement,
-  filePath: string,
-  layoutByKey: Map<string, BlockLayout>,
-): BlockLayout[] {
-  const groupId = wrapper.dataset.groupId;
-  if (!groupId) return [layoutForWrapper(wrapper, filePath, layoutByKey)];
-  const layouts = getLayoutWrappers(root)
-    .filter((item) => item.dataset.groupId === groupId)
-    .map((item) => layoutForWrapper(item, filePath, layoutByKey));
-  return layouts.length > 0 ? layouts : [layoutForWrapper(wrapper, filePath, layoutByKey)];
-}
-
-function normalizeLayoutGroups(
-  root: HTMLElement,
-  filePath: string,
-  layoutByKey: Map<string, BlockLayout>,
-): BlockLayout[] {
-  const wrappers = getLayoutWrappers(root);
-  const groups = new Map<string, HTMLElement[]>();
-
-  wrappers.forEach((wrapper) => {
-    const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
-    const groupId = getLayoutGroupId(layout);
-    if (!groupId) return;
-    const group = groups.get(groupId) ?? [];
-    group.push(wrapper);
-    groups.set(groupId, group);
-  });
-
-  const normalized: BlockLayout[] = [];
-
-  groups.forEach((groupWrappers) => {
-    const orderedWrappers = groupWrappers.sort((a, b) => getLayoutWrappers(root).indexOf(a) - getLayoutWrappers(root).indexOf(b));
-    const shouldClear = orderedWrappers.length <= 1 || !wrappersAreContiguous(orderedWrappers);
-    if (!shouldClear) return;
-
-    orderedWrappers.forEach((wrapper) => {
-      const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
-      const next = clearLayoutGroup({ ...layout, widthValue: 100, widthUnit: '%' });
-      normalized.push(next);
-      applyBlockLayout(wrapper, next);
-    });
-  });
-
-  return normalized;
-}
-
-function getLayoutWrappers(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>('.preview-layout-block')).filter((wrapper) =>
-    isLayoutControlBlockKind(blockKindFromDataset(wrapper.dataset.blockKind)),
-  );
-}
-
-function contiguousLayoutWrappers(root: HTMLElement, wrapper: HTMLElement, columns: number): HTMLElement[] {
-  const wrappers = getLayoutWrappers(root);
-  const index = wrappers.indexOf(wrapper);
-  if (index < 0) return [];
-
-  const forward = wrappers.slice(index, index + columns);
-  if (forward.length === columns && wrappersAreContiguous(forward)) return forward;
-
-  for (let start = Math.max(0, index - columns + 1); start <= index; start += 1) {
-    const slice = wrappers.slice(start, start + columns);
-    if (slice.length === columns && slice.includes(wrapper) && wrappersAreContiguous(slice)) {
-      return slice;
-    }
-  }
-
-  return [];
-}
-
-function wrappersAreContiguous(wrappers: HTMLElement[]): boolean {
-  for (let index = 1; index < wrappers.length; index += 1) {
-    if (!sourceLinesAreContiguous(wrappers[index - 1], wrappers[index])) return false;
-  }
-  return true;
-}
-
-function sourceLinesAreContiguous(previous: HTMLElement, next: HTMLElement): boolean {
-  const previousEndLine = sourceEndLine(previous);
-  const nextStartLine = sourceStartLine(next);
-  return previousEndLine !== null && nextStartLine !== null && nextStartLine <= previousEndLine + 1;
-}
-
-function withColumnGroup(layout: BlockLayout, groupId: string, columns: number, index: number): BlockLayout {
-  const width = columns === 2 ? 50 : 33.3333;
-  return {
-    ...layout,
-    widthValue: width,
-    widthUnit: '%',
-    align: 'left',
-    layoutJson: {
-      ...(layout.layoutJson ?? {}),
-      groupId,
-      groupColumns: columns,
-      groupIndex: index,
-    },
-  };
-}
-
-function withGroupIndex(layout: BlockLayout, index: number): BlockLayout {
-  return {
-    ...layout,
-    layoutJson: {
-      ...(layout.layoutJson ?? {}),
-      groupIndex: index,
-    },
-  };
-}
-
-function withKatexEquationAlign(layout: BlockLayout, key: string, align: LayoutAlign): BlockLayout {
-  const layoutJson = { ...(layout.layoutJson ?? {}) };
-  const alignments = getKatexEquationAlignments(layout);
-
-  if (align === 'center') {
-    delete alignments[key];
-  } else {
-    alignments[key] = align;
-  }
-
-  if (Object.keys(alignments).length > 0) {
-    layoutJson.equationAlignments = alignments;
-  } else {
-    delete layoutJson.equationAlignments;
-  }
-
-  return {
-    ...layout,
-    layoutJson: Object.keys(layoutJson).length > 0 ? layoutJson : null,
-  };
-}
-
-function clearLayoutGroup(layout: BlockLayout): BlockLayout {
-  const rest = { ...(layout.layoutJson ?? {}) };
-  delete rest.groupId;
-  delete rest.groupColumns;
-  delete rest.groupIndex;
-  return {
-    ...layout,
-    layoutJson: Object.keys(rest).length > 0 ? rest : null,
-  };
-}
-
-function isGroupedLayout(layout: BlockLayout): boolean {
-  return getLayoutGroupColumns(layout) > 1 && Boolean(getLayoutGroupId(layout));
-}
-
-function getLayoutGroupId(layout: BlockLayout): string | null {
-  const value = layout.layoutJson?.groupId;
-  return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-function getLayoutGroupColumns(layout: BlockLayout): number {
-  const value = layout.layoutJson?.groupColumns;
-  return typeof value === 'number' && value > 1 ? value : 1;
-}
-
-function getLayoutGroupIndex(layout: BlockLayout): number {
-  const value = layout.layoutJson?.groupIndex;
-  return typeof value === 'number' && value >= 0 ? value : 0;
-}
-
-function getKatexEquationAlignments(layout: BlockLayout): Record<string, LayoutAlign> {
-  const value = layout.layoutJson?.equationAlignments;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-
-  return Object.entries(value).reduce<Record<string, LayoutAlign>>((alignments, [key, align]) => {
-    if (typeof key === 'string' && isLayoutAlignValue(align)) {
-      alignments[key] = align;
-    }
-    return alignments;
-  }, {});
-}
-
-function isLayoutAlignValue(value: unknown): value is LayoutAlign {
-  return value === 'left' || value === 'center' || value === 'right';
-}
-
-function unwrapLayoutGroups(root: HTMLElement): void {
-  root.querySelectorAll<HTMLElement>('.preview-layout-group').forEach((group) => {
-    const parent = group.parentElement;
-    if (!parent) return;
-    Array.from(group.children).forEach((child) => {
-      parent.insertBefore(child, group);
-    });
-    group.remove();
-  });
-}
-
-function unwrapUnsupportedLayoutWrappers(root: HTMLElement): void {
-  root.querySelectorAll<HTMLElement>('.preview-layout-block').forEach((wrapper) => {
-    if (isLayoutControlBlockKind(blockKindFromDataset(wrapper.dataset.blockKind))) return;
-
-    const parent = wrapper.parentElement;
-    if (!parent) return;
-
-    const surface = wrapper.querySelector<HTMLElement>(':scope > .preview-layout-surface');
-    const nodes = surface
-      ? Array.from(surface.childNodes)
-      : Array.from(wrapper.childNodes).filter(
-          (node) => !(node instanceof HTMLElement && node.classList.contains('preview-layout-tools')),
-        );
-
-    nodes.forEach((node) => parent.insertBefore(node, wrapper));
-    wrapper.remove();
-  });
-}
-
-function arrangeLayoutGroups(root: HTMLElement): void {
-  const wrappers = getLayoutWrappers(root);
-  let index = 0;
-
-  while (index < wrappers.length) {
-    const wrapper = wrappers[index];
-    const groupId = wrapper.dataset.groupId;
-    const columns = Number.parseInt(wrapper.dataset.groupColumns ?? '1', 10);
-    if (!groupId || columns <= 1) {
-      index += 1;
-      continue;
-    }
-
-    const groupWrappers = wrappers
-      .filter((item) => item.dataset.groupId === groupId)
-      .sort((a, b) => Number.parseInt(a.dataset.groupIndex ?? '0', 10) - Number.parseInt(b.dataset.groupIndex ?? '0', 10));
-    if (groupWrappers.length <= 1) {
-      index += 1;
-      continue;
-    }
-
-    const group = document.createElement('div');
-    group.className = 'preview-layout-group';
-    group.dataset.columns = String(columns);
-    group.style.setProperty('--preview-layout-columns', String(columns));
-    wrapper.before(group);
-    groupWrappers.forEach((item) => group.append(item));
-    index += groupWrappers.length;
-  }
-}
-
-function copySourceLineDataset(from: HTMLElement, to: HTMLElement): void {
-  const startLine = from.getAttribute('data-source-line');
-  const endLine = from.getAttribute('data-source-end-line') ?? startLine;
-  if (startLine) to.dataset.sourceLine = startLine;
-  if (endLine) to.dataset.sourceEndLine = endLine;
-}
-
-function sourceStartLine(element: HTMLElement): number | null {
-  const value = element.dataset.sourceLine ?? element.getAttribute('data-source-line');
-  const line = Number.parseInt(value ?? '', 10);
-  return Number.isFinite(line) ? line : null;
-}
-
-function sourceEndLine(element: HTMLElement): number | null {
-  const value = element.dataset.sourceEndLine ?? element.getAttribute('data-source-end-line') ?? element.dataset.sourceLine;
-  const line = Number.parseInt(value ?? '', 10);
-  return Number.isFinite(line) ? line : null;
-}
-
 function layoutIdentity(layout: Pick<BlockLayout, 'blockKind' | 'blockKey' | 'occurrenceIndex'>): string {
   return `${layout.blockKind}:${layout.blockKey}:${layout.occurrenceIndex}`;
-}
-
-function nextOccurrence(counts: Map<string, number>, key: string): number {
-  const next = counts.get(key) ?? 0;
-  counts.set(key, next + 1);
-  return next;
-}
-
-function blockKindForElement(element: HTMLElement): BlockKind | null {
-  if (element.classList.contains('mermaid-block')) return 'mermaid';
-  if (element.classList.contains('math-block')) return 'katex';
-  if (element.tagName === 'TABLE') return 'table';
-  if (element.tagName === 'PRE') return 'code';
-  return null;
-}
-
-function blockKindFromDataset(value?: string): BlockKind | null {
-  if (
-    value === 'image' ||
-    value === 'table' ||
-    value === 'list' ||
-    value === 'blockquote' ||
-    value === 'code' ||
-    value === 'mermaid' ||
-    value === 'katex'
-  ) {
-    return value;
-  }
-  return null;
-}
-
-function isLayoutControlBlockKind(value: BlockKind | null): boolean {
-  return value === 'image' || value === 'table' || value === 'code' || value === 'mermaid' || value === 'katex';
-}
-
-function stableBlockKey(element: HTMLElement, kind: BlockKind): string {
-  const sourceLine = element.getAttribute('data-source-line') ?? '0';
-  const sourceEndLine = element.getAttribute('data-source-end-line') ?? sourceLine;
-  const text = element.dataset.source ?? element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-  return `${kind}:${sourceLine}-${sourceEndLine}:${stableHash(text)}`;
-}
-
-function stableHash(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-function isSingleImageParagraph(paragraph: HTMLElement): boolean {
-  const children = Array.from(paragraph.childNodes);
-  const imageCount = children.filter((node) => node instanceof HTMLImageElement).length;
-  if (imageCount !== 1) return false;
-
-  return children.every((node) => {
-    if (node.nodeType === Node.TEXT_NODE) return !node.textContent?.trim();
-    if (node instanceof HTMLBRElement) return true;
-    return node instanceof HTMLImageElement;
-  });
 }

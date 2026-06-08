@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
-import { createCommandRegistry } from './app/commands';
+import { createCommandRegistry, dispatchCommand } from './app/commands';
 import { enabledFeatures } from './app/featureRegistry';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { useExternalFileOpen } from './hooks/useExternalFileOpen';
@@ -12,7 +12,6 @@ import { useResponsiveSplitWidth } from './hooks/useResponsiveSplitWidth';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
-import { exportPreviewToPdf } from './lib/pdf/export';
 import { useSearchStore } from './features/search';
 import { useUIStore } from './store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from './store/workspace';
@@ -38,7 +37,6 @@ export function App() {
   const editorWidth = useUIStore((state) => state.editorWidth);
   const setSidebarWidth = useUIStore((state) => state.setSidebarWidth);
   const setEditorWidth = useUIStore((state) => state.setEditorWidth);
-  const setPdfExportStatus = useUIStore((state) => state.setPdfExportStatus);
   const openingRecentFileRef = useRef(false);
 
   const commandRegistry = useMemo(
@@ -56,27 +54,14 @@ export function App() {
       onOpenFolder: () => void openFolder(),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
-      onExportPdf: () => {
-        void (async () => {
-          try {
-            setPdfExportStatus('exporting');
-            const exported = await exportPreviewToPdf({ suggestedName: activeFile?.name });
-            setPdfExportStatus(exported ? 'done' : 'idle');
-            if (exported) window.setTimeout(() => setPdfExportStatus('idle'), 3000);
-          } catch (error) {
-            console.error('PDF export failed:', error);
-            setPdfExportStatus('error');
-            window.setTimeout(() => setPdfExportStatus('idle'), 4000);
-          }
-        })();
-      },
+      onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),
       onClose: () => {
         if (!activeFile) return;
         if (isDirty(activeFile) && !window.confirm(`${activeFile.name} 파일의 저장되지 않은 변경사항을 버리고 닫을까요?`)) return;
         closeFile(activeFile.id);
       },
     }),
-    [activeFile, closeFile, createFile, openFile, openFolder, saveActive, saveActiveAs, setPdfExportStatus],
+    [activeFile, closeFile, commandRegistry, createFile, openFile, openFolder, saveActive, saveActiveAs],
   );
 
   useShortcuts(shortcuts, commandRegistry);

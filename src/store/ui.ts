@@ -33,7 +33,6 @@ interface UIState {
   splitRatio: number;
   editorWidth: number;
   syncScroll: boolean;
-  pdfExportStatus: 'idle' | 'exporting' | 'done' | 'error';
   settingsOpen: boolean;
   toggleSidebar: () => void;
   setSidebarViewMode: (mode: SidebarViewMode) => void;
@@ -42,7 +41,6 @@ interface UIState {
   setSplitRatio: (ratio: number) => void;
   setEditorWidth: (width: number) => void;
   toggleSyncScroll: () => void;
-  setPdfExportStatus: (status: UIState['pdfExportStatus']) => void;
   toggleSettings: () => void;
   closeSettings: () => void;
   restoreUI: (ui: UISession) => void;
@@ -56,7 +54,6 @@ export const useUIStore = create<UIState>()((set) => ({
   splitRatio: 0.5,
   editorWidth: getInitialEditorWidth(),
   syncScroll: true,
-  pdfExportStatus: 'idle',
   settingsOpen: false,
   toggleSidebar: () =>
     set((state) => ({
@@ -68,7 +65,6 @@ export const useUIStore = create<UIState>()((set) => ({
   setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
   setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
   toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
-  setPdfExportStatus: (status) => set({ pdfExportStatus: status }),
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
   restoreUI: (ui) =>
@@ -80,7 +76,6 @@ export const useUIStore = create<UIState>()((set) => ({
       splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
       editorWidth: restoreEditorWidth(ui),
       syncScroll: ui.syncScroll ?? true,
-      pdfExportStatus: 'idle',
       settingsOpen: false,
     }),
 }));

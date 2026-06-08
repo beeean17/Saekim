@@ -14,6 +14,8 @@ export interface BackendAdapter {
   readFolderChildren(path: string): Promise<FileTreeNode[]>;
   saveFile(path: string | null, content: string): Promise<string | null>;
   saveFileAs(content: string, suggestedName: string): Promise<string | null>;
+  pickPdfExportPath(suggestedName: string): Promise<string | null>;
+  writePdfExport(path: string, bytes: number[]): Promise<string>;
   loadSession<T>(): Promise<T | null>;
   saveSession<T>(session: T): Promise<void>;
   loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;

@@ -2,6 +2,7 @@ import type { ClipboardEvent as ReactClipboardEvent, DragEvent as ReactDragEvent
 import type { EditorHelperItemBase } from '../core/editor/helperTypes';
 import type { FileTypeContribution, FileTypeInfo } from '../core/document/fileType';
 import type { PlatformCapability } from '../platform/common/capabilities';
+import type { BlockLayout } from '../types/metadata';
 import type { HtmlPreviewMode } from '../types/session';
 import type { ThemeName, OpenFile } from '../types/workspace';
 
@@ -14,6 +15,8 @@ export interface SaekimFeature {
   fileTypes?: FileTypeContribution | FileTypeContribution[];
   editor?: EditorContribution | EditorContribution[];
   commands?: CommandContributionFactory;
+  metadata?: MetadataContribution | MetadataContribution[];
+  pdf?: PdfContribution | PdfContribution[];
 }
 
 export interface FeatureCapabilityRequirements {
@@ -110,6 +113,15 @@ export interface CommandRuntimeContext {
   search: {
     openFind(): void;
   };
+}
+
+export interface MetadataContribution {
+  readLayout(file: OpenFile): Promise<BlockLayout[]>;
+  writeLayout(layout: BlockLayout): Promise<void>;
+}
+
+export interface PdfContribution {
+  exportCurrent(): Promise<void>;
 }
 
 export type PreviewResult =

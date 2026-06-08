@@ -15,7 +15,6 @@ export interface AppMenuHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
-  onExportPdf: () => void;
   onClose: () => void;
 }
 
@@ -109,6 +108,7 @@ function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; com
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
+  const fileCommands = commandMenuItems(commandRegistry, 'file');
   const editCommands = commandMenuItems(commandRegistry, 'edit');
 
   const menus = useMemo<AppMenuGroup[]>(
@@ -123,7 +123,11 @@ function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; com
           { separator: true },
           { label: 'Save', shortcut: 'Ctrl+S', action: handlers.onSave },
           { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: handlers.onSaveAs },
-          { label: 'Export PDF', shortcut: 'Ctrl+P', action: handlers.onExportPdf },
+          ...fileCommands.map((command) => ({
+            label: command.menu?.label,
+            shortcut: formatShortcut(command.defaultShortcut),
+            action: () => dispatchCommand(commandRegistry, command.id),
+          })),
           { separator: true },
           { label: 'Close File', shortcut: 'Ctrl+W', action: handlers.onClose },
         ],
@@ -175,7 +179,7 @@ function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; com
         items: [{ label: 'About Saekim', action: () => window.alert('Saekim 3.0.1') }],
       },
     ],
-    [editCommands, handlers, setViewMode, syncScroll, toggleSidebar, toggleSyncScroll, viewMode],
+    [editCommands, fileCommands, handlers, setViewMode, syncScroll, toggleSidebar, toggleSyncScroll, viewMode],
   );
 
   useEffect(() => {
