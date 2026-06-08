@@ -120,7 +120,8 @@
 
 .preview-content pre,
 .preview-content .shiki {
-  --preview-code-line-height: 1.45;
+  --preview-code-font-size: clamp(11px, calc(var(--editor-font-size, 13.5px) - 1px), 15px);
+  --preview-code-row-height: max(14px, calc(var(--preview-code-font-size) + 3px));
 
   position: relative;
   margin: 14px 0;
@@ -131,8 +132,8 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-family: var(--font-mono);
-  font-size: 12.5px;
-  line-height: var(--preview-code-line-height);
+  font-size: var(--preview-code-font-size);
+  line-height: var(--preview-code-row-height);
 }
 
 .preview-content .shiki::before {
@@ -532,10 +533,12 @@
 }
 
 .preview-content .shiki .line {
-  display: inline-block;
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
   padding: 0 16px 0 52px;
-  line-height: var(--preview-code-line-height);
-  vertical-align: top;
+  line-height: var(--preview-code-row-height);
 }
 
 .preview-content .shiki .line::before {
@@ -676,6 +679,8 @@
   border-radius: var(--radius-sm);
   box-shadow: 0 8px 24px color-mix(in srgb, #000 18%, transparent);
   transition: opacity 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .preview-layout-block[data-selected="true"] > .preview-layout-tools {
@@ -911,6 +916,8 @@
   box-shadow: 0 8px 24px color-mix(in srgb, #000 18%, transparent);
   transform: translateY(-50%);
   transition: opacity 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .preview-content .math-equation:hover > .math-equation-tools,

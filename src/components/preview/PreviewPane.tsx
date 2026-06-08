@@ -144,9 +144,11 @@ function PreviewContent({ previewRef }: { previewRef: React.MutableRefObject<HTM
     };
   }, [activeFile?.content, activeFile?.name, activeFile?.path, fileType.previewKind, htmlPreviewMode, theme, usesStructuredPreview]);
 
+  const previewRenderKey = usesStructuredPreview ? activeFile?.content : html;
+
   useLayoutEffect(() => {
     notifyPreviewRendered(localRef.current);
-  }, [activeFile?.content, fileType.previewKind, html]);
+  }, [activeFile?.path, fileType.previewKind, previewRenderKey]);
 
   useEffect(
     () => () => {
@@ -527,6 +529,10 @@ function renderLayoutControls(
   const tools = document.createElement('div');
   tools.className = 'preview-layout-tools';
   tools.setAttribute('aria-label', '블록 레이아웃');
+  tools.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
   bindLayoutSelection(root, wrapper);
 
   layoutWidths.forEach((width) => {
@@ -631,6 +637,10 @@ function renderKatexEquationControls(
     const tools = document.createElement('div');
     tools.className = 'math-equation-tools';
     tools.setAttribute('aria-label', '수식 정렬');
+    tools.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
 
     equationAligns.forEach((align) => {
       const button = document.createElement('button');

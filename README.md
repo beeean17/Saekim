@@ -22,8 +22,9 @@ that stay next to the source file.
 - Markdown editor with edit, preview, and split-view modes
 - Live preview for Markdown with tables, images, blockquotes, task lists, code
   blocks, Mermaid diagrams, and KaTeX formulas
-- Shiki syntax highlighting for fenced code blocks with an explicit language
-- Scroll synchronization between the editor and preview
+- Shiki syntax highlighting for fenced code blocks with explicit language labels
+  and source-line anchors
+- Source-line-aware scroll synchronization between the editor and preview
 - Native file/folder open, save, save as, drag and drop, and OS file association
   handling through Tauri
 - Markdown/text default-app support for macOS and Windows packaging

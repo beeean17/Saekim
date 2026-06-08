@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 코드블럭 줄간을 조정해 텍스트 선택 영역이 위아래 줄과 겹쳐 보이는 문제를 완화했습니다.
 - preview 레이아웃 패널이 리스트/인용문 같은 일반 문단 요소에도 표시되던 문제를 수정했습니다.
 - KaTeX 블록 수식에 코드블럭과 같은 라벨과 레이아웃 패널 처리를 적용했습니다.
+- 코드블럭 편집 중 스크롤 동기화된 preview가 위로 튀는 문제를 완화했습니다.
+- 코드블럭을 여러 줄 드래그 선택할 때 줄 끝에 빈칸처럼 보이는 선택 배경 깨짐을 수정했습니다.
+- 코드블럭 줄 높이를 글자 크기별 px 행 높이로 계산하고, 플로팅 레이아웃 패널이 텍스트 선택에 포함되지 않도록 수정했습니다.
 
 ---
 
@@ -256,7 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
-| 3.1.0 | Unreleased | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, recent-file close cleanup, Windows text icon handling |
+| 3.1.0 | Unreleased | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, source-line preview sync, code block selection stability, recent-file close cleanup, Windows text icon handling |
 | 3.0.1 | Unreleased | Flexible text-file detection, HTML/data previews, image assets workflow, preview block layouts, Windows desktop support |
 | 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
 | 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |

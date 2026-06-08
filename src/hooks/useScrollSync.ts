@@ -143,7 +143,7 @@ export function useScrollSync(
     const onEditorInput = () => {
       activeScroller = 'editor';
       renderAnchor = {
-        line: getCaretLine(editor),
+        line: getEditorVisibleLine(editor),
         keepBottom: isNearBottom(editor, BOTTOM_THRESHOLD_PX),
         scrollTop: editor.scrollTop,
         time: performance.now(),
@@ -152,7 +152,7 @@ export function useScrollSync(
 
     const onSelectionChange = () => {
       if (document.activeElement !== editor) return;
-      if (renderAnchor && performance.now() - renderAnchor.time < PROGRAMMATIC_SCROLL_MS) return;
+      if (renderAnchor && performance.now() - renderAnchor.time < INPUT_RENDER_WINDOW_MS) return;
       activeScroller = 'editor';
       scheduleSync('editor', 'selection');
     };
@@ -160,7 +160,6 @@ export function useScrollSync(
     const onPreviewRendered = () => {
       if (renderAnchor && performance.now() - renderAnchor.time < INPUT_RENDER_WINDOW_MS) {
         activeScroller = 'editor';
-        syncNow('editor', 'render');
         return;
       }
 

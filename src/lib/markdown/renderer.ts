@@ -222,8 +222,8 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
         template.innerHTML = highlighted.trim();
         const highlightedPre = template.content.firstElementChild;
         if (highlightedPre instanceof HTMLElement) {
-          enhanceHighlightedCodeBlock(doc, highlightedPre, lang);
           copySourceLineAttributes(pre, highlightedPre);
+          enhanceHighlightedCodeBlock(doc, highlightedPre, lang);
           pre.replaceWith(highlightedPre);
         } else {
           pre.outerHTML = highlighted;
@@ -245,9 +245,15 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
 function enhanceHighlightedCodeBlock(doc: Document, pre: HTMLElement, lang: string): void {
   pre.dataset.lang = lang;
   pre.setAttribute('data-label', formatLanguageLabel(lang));
+  const sourceStartLine = Number.parseInt(pre.dataset.sourceLine ?? '', 10);
   pre.querySelectorAll<HTMLElement>('.line').forEach((line, index) => {
     const text = line.textContent ?? '';
     line.dataset.line = String(index + 1);
+    if (Number.isFinite(sourceStartLine)) {
+      const sourceLine = sourceStartLine + index + 1;
+      line.dataset.sourceLine = String(sourceLine);
+      line.dataset.sourceEndLine = String(sourceLine);
+    }
     if (text.startsWith('+')) line.classList.add('diff-add');
     if (text.startsWith('-')) line.classList.add('diff-remove');
   });
