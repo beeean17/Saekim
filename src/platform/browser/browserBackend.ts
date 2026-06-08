@@ -38,8 +38,14 @@ export const browserBackend: BackendAdapter = {
     isTauriRuntime: () => false,
     isExternalUrl,
     openExternalUrl,
+    setWindowMinSize: noop,
+    startWindowDrag: noop,
+    setWindowBackgroundColor: noop,
+    runWindowAction: noop,
   },
 };
+
+async function noop(): Promise<void> {}
 
 async function openFileDialog(): Promise<boolean> {
   return false;

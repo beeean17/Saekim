@@ -47,4 +47,10 @@ export interface RuntimeBackend {
   isTauriRuntime(): boolean;
   isExternalUrl(url: string): boolean;
   openExternalUrl(url: string): Promise<void>;
+  setWindowMinSize(width: number, height: number): Promise<void>;
+  startWindowDrag(): Promise<void>;
+  setWindowBackgroundColor(color: string): Promise<void>;
+  runWindowAction(action: WindowAction): Promise<void>;
 }
+
+export type WindowAction = 'minimize' | 'toggleMaximize' | 'close';

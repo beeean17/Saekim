@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { Backend } from '../platform/common/backend';
+import { currentPlatformCapabilities } from '../platform/common/capabilities';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
 const PANE_MIN_WIDTH = 280;
@@ -9,6 +10,8 @@ const MIN_WINDOW_HEIGHT = 640;
 
 export function useWindowSizeConstraints(viewMode: ViewMode, sidebarMode: SidebarMode, sidebarWidth: number): void {
   useEffect(() => {
+    if (!currentPlatformCapabilities().has('window.chrome')) return;
+
     const activeSidebarWidth = sidebarMode === 'collapsed' ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
     const sidebarResizerWidth = sidebarMode === 'collapsed' ? 0 : PANE_RESIZER_WIDTH;
     const contentWidth =
@@ -18,7 +21,7 @@ export function useWindowSizeConstraints(viewMode: ViewMode, sidebarMode: Sideba
 
     const frameId = window.requestAnimationFrame(() => {
       if (!cancelled) {
-        void invoke('set_window_min_size', { width: minWidth, height: MIN_WINDOW_HEIGHT }).catch(
+        void Backend.runtime.setWindowMinSize(minWidth, MIN_WINDOW_HEIGHT).catch(
           () => undefined,
         );
       }

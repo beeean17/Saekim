@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { commandMenuItems, dispatchCommand, formatShortcut, type CommandRegistry } from '../../app/commands';
 import { Backend } from '../../platform/common/backend';
+import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import { useUIStore } from '../../store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
@@ -68,13 +68,13 @@ export function Header({ menuHandlers, commandRegistry }: { menuHandlers: AppMen
 }
 
 function startTitlebarDrag(event: MouseEvent<HTMLElement>): void {
-  if (event.button !== 0 || !('__TAURI_INTERNALS__' in window)) return;
+  if (event.button !== 0 || !currentPlatformCapabilities().has('window.chrome')) return;
 
   const target = event.target as HTMLElement | null;
   if (target?.closest('button, input, textarea, select, a, [role="button"]')) return;
 
   event.preventDefault();
-  void invoke('start_window_drag').catch((error) => {
+  void Backend.runtime.startWindowDrag().catch((error) => {
     console.warn('Failed to start titlebar drag:', error);
   });
 }
@@ -282,8 +282,6 @@ async function runPasteCommand(target: HTMLElement | null): Promise<void> {
 }
 
 async function runWindowAction(action: 'minimize' | 'toggleMaximize' | 'close'): Promise<void> {
-  if (!Backend.runtime.isTauriRuntime()) return;
-  const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-  const window = getCurrentWebviewWindow();
-  await window[action]();
+  if (!currentPlatformCapabilities().has('window.chrome')) return;
+  await Backend.runtime.runWindowAction(action);
 }

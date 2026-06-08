@@ -42,8 +42,14 @@ export const androidBackend: BackendAdapter = {
     isTauriRuntime,
     isExternalUrl,
     openExternalUrl,
+    setWindowMinSize: noop,
+    startWindowDrag: noop,
+    setWindowBackgroundColor: noop,
+    runWindowAction: noop,
   },
 };
+
+async function noop(): Promise<void> {}
 
 function unsupported<T>(capability: string): (..._args: unknown[]) => Promise<T> {
   return async () => {

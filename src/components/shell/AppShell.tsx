@@ -1,6 +1,7 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { CommandRegistry } from '../../app/commands';
+import { Backend } from '../../platform/common/backend';
+import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { Header, type AppMenuHandlers } from './Header';
@@ -41,16 +42,16 @@ function useNativeWindowChrome(): void {
   const theme = useSettingsStore((state) => state.theme);
 
   useEffect(() => {
-    const isTauri = '__TAURI_INTERNALS__' in window;
-    document.documentElement.classList.toggle('tauri-window-chrome', isTauri);
-    if (!isTauri) return;
+    const hasWindowChrome = currentPlatformCapabilities().has('window.chrome');
+    document.documentElement.classList.toggle('tauri-window-chrome', hasWindowChrome);
+    if (!hasWindowChrome) return;
 
     const titlebarColor = getComputedStyle(document.documentElement)
       .getPropertyValue('--bg-surface')
       .trim();
     if (!titlebarColor) return;
 
-    void getCurrentWebviewWindow().setBackgroundColor(titlebarColor).catch((error) => {
+    void Backend.runtime.setWindowBackgroundColor(titlebarColor).catch((error) => {
       console.warn('Failed to sync native titlebar color:', error);
     });
   }, [theme]);
