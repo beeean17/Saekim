@@ -103,6 +103,7 @@ pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
     }
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>> {
     let selected =
@@ -119,6 +120,12 @@ pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>>
         Ok(None) => ok(None),
         Err(error) => fail(format!("failed to open folder dialog: {error}")),
     }
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub async fn open_folder_dialog(_app: AppHandle) -> CommandResult<Option<String>> {
+    fail("Folder picker is not supported on this platform.".to_string())
 }
 
 #[tauri::command]

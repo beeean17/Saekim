@@ -7,6 +7,8 @@ use std::{
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+#[cfg(target_os = "android")]
+use tauri::Manager;
 
 use super::file::CommandResult;
 
@@ -30,39 +32,45 @@ pub struct BlockLayoutPayload {
 }
 
 #[tauri::command]
-pub fn load_session() -> CommandResult<Option<Value>> {
-    match load_session_from_metadata().or_else(|_| load_legacy_session()) {
+pub fn load_session(app: tauri::AppHandle) -> CommandResult<Option<Value>> {
+    match load_session_from_metadata(&app).or_else(|_| load_legacy_session()) {
         Ok(session) => ok(session),
         Err(error) => fail(error),
     }
 }
 
 #[tauri::command]
-pub fn save_session(session: Value) -> CommandResult<Option<()>> {
-    match save_session_to_metadata(&session) {
+pub fn save_session(app: tauri::AppHandle, session: Value) -> CommandResult<Option<()>> {
+    match save_session_to_metadata(&app, &session) {
         Ok(()) => ok(Some(())),
         Err(error) => fail(error),
     }
 }
 
 #[tauri::command]
-pub fn load_block_layouts(file_path: String) -> CommandResult<Vec<BlockLayoutPayload>> {
-    match load_block_layouts_from_metadata(&file_path) {
+pub fn load_block_layouts(
+    app: tauri::AppHandle,
+    file_path: String,
+) -> CommandResult<Vec<BlockLayoutPayload>> {
+    match load_block_layouts_from_metadata(&app, &file_path) {
         Ok(layouts) => ok(layouts),
         Err(error) => fail(error),
     }
 }
 
 #[tauri::command]
-pub fn save_block_layout(layout: BlockLayoutPayload) -> CommandResult<Option<()>> {
-    match save_block_layout_to_metadata(&layout) {
+pub fn save_block_layout(
+    app: tauri::AppHandle,
+    layout: BlockLayoutPayload,
+) -> CommandResult<Option<()>> {
+    match save_block_layout_to_metadata(&app, &layout) {
         Ok(()) => ok(Some(())),
         Err(error) => fail(error),
     }
 }
 
-fn load_session_from_metadata() -> Result<Option<Value>, String> {
-    let connection = open_metadata_connection()?;
+fn load_session_from_metadata(app: &tauri::AppHandle) -> Result<Option<Value>, String> {
+    let connection = open_metadata_connection(app)?;
     let saved_at = metadata_value(&connection, "saved_at")?;
     if saved_at.is_none() {
         return Ok(None);
@@ -129,8 +137,8 @@ fn load_session_from_metadata() -> Result<Option<Value>, String> {
     })))
 }
 
-fn save_session_to_metadata(session: &Value) -> Result<(), String> {
-    let mut connection = open_metadata_connection()?;
+fn save_session_to_metadata(app: &tauri::AppHandle, session: &Value) -> Result<(), String> {
+    let mut connection = open_metadata_connection(app)?;
     let transaction = connection
         .transaction()
         .map_err(|error| format!("failed to start metadata transaction: {error}"))?;
@@ -271,8 +279,11 @@ fn save_session_to_metadata(session: &Value) -> Result<(), String> {
         .map_err(|error| format!("failed to commit metadata transaction: {error}"))
 }
 
-fn load_block_layouts_from_metadata(file_path: &str) -> Result<Vec<BlockLayoutPayload>, String> {
-    let connection = open_metadata_connection()?;
+fn load_block_layouts_from_metadata(
+    app: &tauri::AppHandle,
+    file_path: &str,
+) -> Result<Vec<BlockLayoutPayload>, String> {
+    let connection = open_metadata_connection(app)?;
     let Some((file_id, _workspace_id)) = find_file_for_path(&connection, file_path)? else {
         return Ok(Vec::new());
     };
@@ -315,7 +326,10 @@ fn load_block_layouts_from_metadata(file_path: &str) -> Result<Vec<BlockLayoutPa
     Ok(layouts)
 }
 
-fn save_block_layout_to_metadata(layout: &BlockLayoutPayload) -> Result<(), String> {
+fn save_block_layout_to_metadata(
+    app: &tauri::AppHandle,
+    layout: &BlockLayoutPayload,
+) -> Result<(), String> {
     if layout.file_path.trim().is_empty()
         || layout.file_path.starts_with('~')
         || layout.file_path.starts_with("browser://")
@@ -323,7 +337,7 @@ fn save_block_layout_to_metadata(layout: &BlockLayoutPayload) -> Result<(), Stri
         return Err("block layout requires a saved local file path".to_string());
     }
 
-    let connection = open_metadata_connection()?;
+    let connection = open_metadata_connection(app)?;
     let (workspace_id, canonical_root_path) =
         workspace_context_for_file(&connection, &layout.file_path)?;
     ensure_workspace(&connection, &workspace_id, &canonical_root_path)?;
@@ -387,8 +401,8 @@ fn save_block_layout_to_metadata(layout: &BlockLayoutPayload) -> Result<(), Stri
     Ok(())
 }
 
-fn open_metadata_connection() -> Result<Connection, String> {
-    let path = metadata_path();
+fn open_metadata_connection(app: &tauri::AppHandle) -> Result<Connection, String> {
+    let path = metadata_path(app)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("failed to create metadata directory: {error}"))?;
@@ -976,11 +990,23 @@ fn file_name_from_path(path: &str) -> String {
         .to_string()
 }
 
-fn metadata_path() -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("Saekim")
-        .join("metadata.sqlite3")
+fn metadata_path(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    #[cfg(target_os = "android")]
+    {
+        return _app
+            .path()
+            .app_config_dir()
+            .map(|path| path.join("metadata.sqlite3"))
+            .map_err(|error| format!("failed to resolve metadata directory: {error}"));
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        Ok(dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Saekim")
+            .join("metadata.sqlite3"))
+    }
 }
 
 fn legacy_session_path() -> PathBuf {

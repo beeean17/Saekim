@@ -1,6 +1,8 @@
 import { isTauriRuntime } from '../../lib/tauri/invoke';
+import { androidCapabilities } from '../android/androidCapabilities';
 import { browserCapabilities } from '../browser/browserCapabilities';
 import { desktopCapabilities } from '../desktop/desktopCapabilities';
+import { isAndroidRuntime } from './runtime';
 
 export type PlatformCapability =
   | 'file.open'
@@ -18,5 +20,6 @@ export type PlatformCapability =
   | 'native.menu';
 
 export function currentPlatformCapabilities(): ReadonlySet<PlatformCapability> {
+  if (isAndroidRuntime()) return androidCapabilities;
   return isTauriRuntime() ? desktopCapabilities : browserCapabilities;
 }

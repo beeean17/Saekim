@@ -5,33 +5,33 @@ mod platform;
 
 use app_state::AppState;
 use std::path::{Path, PathBuf};
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{DragDropEvent, Emitter, Manager, WebviewEvent, WindowEvent};
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const MENU_SAVE: &str = "save";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const MENU_SAVE_AS: &str = "save-as";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const MENU_EXPORT_PDF: &str = "export-pdf";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const MENU_NEW_FILE: &str = "new-file";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const MENU_OPEN_FILE: &str = "open-file";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const MENU_OPEN_FOLDER: &str = "open-folder";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const EVENT_SAVE: &str = "saekim-menu-save";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(desktop, not(target_os = "windows")))]
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
 
@@ -49,7 +49,7 @@ pub fn run() {
             Ok(())
         });
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(desktop, not(target_os = "windows")))]
     let builder = builder.menu(build_menu).on_menu_event(|app, event| {
         let event_name = match event.id().as_ref() {
             MENU_SAVE => Some(EVENT_SAVE),
@@ -177,6 +177,7 @@ fn startup_document_args() -> Vec<String> {
         .collect()
 }
 
+#[cfg(any(desktop, test))]
 fn document_args_from_strings(args: Vec<String>, cwd: Option<&str>) -> Vec<String> {
     args.into_iter()
         .filter_map(|arg| document_path_from_arg(&arg, cwd))
@@ -297,13 +298,21 @@ pub(crate) fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
     let _ = app.emit(EVENT_OPEN_EXTERNAL_FILES, paths.clone());
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.emit(EVENT_OPEN_EXTERNAL_FILES, paths);
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
+        focus_opened_document_window(&window);
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(desktop)]
+fn focus_opened_document_window(window: &tauri::WebviewWindow) {
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+#[cfg(not(desktop))]
+fn focus_opened_document_window(_window: &tauri::WebviewWindow) {}
+
+#[cfg(all(desktop, not(target_os = "windows")))]
 fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let package_info = app.package_info();
     let config = app.config();

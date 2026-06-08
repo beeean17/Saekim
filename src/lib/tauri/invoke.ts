@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { CommandResult } from '../../types/workspace';
 
 export async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -10,5 +10,5 @@ export async function invokeCommand<T>(command: string, args?: Record<string, un
 }
 
 export function isTauriRuntime(): boolean {
-  return Boolean('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  return isTauri();
 }

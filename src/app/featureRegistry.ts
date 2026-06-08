@@ -10,7 +10,7 @@ import { searchCommands, searchEditorContribution } from '../features/search';
 import { structuredDataPreviewContribution, tabularDataPreviewContribution } from '../features/structured-data';
 import { currentPlatformCapabilities, type PlatformCapability } from '../platform/common/capabilities';
 
-export const enabledFeatures: SaekimFeature[] = [
+const featureCatalog: SaekimFeature[] = [
   {
     id: 'file-workspace',
     label: 'File Workspace',
@@ -89,7 +89,29 @@ export const enabledFeatures: SaekimFeature[] = [
   { id: 'search', label: 'Search', editor: searchEditorContribution, commands: searchCommands },
 ];
 
+export const enabledFeatures = selectSupportedFeatures(featureCatalog, currentPlatformCapabilities());
+
 validateFeatureGraph(enabledFeatures, currentPlatformCapabilities());
+
+export function selectSupportedFeatures(
+  features: SaekimFeature[],
+  capabilities: ReadonlySet<PlatformCapability>,
+): SaekimFeature[] {
+  let supported = features.filter((feature) => hasRequiredCapabilities(feature, capabilities));
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    const ids = new Set(supported.map((feature) => feature.id));
+    const next = supported.filter((feature) => (feature.dependsOn ?? []).every((dependency) => ids.has(dependency)));
+    if (next.length !== supported.length) {
+      supported = next;
+      changed = true;
+    }
+  }
+
+  return supported;
+}
 
 export function validateFeatureGraph(
   features: SaekimFeature[],
@@ -134,4 +156,8 @@ export function validateFeatureGraph(
   };
 
   features.forEach((feature) => visit(feature, []));
+}
+
+function hasRequiredCapabilities(feature: SaekimFeature, capabilities: ReadonlySet<PlatformCapability>): boolean {
+  return (feature.requiresCapabilities?.required ?? []).every((capability) => capabilities.has(capability));
 }

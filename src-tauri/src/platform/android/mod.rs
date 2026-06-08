@@ -1,0 +1,1 @@
+//! Android reference platform boundary.

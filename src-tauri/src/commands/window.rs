@@ -5,9 +5,16 @@ pub fn set_window_min_size(window: tauri::Window, width: f64, height: f64) -> Re
         .map_err(|error| error.to_string())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn start_window_drag(window: tauri::Window) -> Result<(), String> {
     window.start_dragging().map_err(|error| error.to_string())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn start_window_drag(_window: tauri::Window) -> Result<(), String> {
+    Ok(())
 }
 
 #[tauri::command]

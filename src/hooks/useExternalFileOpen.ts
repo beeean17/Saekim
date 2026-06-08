@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { takePendingOpenFiles } from '../lib/tauri/fs';
 import { Backend } from '../platform/common/backend';
+import { currentPlatformCapabilities } from '../platform/common/capabilities';
 
 const externalOpenEvent = 'saekim-open-external-files';
 
@@ -11,7 +12,14 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
   const disposedRef = useRef(false);
 
   const flushQueuedPaths = useCallback(async () => {
-    if (!Backend.runtime.isTauriRuntime() || !enabledRef.current || openingRef.current) return;
+    if (
+      !Backend.runtime.isTauriRuntime() ||
+      !currentPlatformCapabilities().has('externalFile.open') ||
+      !enabledRef.current ||
+      openingRef.current
+    ) {
+      return;
+    }
 
     openingRef.current = true;
     try {
@@ -40,7 +48,7 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
   }, [enabled, flushQueuedPaths]);
 
   useEffect(() => {
-    if (!Backend.runtime.isTauriRuntime()) return;
+    if (!Backend.runtime.isTauriRuntime() || !currentPlatformCapabilities().has('externalFile.open')) return;
 
     disposedRef.current = false;
     let unlisten: (() => void) | null = null;
