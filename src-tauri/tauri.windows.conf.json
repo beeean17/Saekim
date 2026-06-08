@@ -1,0 +1,19 @@
+{
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "contentTypes": ["net.daringfireball.markdown"],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/text-file-association.nsh"
+      }
+    }
+  }
+}

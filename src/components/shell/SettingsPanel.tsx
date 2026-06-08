@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { useSettingsStore } from '../../store/settings';
+import { fontSizeOptions, useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import type { ThemeName, ViewMode } from '../../types/workspace';
 
 const themes: Array<{ id: ThemeName; label: string }> = [
-  { id: 'default', label: 'Default' },
+  { id: 'default', label: 'Light' },
   { id: 'dark', label: 'Dark' },
   { id: 'nord', label: 'Nord' },
 ];
@@ -21,8 +21,6 @@ export function SettingsPanel() {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const open = useUIStore((state) => state.settingsOpen);
   const close = useUIStore((state) => state.closeSettings);
-  const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
-  const toggleToolbarExpanded = useUIStore((state) => state.toggleToolbarExpanded);
   const viewMode = useUIStore((state) => state.viewMode);
   const setViewMode = useUIStore((state) => state.setViewMode);
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -92,18 +90,18 @@ export function SettingsPanel() {
       </section>
 
       <section className="settings-section">
-        <label htmlFor="font-size">글자 크기</label>
-        <div className="settings-range">
-          <input
-            id="font-size"
-            max={20}
-            min={11}
-            step={0.5}
-            type="range"
-            value={fontSize}
-            onChange={(event) => setFontSize(Number(event.currentTarget.value))}
-          />
-          <span>{fontSize}px</span>
+        <label>글자 크기</label>
+        <div className="settings-segmented" aria-label="글자 크기">
+          {fontSizeOptions.map((option) => (
+            <button
+              className={fontSize === option.value ? 'active' : ''}
+              key={option.id}
+              type="button"
+              onClick={() => setFontSize(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -139,10 +137,6 @@ export function SettingsPanel() {
       </section>
 
       <section className="settings-section">
-        <label className="settings-check">
-          <input checked={toolbarExpanded} type="checkbox" onChange={toggleToolbarExpanded} />
-          확장 툴바
-        </label>
         <label className="settings-check">
           <input checked={syncScroll} type="checkbox" onChange={toggleSyncScroll} />
           스크롤 동기화

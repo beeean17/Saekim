@@ -39,13 +39,13 @@ function readLegacyMetadata(): LegacyMetadata {
             theme: settings.theme,
             fontSize: settings.fontSize,
             editorFontFamily: settings.editorFontFamily,
+            htmlPreviewMode: settings.htmlPreviewMode,
           }
         : null,
     ui:
-      ui?.sidebarMode && ui.toolbarExpanded !== undefined && ui.viewMode && typeof ui.sidebarWidth === 'number'
+      ui?.sidebarMode && ui.viewMode && typeof ui.sidebarWidth === 'number'
         ? {
             sidebarMode: ui.sidebarMode,
-            toolbarExpanded: ui.toolbarExpanded,
             viewMode: ui.viewMode,
             sidebarWidth: ui.sidebarWidth,
             splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
@@ -63,18 +63,19 @@ function clearLegacyLocalStorage(): void {
   }
 }
 
-export function useSessionPersistence(): void {
+export function useSessionPersistence(): boolean {
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<number | null>(null);
 
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
+  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
 
   const sidebarMode = useUIStore((state) => state.sidebarMode);
-  const toolbarExpanded = useUIStore((state) => state.toolbarExpanded);
+  const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
@@ -85,6 +86,7 @@ export function useSessionPersistence(): void {
   const theme = useSettingsStore((state) => state.theme);
   const fontSize = useSettingsStore((state) => state.fontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
+  const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const restoreSettings = useSettingsStore((state) => state.restoreSettings);
 
   useEffect(() => {
@@ -127,11 +129,12 @@ export function useSessionPersistence(): void {
           rootPath,
           tree,
           openFiles,
+          recentFiles,
           activeFileId,
         },
         ui: {
           sidebarMode,
-          toolbarExpanded,
+          sidebarViewMode,
           viewMode,
           sidebarWidth,
           splitRatio,
@@ -142,6 +145,7 @@ export function useSessionPersistence(): void {
           theme,
           fontSize,
           editorFontFamily,
+          htmlPreviewMode,
         },
       };
 
@@ -158,16 +162,20 @@ export function useSessionPersistence(): void {
     editorFontFamily,
     editorWidth,
     fontSize,
+    htmlPreviewMode,
     loaded,
     openFiles,
+    recentFiles,
     rootPath,
     sidebarMode,
+    sidebarViewMode,
     sidebarWidth,
     splitRatio,
     syncScroll,
     theme,
-    toolbarExpanded,
     tree,
     viewMode,
   ]);
+
+  return loaded;
 }

@@ -7,6 +7,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.0] - Unreleased
+
+### Added
+
+- Markdown 문법 검색 모달에 문단 도구로 줄바꿈, 들여쓰기, 내어쓰기 항목을 추가했습니다.
+- Markdown 문법 검색 모달의 이미지 항목에서 원본 경로 연결과 문서 assets 복사 삽입을 실행할 수 있도록 추가했습니다.
+- Assets 이미지 미리보기에서 현재 문서에 이미지를 추가할 수 있는 버튼을 추가했습니다.
+- 열린 문서가 없을 때 편집기와 미리보기 영역에 파일 선택/열기 안내 메시지를 표시하도록 추가했습니다.
+- 열린 문서가 없는 상태에서 메타데이터에 저장된 최근 파일 순서 큐의 맨 위 파일을 즉시 열도록 추가했습니다.
+- 문단 도구 단축키로 `Shift+Enter`, `Tab`, `Shift+Tab`, `Cmd/Ctrl+]`, `Cmd/Ctrl+[`를 추가했습니다.
+- Mermaid/KaTeX 헬퍼와 같은 검색 모달로 일반 Markdown 문법을 찾아 삽입할 수 있도록 추가했습니다.
+- Markdown preview에서 `->`, `<-`, `^|`, `v|` 텍스트 화살표를 방향 화살표로 렌더링하도록 추가했습니다.
+- ASCII 박스/흐름도 형태의 일반 텍스트 코드블럭을 선 연결 문자로 다듬어 렌더링하도록 추가했습니다.
+
+### Changed
+
+- 확장 아코디언 툴바를 제거하고, Markdown/Mermaid/KaTeX 검색 중심의 기본 툴바로 정리했습니다.
+- Markdown preview는 기본 Markdown 줄바꿈을 유지하고, 코드블럭은 fenced code block 문법만 렌더링하도록 조정했습니다.
+- Windows 패키징에서 `.txt` 파일은 앱 아이콘 대신 시스템 텍스트 문서 아이콘을 쓰는 별도 Open With ProgID로 등록하도록 조정했습니다.
+- 공개 3.x 앱의 현재 의존성 기준으로 프로젝트 라이선스와 서드파티 고지 범위를 MIT 중심으로 정리했습니다.
+
+### Fixed
+
+- 한 줄짜리 `-` 입력이 이전 줄을 setext heading처럼 렌더링하던 문제를 수정했습니다.
+- preview 블럭 레이아웃 도구가 실제 블럭 외부 여백 클릭으로 열리던 문제를 수정했습니다.
+- 최근 파일에서 열린 파일을 `Cmd/Ctrl+W`로 닫아도 최근 파일 목록에 남던 문제를 수정했습니다.
+- Shiki 코드블럭 텍스트 선택 시 줄 바깥 여백까지 선택되는 것처럼 보이던 시각 문제를 완화했습니다.
+- 코드블럭 줄간을 조정해 텍스트 선택 영역이 위아래 줄과 겹쳐 보이는 문제를 완화했습니다.
+- preview 레이아웃 패널이 리스트/인용문 같은 일반 문단 요소에도 표시되던 문제를 수정했습니다.
+- KaTeX 블록 수식에 코드블럭과 같은 라벨과 레이아웃 패널 처리를 적용했습니다.
+- 코드블럭 편집 중 스크롤 동기화된 preview가 위로 튀는 문제를 완화했습니다.
+- 코드블럭을 여러 줄 드래그 선택할 때 줄 끝에 빈칸처럼 보이는 선택 배경 깨짐을 수정했습니다.
+- 코드블럭 줄 높이를 글자 크기별 px 행 높이로 계산하고, 플로팅 레이아웃 패널이 텍스트 선택에 포함되지 않도록 수정했습니다.
+
+---
+
+## [3.0.1] - 2026-05-30
+
+### Added
+
+- Markdown 외 텍스트 기반 파일을 열 수 있도록 파일 타입 판정 구조를 확장했습니다.
+- `.html`, `.htm`, `.json`, `.yml`, `.yaml`, `.toml`, `.env` 파일을 3.0.1 우선 지원 대상으로 추가했습니다.
+- 확장자가 알려지지 않은 파일도 UTF-8 텍스트로 판정되면 일반 텍스트 파일로 열 수 있도록 했습니다.
+- 프론트엔드 파일 타입 모델에 `label`, `language`, `previewKind`를 추가해 파일 형식별 렌더링/하이라이트 확장 기반을 마련했습니다.
+- HTML 파일 전용 미리보기 렌더링을 추가했습니다.
+- HTML 미리보기 모드를 선택할 수 있는 `브라우저`/`안전` 토글을 추가했습니다.
+- `브라우저` 모드에서는 sandboxed iframe과 `srcDoc`을 사용해 HTML을 브라우저에 가까운 방식으로 렌더링합니다.
+- `안전` 모드에서는 sanitizer를 거친 HTML 조각을 기존 preview DOM 안에 렌더링합니다.
+- JSON/YAML/TOML 파일을 접고 펼칠 수 있는 interactive tree preview로 렌더링하도록 추가했습니다.
+- CSV/TSV 파일을 spreadsheet 형태의 table preview로 렌더링하도록 추가했습니다.
+- OpenAPI v3 JSON/YAML 문서를 감지해 API 문서 preview로 렌더링하도록 추가했습니다.
+- 구조화 데이터 preview에 `API`/`Tree`/`Raw`, 표 데이터 preview에 `Table`/`Raw` 모드 전환을 추가했습니다.
+- 구조화 데이터 tree preview에서 객체 key path를 클릭해 복사할 수 있도록 추가했습니다.
+- 이미지 삽입 버튼에 `원본 경로로 연결`과 `문서 assets로 복사` 드롭다운 옵션을 추가했습니다.
+- 브라우저에서 원격 이미지를 편집기에 드래그 앤 드롭하면 현재 문서 옆 `.assets/` 폴더로 다운로드해 상대 경로로 삽입하는 기능을 추가했습니다.
+- 원격 이미지 다운로드 중 Markdown preview의 이미지 위치에 진행률/실패 상태를 표시하도록 추가했습니다.
+- 클립보드 이미지 붙여넣기 시 현재 문서 옆 `.assets/` 폴더에 저장하고 Markdown 이미지 문법을 자동 삽입하도록 추가했습니다.
+- `.assets` 폴더의 이미지 파일을 워크스페이스 파일 트리에 표시하도록 추가했습니다.
+- 워크스페이스 이미지 파일 클릭 시 앱 내부에서 이미지 미리보기 모달을 열 수 있도록 추가했습니다.
+- Markdown preview의 이미지, 표, 리스트, 인용문, 코드블럭, Mermaid, KaTeX 블럭에 크기/정렬 metadata를 저장하는 블럭 레이아웃 기능을 추가했습니다.
+- 연속된 preview 블럭을 2열 또는 3열로 묶어 표시하는 column group 기능을 추가했습니다.
+- 앱 metadata 저장소를 SQLite 기반 구조로 확장하고 workspace, file, block layout metadata 저장 기반을 추가했습니다.
+- Windows 데스크톱 빌드 지원을 추가했습니다.
+
+### Changed
+
+- 파일 열기 큐 진입 조건을 고정 확장자 화이트리스트 중심에서 텍스트 파일 판정 중심으로 변경했습니다.
+- 파일 열기, drag and drop, OS 기본 앱 열기, `Cmd/Ctrl+O`가 동일한 Rust pending open queue를 공유하도록 정리했습니다.
+- HTML preview에서 상대 이미지, 링크, CSS 경로를 현재 HTML 파일 위치 기준으로 해석하도록 보정했습니다.
+- HTML preview 모드 선택값을 세션 설정에 저장하고 다음 실행 시 복원하도록 했습니다.
+- JSON/YAML/TOML/CSV/TSV 파일의 기본 preview를 raw text에서 구조화된 데이터 preview로 변경했습니다.
+- CSV/TSV preview는 대용량 파일에서 첫 1,000개 행만 표시하고 전체 행 수와 truncation 상태를 표시합니다.
+- JSON/YAML/TOML/CSV/TSV preview 렌더링은 기존 Markdown/HTML 문자열 렌더링 경로와 분리된 React 컴포넌트 기반 렌더링 경로를 사용하도록 변경했습니다.
+- Markdown preview에서 상대 이미지 경로를 현재 문서 위치 기준으로 해석하도록 변경했습니다.
+- 이미지 assets 복사 시 원본 파일명을 우선 사용하고, 같은 파일이 이미 `.assets`에 있으면 중복 복사하지 않고 기존 파일을 재사용하도록 변경했습니다.
+- 원격 이미지 URL 가져오기 메뉴는 기능 안정성과 필요성 대비 구현 비용을 고려해 UI에서 숨겼습니다.
+- 현재 열린 파일 경로 기준으로 워크스페이스 루트를 표시하도록 정리해 `.assets`와 문서 주변 파일을 함께 탐색할 수 있도록 변경했습니다.
+- preview 블럭 레이아웃 도구는 hover가 아니라 블럭 클릭 선택 상태에서만 표시되도록 변경했습니다.
+- preview 블럭 그룹 해제는 별도 `풀기` 버튼 대신 활성화된 `2열`/`3열` 버튼을 다시 누르는 토글 방식으로 변경했습니다.
+- 묶인 preview 블럭은 같은 시작 높이를 기준으로 정렬되도록 변경했습니다.
+
+### Fixed
+
+- 텍스트 파일임에도 확장자가 목록에 없으면 열리지 않던 문제를 완화했습니다.
+- 명확한 바이너리 파일은 텍스트로 잘못 열리지 않도록 확장자와 내용 기반 판정을 추가했습니다.
+- HTML preview에서 `<script>`, iframe/form/input류, inline event handler, 위험한 URL이 실행되거나 삽입되지 않도록 차단했습니다.
+- iframe HTML preview 내부 링크 클릭이 앱 내부 navigation으로 이어지지 않고 외부 브라우저/시스템 열기로 처리되도록 했습니다.
+- 구조화 데이터 파싱 실패 시 preview가 비지 않고 오류 패널과 raw text fallback을 표시하도록 했습니다.
+- CSV/TSV 파싱 경고가 있을 때 표 preview와 함께 경고 메시지를 표시하도록 했습니다.
+- 원격 이미지 assets 가져오기에서 `http`/`https` 외 URL, 사설망/localhost URL, remote SVG, 비이미지 MIME, 20MB 초과 파일을 차단하도록 했습니다.
+- 원격 이미지 다운로드 실패 시 임시 파일이 남지 않도록 처리했습니다.
+- Markdown preview에서 문서 옆 `.assets` 상대 이미지가 렌더링되지 않던 문제를 수정했습니다.
+- preview 블럭 레이아웃 도구가 코드블럭 라벨 영역에만 반응하거나 hover로 불필요하게 노출되던 문제를 수정했습니다.
+- Mermaid 블럭을 레이아웃 wrapper로 감싼 뒤 다이어그램 렌더링이 깨지던 문제를 수정했습니다.
+- 묶이지 않은 preview 블럭에 stale group metadata가 남아 `풀기` 상태로 보이던 문제를 수정했습니다.
+- preview 블럭 그룹 버튼 텍스트가 좁은 패널에서 위아래로 줄바꿈되어 도구 영역을 벗어나던 문제를 수정했습니다.
+- Windows 환경에서 PDF export와 데스크톱 빌드가 동작하도록 플랫폼별 경로/빌드 설정 문제를 수정했습니다.
+
+### Build
+
+- 3.0.1 HTML/text 파일 지원 계획 문서를 `private/3.0.1/html_text_file_support_plan.md`에 추가했습니다.
+- 구조화 데이터 preview를 위해 `yaml`, `smol-toml`, `papaparse` 의존성을 추가했습니다.
+- 이미지 assets 가져오기 개발 계획 문서를 `private/3.0.1/image_assets_import_plan.md`에 추가했습니다.
+- 원격 이미지 스트리밍 다운로드를 위해 Rust `reqwest`, `futures-util` 의존성을 추가했습니다.
+- metadata 저장소 설계 문서를 `private/3.0.1/metadata_store_plan.md`에 추가했습니다.
+
+---
+
 ## [3.0.0] - Unreleased
 
 ### Added
@@ -151,6 +259,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.1.0 | Unreleased | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, source-line preview sync, code block selection stability, recent-file close cleanup, Windows text icon handling |
+| 3.0.1 | Unreleased | Flexible text-file detection, HTML/data previews, image assets workflow, preview block layouts, Windows desktop support |
 | 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
 | 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |
 | 1.2.0 | 2025-12-23 | Resize overlay, Pretendard font, ViewToggle styles, Refresh feature |

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { UISession } from '../types/session';
-import type { SidebarMode, ViewMode } from '../types/workspace';
+import type { SidebarMode, SidebarViewMode, ViewMode } from '../types/workspace';
 
 const DEFAULT_SIDEBAR_WIDTH = 248;
 const DEFAULT_EDITOR_WIDTH = 560;
@@ -27,7 +27,7 @@ function restoreEditorWidth(ui: UISession): number {
 
 interface UIState {
   sidebarMode: SidebarMode;
-  toolbarExpanded: boolean;
+  sidebarViewMode: SidebarViewMode;
   viewMode: ViewMode;
   sidebarWidth: number;
   splitRatio: number;
@@ -37,7 +37,7 @@ interface UIState {
   findOpen: boolean;
   settingsOpen: boolean;
   toggleSidebar: () => void;
-  toggleToolbarExpanded: () => void;
+  setSidebarViewMode: (mode: SidebarViewMode) => void;
   setViewMode: (mode: ViewMode) => void;
   setSidebarWidth: (width: number) => void;
   setSplitRatio: (ratio: number) => void;
@@ -53,7 +53,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>()((set) => ({
   sidebarMode: 'expanded',
-  toolbarExpanded: true,
+  sidebarViewMode: 'files',
   viewMode: 'split',
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   splitRatio: 0.5,
@@ -66,10 +66,7 @@ export const useUIStore = create<UIState>()((set) => ({
     set((state) => ({
       sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
     })),
-  toggleToolbarExpanded: () =>
-    set((state) => ({
-      toolbarExpanded: !state.toolbarExpanded,
-    })),
+  setSidebarViewMode: (mode) => set({ sidebarViewMode: mode }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
   setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
@@ -81,5 +78,16 @@ export const useUIStore = create<UIState>()((set) => ({
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
   restoreUI: (ui) =>
-    set({ ...ui, editorWidth: restoreEditorWidth(ui), pdfExportStatus: 'idle', findOpen: false, settingsOpen: false }),
+    set({
+      sidebarMode: ui.sidebarMode,
+      sidebarViewMode: ui.sidebarViewMode ?? 'files',
+      viewMode: ui.viewMode,
+      sidebarWidth: ui.sidebarWidth,
+      splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
+      editorWidth: restoreEditorWidth(ui),
+      syncScroll: ui.syncScroll ?? true,
+      pdfExportStatus: 'idle',
+      findOpen: false,
+      settingsOpen: false,
+    }),
 }));
