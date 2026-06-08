@@ -1,5 +1,6 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import type { CommandRegistry } from '../../app/commands';
+import { useViewportProfile } from '../../hooks/useViewportProfile';
 import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import { useSettingsStore } from '../../store/settings';
@@ -16,6 +17,7 @@ interface AppShellProps {
 
 export function AppShell({ children, menuHandlers, commandRegistry }: AppShellProps) {
   useNativeWindowChrome();
+  const viewportProfile = useViewportProfile();
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
@@ -29,7 +31,13 @@ export function AppShell({ children, menuHandlers, commandRegistry }: AppShellPr
   } as CSSProperties;
 
   return (
-    <div className="app" data-sidebar={sidebarMode} data-view={viewMode} style={layoutStyle}>
+    <div
+      className="app"
+      data-sidebar={sidebarMode}
+      data-view={viewMode}
+      data-viewport-profile={viewportProfile.profile}
+      style={layoutStyle}
+    >
       <Header menuHandlers={menuHandlers} commandRegistry={commandRegistry} />
       <SettingsPanel />
       {children}
