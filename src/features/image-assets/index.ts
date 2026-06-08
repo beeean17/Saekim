@@ -1,1 +1,1 @@
-export {};
+export { imageAssetsEditorContribution } from './editorHandlers';

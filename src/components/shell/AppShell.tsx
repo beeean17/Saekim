@@ -1,5 +1,6 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import type { CommandRegistry } from '../../app/commands';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { Header, type AppMenuHandlers } from './Header';
@@ -9,9 +10,10 @@ import { StatusBar } from './StatusBar';
 interface AppShellProps {
   children: ReactNode;
   menuHandlers: AppMenuHandlers;
+  commandRegistry: CommandRegistry;
 }
 
-export function AppShell({ children, menuHandlers }: AppShellProps) {
+export function AppShell({ children, menuHandlers, commandRegistry }: AppShellProps) {
   useNativeWindowChrome();
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
@@ -27,7 +29,7 @@ export function AppShell({ children, menuHandlers }: AppShellProps) {
 
   return (
     <div className="app" data-sidebar={sidebarMode} data-view={viewMode} style={layoutStyle}>
-      <Header menuHandlers={menuHandlers} />
+      <Header menuHandlers={menuHandlers} commandRegistry={commandRegistry} />
       <SettingsPanel />
       {children}
       <StatusBar />

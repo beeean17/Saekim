@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { dispatchShortcut, type CommandRegistry } from '../app/commands';
 
 interface ShortcutHandlers {
   onNewFile: () => void;
@@ -7,11 +8,10 @@ interface ShortcutHandlers {
   onSave: () => void;
   onSaveAs: () => void;
   onExportPdf: () => void;
-  onFind: () => void;
   onClose: () => void;
 }
 
-export function useShortcuts(handlers: ShortcutHandlers): void {
+export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegistry): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const meta = event.metaKey || event.ctrlKey;
@@ -36,8 +36,7 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
         handlers.onSave();
       }
       if (event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        handlers.onFind();
+        if (dispatchShortcut(commands, 'mod+f')) event.preventDefault();
       }
       if (event.key.toLowerCase() === 'p') {
         event.preventDefault();
@@ -51,5 +50,5 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handlers]);
+  }, [commands, handlers]);
 }

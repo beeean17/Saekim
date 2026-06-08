@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
+import { createCommandRegistry } from './app/commands';
+import { enabledFeatures } from './app/featureRegistry';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { useExternalFileOpen } from './hooks/useExternalFileOpen';
 import { useNativeMenuCommands } from './hooks/useNativeMenuCommands';
@@ -11,6 +13,7 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { exportPreviewToPdf } from './lib/pdf/export';
+import { useSearchStore } from './features/search';
 import { useUIStore } from './store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from './store/workspace';
 
@@ -27,7 +30,7 @@ export function App() {
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
   const closeFile = useWorkspaceStore((state) => state.closeFile);
   const activeFile = useWorkspaceStore(selectActiveFile);
-  const openFind = useUIStore((state) => state.openFind);
+  const openFind = useSearchStore((state) => state.openFind);
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -37,6 +40,14 @@ export function App() {
   const setEditorWidth = useUIStore((state) => state.setEditorWidth);
   const setPdfExportStatus = useUIStore((state) => state.setPdfExportStatus);
   const openingRecentFileRef = useRef(false);
+
+  const commandRegistry = useMemo(
+    () =>
+      createCommandRegistry(enabledFeatures, {
+        search: { openFind },
+      }),
+    [openFind],
+  );
 
   const shortcuts = useMemo(
     () => ({
@@ -59,17 +70,16 @@ export function App() {
           }
         })();
       },
-      onFind: openFind,
       onClose: () => {
         if (!activeFile) return;
         if (isDirty(activeFile) && !window.confirm(`${activeFile.name} 파일의 저장되지 않은 변경사항을 버리고 닫을까요?`)) return;
         closeFile(activeFile.id);
       },
     }),
-    [activeFile, closeFile, createFile, openFile, openFolder, openFind, saveActive, saveActiveAs, setPdfExportStatus],
+    [activeFile, closeFile, createFile, openFile, openFolder, saveActive, saveActiveAs, setPdfExportStatus],
   );
 
-  useShortcuts(shortcuts);
+  useShortcuts(shortcuts, commandRegistry);
   useNativeMenuCommands(shortcuts);
   const sessionLoaded = useSessionPersistence();
   useExternalFileOpen(openFile, sessionLoaded);
@@ -130,11 +140,11 @@ export function App() {
   };
 
   return (
-    <AppShell menuHandlers={shortcuts}>
+    <AppShell menuHandlers={shortcuts} commandRegistry={commandRegistry}>
       <main className="body" ref={bodyRef}>
         <Sidebar textareaRef={editorRef} />
         <PaneResizer hidden={sidebarMode === 'collapsed'} label="사이드바 크기 조절" onPointerDown={startSidebarResize} />
-        <EditorPane textareaRef={editorRef} />
+        <EditorPane textareaRef={editorRef} commandRegistry={commandRegistry} />
         <PaneResizer hidden={viewMode !== 'split'} label="편집 구역 크기 조절" onPointerDown={startSplitResize} />
         <PreviewPane previewRef={previewRef} />
       </main>

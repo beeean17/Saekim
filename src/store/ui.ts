@@ -34,7 +34,6 @@ interface UIState {
   editorWidth: number;
   syncScroll: boolean;
   pdfExportStatus: 'idle' | 'exporting' | 'done' | 'error';
-  findOpen: boolean;
   settingsOpen: boolean;
   toggleSidebar: () => void;
   setSidebarViewMode: (mode: SidebarViewMode) => void;
@@ -44,8 +43,6 @@ interface UIState {
   setEditorWidth: (width: number) => void;
   toggleSyncScroll: () => void;
   setPdfExportStatus: (status: UIState['pdfExportStatus']) => void;
-  openFind: () => void;
-  closeFind: () => void;
   toggleSettings: () => void;
   closeSettings: () => void;
   restoreUI: (ui: UISession) => void;
@@ -60,7 +57,6 @@ export const useUIStore = create<UIState>()((set) => ({
   editorWidth: getInitialEditorWidth(),
   syncScroll: true,
   pdfExportStatus: 'idle',
-  findOpen: false,
   settingsOpen: false,
   toggleSidebar: () =>
     set((state) => ({
@@ -73,8 +69,6 @@ export const useUIStore = create<UIState>()((set) => ({
   setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
   toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
   setPdfExportStatus: (status) => set({ pdfExportStatus: status }),
-  openFind: () => set({ findOpen: true }),
-  closeFind: () => set({ findOpen: false }),
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
   restoreUI: (ui) =>
@@ -87,7 +81,6 @@ export const useUIStore = create<UIState>()((set) => ({
       editorWidth: restoreEditorWidth(ui),
       syncScroll: ui.syncScroll ?? true,
       pdfExportStatus: 'idle',
-      findOpen: false,
       settingsOpen: false,
     }),
 }));

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { commandMenuItems, dispatchCommand, formatShortcut, type CommandRegistry } from '../../app/commands';
 import { isTauriRuntime } from '../../lib/tauri/invoke';
 import { useUIStore } from '../../store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -15,7 +16,6 @@ export interface AppMenuHandlers {
   onSave: () => void;
   onSaveAs: () => void;
   onExportPdf: () => void;
-  onFind: () => void;
   onClose: () => void;
 }
 
@@ -35,7 +35,7 @@ interface AppMenuGroup {
   items: AppMenuItem[];
 }
 
-export function Header({ menuHandlers }: { menuHandlers: AppMenuHandlers }) {
+export function Header({ menuHandlers, commandRegistry }: { menuHandlers: AppMenuHandlers; commandRegistry: CommandRegistry }) {
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
@@ -45,7 +45,7 @@ export function Header({ menuHandlers }: { menuHandlers: AppMenuHandlers }) {
   return (
     <header className={`titlebar ${isWindows ? 'windows-titlebar' : ''}`} onMouseDown={startTitlebarDrag}>
       <div className="titlebar-drag" data-tauri-drag-region />
-      {isWindows ? <AppMenu handlers={menuHandlers} /> : null}
+      {isWindows ? <AppMenu handlers={menuHandlers} commandRegistry={commandRegistry} /> : null}
       <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.path}>
         {activeFile
           ? parts.map((part, index) => (
@@ -100,7 +100,7 @@ function ViewToggle() {
   );
 }
 
-function AppMenu({ handlers }: { handlers: AppMenuHandlers }) {
+function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; commandRegistry: CommandRegistry }) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -109,6 +109,7 @@ function AppMenu({ handlers }: { handlers: AppMenuHandlers }) {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
+  const editCommands = commandMenuItems(commandRegistry, 'edit');
 
   const menus = useMemo<AppMenuGroup[]>(
     () => [
@@ -138,7 +139,11 @@ function AppMenu({ handlers }: { handlers: AppMenuHandlers }) {
           { label: 'Copy', shortcut: 'Ctrl+C', action: () => runDocumentCommand('copy', lastFocusedRef.current) },
           { label: 'Paste', shortcut: 'Ctrl+V', action: () => void runPasteCommand(lastFocusedRef.current) },
           { separator: true },
-          { label: 'Find', shortcut: 'Ctrl+F', action: handlers.onFind },
+          ...editCommands.map((command) => ({
+            label: command.menu?.label,
+            shortcut: formatShortcut(command.defaultShortcut),
+            action: () => dispatchCommand(commandRegistry, command.id),
+          })),
           { label: 'Select All', shortcut: 'Ctrl+A', action: () => runDocumentCommand('selectAll', lastFocusedRef.current) },
         ],
       },
@@ -170,7 +175,7 @@ function AppMenu({ handlers }: { handlers: AppMenuHandlers }) {
         items: [{ label: 'About Saekim', action: () => window.alert('Saekim 3.0.1') }],
       },
     ],
-    [handlers, setViewMode, syncScroll, toggleSidebar, toggleSyncScroll, viewMode],
+    [editCommands, handlers, setViewMode, syncScroll, toggleSidebar, toggleSyncScroll, viewMode],
   );
 
   useEffect(() => {

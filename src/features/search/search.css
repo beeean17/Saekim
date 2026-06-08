@@ -1,0 +1,63 @@
+.find-bar {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.find-bar .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.find-bar input {
+  width: min(280px, 100%);
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.find-bar input:focus {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
+.find-count {
+  min-width: 44px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.find-bar button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.find-bar button:not(.find-close) {
+  width: 28px;
+}
+
+.find-bar button:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.find-close {
+  padding: 0 9px;
+}

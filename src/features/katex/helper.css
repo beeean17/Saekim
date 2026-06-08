@@ -1,0 +1,10 @@
+.katex-helper-render {
+  grid-template-rows: minmax(96px, auto) auto;
+}
+
+.katex-helper-render > div:first-child {
+  width: 100%;
+  overflow-x: auto;
+  color: var(--text-primary);
+  text-align: center;
+}

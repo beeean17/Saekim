@@ -1,0 +1,63 @@
+.markdown-helper-render {
+  grid-template-rows: minmax(96px, auto) auto;
+  place-items: stretch;
+}
+
+.markdown-helper-preview {
+  width: 100%;
+  min-height: 96px;
+  padding: 14px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.markdown-helper-preview > :first-child {
+  margin-top: 0;
+}
+
+.markdown-helper-preview > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-image-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.markdown-image-actions button {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 11px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.markdown-image-actions button:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.markdown-image-actions span {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-image-actions small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

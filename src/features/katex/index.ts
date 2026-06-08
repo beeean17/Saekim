@@ -1,3 +1,3 @@
 import './katex.css';
 
-export {};
+export { katexEditorContribution } from './helper';
