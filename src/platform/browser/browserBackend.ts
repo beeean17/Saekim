@@ -38,6 +38,7 @@ export const browserBackend: BackendAdapter = {
     isTauriRuntime: () => false,
     isExternalUrl,
     toFileSrc: toFileHref,
+    logEvent,
     openExternalUrl,
     takePendingOpenFiles: async () => [],
     listenExternalOpenFiles: listenNoop,
@@ -51,6 +52,11 @@ export const browserBackend: BackendAdapter = {
 };
 
 async function noop(): Promise<void> {}
+
+async function logEvent(scope: string, message: string, details?: unknown): Promise<void> {
+  if (details === undefined) console.info(`[saekim:${scope}] ${message}`);
+  else console.info(`[saekim:${scope}] ${message}`, details);
+}
 
 async function listenNoop(): Promise<() => void> {
   return () => {};

@@ -1,4 +1,16 @@
 #[tauri::command]
+pub fn log_frontend_event(scope: String, message: String, details: Option<String>) {
+    match details {
+        Some(details) if !details.is_empty() => {
+            eprintln!("[saekim:{scope}] {message} {details}");
+        }
+        _ => {
+            eprintln!("[saekim:{scope}] {message}");
+        }
+    }
+}
+
+#[tauri::command]
 pub fn set_window_min_size(window: tauri::Window, width: f64, height: f64) -> Result<(), String> {
     window
         .set_min_size(Some(tauri::LogicalSize::new(width, height)))

@@ -1,6 +1,6 @@
 import type { CommandContributionFactory, PdfContribution } from '../../app/feature';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import { exportPreviewToPdf } from './export';
+import { exportPreviewToPdf, logPdfExport, pdfExportErrorDetails } from './export';
 import { usePdfExportStore } from './store';
 
 export const pdfExportCommands: CommandContributionFactory = () => [
@@ -21,12 +21,15 @@ export async function exportCurrentPdf(): Promise<void> {
   const { setStatus } = usePdfExportStore.getState();
 
   try {
+    logPdfExport('command start', { activeFileName: activeFile?.name ?? null });
     setStatus('exporting');
     const exported = await exportPreviewToPdf({ suggestedName: activeFile?.name });
+    logPdfExport('command result', { exported });
     setStatus(exported ? 'done' : 'idle');
     if (exported) window.setTimeout(() => setStatus('idle'), 3000);
   } catch (error) {
     console.error('PDF export failed:', error);
+    logPdfExport('command failed', pdfExportErrorDetails(error));
     setStatus('error');
     window.setTimeout(() => setStatus('idle'), 4000);
   }

@@ -67,6 +67,7 @@ export const tauriDesktopBackend: BackendAdapter = {
     isTauriRuntime,
     isExternalUrl,
     toFileSrc: convertFileSrc,
+    logEvent,
     openExternalUrl,
     takePendingOpenFiles,
     listenExternalOpenFiles,
@@ -84,6 +85,18 @@ async function openExternalUrl(url: string): Promise<void> {
   await invoke('open_external_url', { url });
 }
 
+async function logEvent(scope: string, message: string, details?: unknown): Promise<void> {
+  const renderedDetails = renderLogDetails(details);
+  if (renderedDetails) console.info(`[saekim:${scope}] ${message}`, details);
+  else console.info(`[saekim:${scope}] ${message}`);
+
+  await invoke('log_frontend_event', {
+    scope,
+    message,
+    details: renderedDetails,
+  });
+}
+
 async function listenExternalOpenFiles(handler: (paths: string[]) => void): Promise<() => void> {
   const unlisteners: Array<() => void> = [];
   unlisteners.push(await listen<string[]>(externalOpenEvent, (event) => handler(event.payload)));
@@ -96,15 +109,46 @@ async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgr
 }
 
 async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void> {
-  const registrations = await Promise.all([
-    listen(menuEvents.newFile, handlers.onNewFile),
-    listen(menuEvents.openFile, handlers.onOpen),
-    listen(menuEvents.openFolder, handlers.onOpenFolder),
-    listen(menuEvents.save, handlers.onSave),
-    listen(menuEvents.saveAs, handlers.onSaveAs),
-    listen(menuEvents.exportPdf, handlers.onExportPdf),
+  const window = getCurrentWindow();
+  const registrations: Array<() => void> = [];
+  const registerMenuEvent = async (eventName: string, command: string, handler: () => void): Promise<void> => {
+    const dedupedHandler = dedupeNativeMenuHandler(command, handler);
+    registrations.push(await listen(eventName, dedupedHandler));
+    registrations.push(await window.listen(eventName, dedupedHandler));
+    logDesktopEvent('native-menu', 'listener registered', { command, eventName });
+  };
+
+  await Promise.all([
+    registerMenuEvent(menuEvents.newFile, 'newFile', handlers.onNewFile),
+    registerMenuEvent(menuEvents.openFile, 'openFile', handlers.onOpen),
+    registerMenuEvent(menuEvents.openFolder, 'openFolder', handlers.onOpenFolder),
+    registerMenuEvent(menuEvents.save, 'save', handlers.onSave),
+    registerMenuEvent(menuEvents.saveAs, 'saveAs', handlers.onSaveAs),
+    registerMenuEvent(menuEvents.exportPdf, 'exportPdf', handlers.onExportPdf),
   ]);
+
   return () => registrations.forEach((unlisten) => unlisten());
+}
+
+function dedupeNativeMenuHandler(command: string, handler: () => void): () => void {
+  let lastHandledAt = 0;
+  return () => {
+    const now = Date.now();
+    if (now - lastHandledAt < 100) {
+      logDesktopEvent('native-menu', 'duplicate event ignored', { command });
+      return;
+    }
+
+    lastHandledAt = now;
+    logDesktopEvent('native-menu', 'event received', { command });
+    handler();
+  };
+}
+
+function logDesktopEvent(scope: string, message: string, details?: unknown): void {
+  void logEvent(scope, message, details).catch((error) => {
+    console.warn('failed to write desktop log event', error);
+  });
 }
 
 async function setWindowMinSize(width: number, height: number): Promise<void> {
@@ -130,5 +174,16 @@ function isExternalUrl(url: string): boolean {
     return ['http:', 'https:', 'mailto:', 'tel:', 'file:'].includes(parsed.protocol);
   } catch {
     return false;
+  }
+}
+
+function renderLogDetails(details?: unknown): string | null {
+  if (details === undefined || details === null) return null;
+  if (typeof details === 'string') return details;
+
+  try {
+    return JSON.stringify(details);
+  } catch {
+    return String(details);
   }
 }

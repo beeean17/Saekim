@@ -47,6 +47,7 @@ export interface RuntimeBackend {
   isTauriRuntime(): boolean;
   isExternalUrl(url: string): boolean;
   toFileSrc(path: string): string;
+  logEvent(scope: string, message: string, details?: unknown): Promise<void>;
   openExternalUrl(url: string): Promise<void>;
   takePendingOpenFiles(): Promise<string[]>;
   listenExternalOpenFiles(handler: (paths: string[]) => void): Promise<() => void>;

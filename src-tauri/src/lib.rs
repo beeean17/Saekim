@@ -5,34 +5,8 @@ mod platform;
 
 use app_state::AppState;
 use std::path::{Path, PathBuf};
-#[cfg(all(desktop, not(target_os = "windows")))]
-use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{DragDropEvent, Emitter, Manager, WebviewEvent, WindowEvent};
 
-#[cfg(all(desktop, not(target_os = "windows")))]
-const MENU_SAVE: &str = "save";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const MENU_SAVE_AS: &str = "save-as";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const MENU_EXPORT_PDF: &str = "export-pdf";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const MENU_NEW_FILE: &str = "new-file";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const MENU_OPEN_FILE: &str = "open-file";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const MENU_OPEN_FOLDER: &str = "open-folder";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const EVENT_SAVE: &str = "saekim-menu-save";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
-#[cfg(all(desktop, not(target_os = "windows")))]
-const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,24 +28,10 @@ pub fn run() {
             Ok(())
         });
 
-    #[cfg(all(desktop, not(target_os = "windows")))]
-    let builder = builder.menu(build_menu).on_menu_event(|app, event| {
-        let event_name = match event.id().as_ref() {
-            MENU_SAVE => Some(EVENT_SAVE),
-            MENU_SAVE_AS => Some(EVENT_SAVE_AS),
-            MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
-            MENU_NEW_FILE => Some(EVENT_NEW_FILE),
-            MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
-            MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
-            _ => None,
-        };
-
-        if let Some(event_name) = event_name {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.emit(event_name, ());
-            }
-        }
-    });
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(platform::macos::native_menu::build_menu)
+        .on_menu_event(platform::macos::native_menu::handle_menu_event);
 
     let app = builder
         .invoke_handler(tauri::generate_handler![
@@ -94,6 +54,7 @@ pub fn run() {
             commands::session::load_block_layouts,
             commands::session::save_session,
             commands::session::save_block_layout,
+            commands::window::log_frontend_event,
             commands::window::open_external_url,
             commands::window::set_window_min_size,
             commands::window::start_window_drag
@@ -316,129 +277,3 @@ fn focus_opened_document_window(window: &tauri::WebviewWindow) {
 
 #[cfg(not(desktop))]
 fn focus_opened_document_window(_window: &tauri::WebviewWindow) {}
-
-#[cfg(all(desktop, not(target_os = "windows")))]
-fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let package_info = app.package_info();
-    let config = app.config();
-    let about_metadata = AboutMetadata {
-        name: Some(package_info.name.clone()),
-        version: Some(package_info.version.to_string()),
-        copyright: config.bundle.copyright.clone(),
-        authors: config
-            .bundle
-            .publisher
-            .clone()
-            .map(|publisher| vec![publisher]),
-        ..Default::default()
-    };
-
-    let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+S"))?;
-    let new_file = MenuItem::with_id(app, MENU_NEW_FILE, "New File", true, Some("CmdOrCtrl+N"))?;
-    let open_file = MenuItem::with_id(
-        app,
-        MENU_OPEN_FILE,
-        "Open File...",
-        true,
-        Some("CmdOrCtrl+O"),
-    )?;
-    let open_folder = MenuItem::with_id(
-        app,
-        MENU_OPEN_FOLDER,
-        "Open Folder...",
-        true,
-        Some("CmdOrCtrl+Shift+O"),
-    )?;
-    let save_as = MenuItem::with_id(
-        app,
-        MENU_SAVE_AS,
-        "Save As...",
-        true,
-        Some("CmdOrCtrl+Shift+S"),
-    )?;
-    let export_pdf = MenuItem::with_id(
-        app,
-        MENU_EXPORT_PDF,
-        "Export PDF",
-        true,
-        Some("CmdOrCtrl+P"),
-    )?;
-
-    let app_menu = Submenu::with_items(
-        app,
-        package_info.name.clone(),
-        true,
-        &[
-            &PredefinedMenuItem::about(app, None, Some(about_metadata))?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::services(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::hide(app, None)?,
-            &PredefinedMenuItem::hide_others(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::quit(app, None)?,
-        ],
-    )?;
-    let file_menu = Submenu::with_items(
-        app,
-        "File",
-        true,
-        &[
-            &new_file,
-            &PredefinedMenuItem::separator(app)?,
-            &open_file,
-            &open_folder,
-            &PredefinedMenuItem::separator(app)?,
-            &save,
-            &save_as,
-            &PredefinedMenuItem::separator(app)?,
-            &export_pdf,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
-        ],
-    )?;
-    let edit_menu = Submenu::with_items(
-        app,
-        "Edit",
-        true,
-        &[
-            &PredefinedMenuItem::undo(app, None)?,
-            &PredefinedMenuItem::redo(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::cut(app, None)?,
-            &PredefinedMenuItem::copy(app, None)?,
-            &PredefinedMenuItem::paste(app, None)?,
-            &PredefinedMenuItem::select_all(app, None)?,
-        ],
-    )?;
-    let view_menu = Submenu::with_items(
-        app,
-        "View",
-        true,
-        &[&PredefinedMenuItem::fullscreen(app, None)?],
-    )?;
-    let window_menu = Submenu::with_items(
-        app,
-        "Window",
-        true,
-        &[
-            &PredefinedMenuItem::minimize(app, None)?,
-            &PredefinedMenuItem::maximize(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
-        ],
-    )?;
-    let help_menu = Submenu::with_items(app, "Help", true, &[])?;
-
-    Menu::with_items(
-        app,
-        &[
-            &app_menu,
-            &file_menu,
-            &edit_menu,
-            &view_menu,
-            &window_menu,
-            &help_menu,
-        ],
-    )
-}

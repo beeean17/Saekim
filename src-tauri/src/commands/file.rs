@@ -332,6 +332,7 @@ pub async fn pick_pdf_export_path(
     app: AppHandle,
     suggested_name: String,
 ) -> CommandResult<Option<String>> {
+    eprintln!("[saekim:pdf-export] pick dialog start suggested_name={suggested_name}");
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let selected = app
             .dialog()
@@ -341,6 +342,7 @@ pub async fn pick_pdf_export_path(
             .blocking_save_file();
 
         let Some(path) = selected else {
+            eprintln!("[saekim:pdf-export] pick dialog cancelled");
             return Ok(None);
         };
 
@@ -359,23 +361,49 @@ pub async fn pick_pdf_export_path(
     .await;
 
     match selected {
-        Ok(Ok(Some(path))) => ok(Some(path)),
+        Ok(Ok(Some(path))) => {
+            eprintln!("[saekim:pdf-export] pick dialog selected path={path}");
+            ok(Some(path))
+        }
         Ok(Ok(None)) => ok(None),
-        Ok(Err(error)) => fail(error),
-        Err(error) => fail(format!("failed to run PDF save dialog: {error}")),
+        Ok(Err(error)) => {
+            eprintln!("[saekim:pdf-export] pick dialog validation failed error={error}");
+            fail(error)
+        }
+        Err(error) => {
+            eprintln!("[saekim:pdf-export] pick dialog task failed error={error}");
+            fail(format!("failed to run PDF save dialog: {error}"))
+        }
     }
 }
 
 #[tauri::command]
 pub fn write_pdf_export(path: String, pdf_data: String) -> CommandResult<String> {
+    eprintln!(
+        "[saekim:pdf-export] write start path={path} base64_len={}",
+        pdf_data.len()
+    );
     let bytes = match BASE64_STANDARD.decode(pdf_data) {
-        Ok(bytes) => bytes,
-        Err(error) => return fail(format!("failed to decode PDF data: {error}")),
+        Ok(bytes) => {
+            eprintln!("[saekim:pdf-export] decoded bytes={}", bytes.len());
+            bytes
+        }
+        Err(error) => {
+            eprintln!("[saekim:pdf-export] decode failed error={error}");
+            return fail(format!("failed to decode PDF data: {error}"));
+        }
     };
+    let byte_len = bytes.len();
 
     match fs::write(&path, bytes) {
-        Ok(()) => ok(path),
-        Err(error) => fail(format!("failed to save PDF: {error}")),
+        Ok(()) => {
+            eprintln!("[saekim:pdf-export] write success path={path} bytes={byte_len}");
+            ok(path)
+        }
+        Err(error) => {
+            eprintln!("[saekim:pdf-export] write failed path={path} error={error}");
+            fail(format!("failed to save PDF: {error}"))
+        }
     }
 }
 
