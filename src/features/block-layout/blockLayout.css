@@ -28,7 +28,7 @@
 
 .preview-layout-group {
   display: grid;
-  grid-template-columns: repeat(var(--preview-layout-columns, 2), minmax(0, 1fr));
+  grid-template-columns: var(--preview-layout-template, repeat(var(--preview-layout-columns, 2), minmax(0, 1fr)));
   align-items: start;
   gap: 12px;
   width: 100%;

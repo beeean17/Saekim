@@ -422,7 +422,7 @@
 .pdf-export-root .preview-layout-group {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(var(--preview-layout-columns, 2), minmax(0, 1fr));
+  grid-template-columns: var(--preview-layout-template, repeat(var(--preview-layout-columns, 2), minmax(0, 1fr)));
   margin: 16px 0;
 }
 

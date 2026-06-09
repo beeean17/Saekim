@@ -129,7 +129,7 @@ export function enhancePreviewLayoutBlocks(
     onChange(normalizedLayouts);
   }
 
-  arrangeLayoutGroups(root);
+  arrangeLayoutGroups(root, filePath, layoutByKey);
 }
 
 function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
@@ -661,7 +661,8 @@ function startImageResize(
 ): void {
   if (event.button !== 0) return;
 
-  const containerWidth = resizeContainerWidth(wrapper);
+  const groupResize = imageGroupResizeContext(root, wrapper, filePath, layoutByKey);
+  const containerWidth = groupResize?.group.getBoundingClientRect().width ?? resizeContainerWidth(wrapper);
   if (containerWidth <= 0) return;
 
   event.preventDefault();
@@ -672,14 +673,30 @@ function startImageResize(
 
   const initialWidth = wrapper.getBoundingClientRect().width;
   const startX = event.clientX;
-  let nextPercent = widthPercentForLayout(layoutForWrapper(wrapper, filePath, layoutByKey), initialWidth, containerWidth);
+  const initialLayout = layoutForWrapper(wrapper, filePath, layoutByKey);
+  const initialPercent = groupResize
+    ? layoutPercentValue(initialLayout, 50)
+    : widthPercentForLayout(initialLayout, initialWidth, containerWidth);
+  let nextPercent = initialPercent;
 
   const handlePointerMove = (moveEvent: PointerEvent) => {
     moveEvent.preventDefault();
     const delta = moveEvent.clientX - startX;
-    const nextWidth = side === 'right' ? initialWidth + delta : initialWidth - delta;
-    nextPercent = clamp((nextWidth / containerWidth) * 100, minImageResizePercent, maxImageResizePercent);
-    wrapper.style.setProperty('--block-layout-width', `${nextPercent}%`);
+
+    if (groupResize) {
+      const deltaPercent = (delta / containerWidth) * 100;
+      nextPercent = clamp(
+        side === 'right' ? initialPercent + deltaPercent : initialPercent - deltaPercent,
+        minImageResizePercent,
+        100 - minImageResizePercent,
+      );
+      applyTwoColumnResizePreview(groupResize.group, groupResize.currentIndex, nextPercent);
+    } else {
+      const nextWidth = side === 'right' ? initialWidth + delta : initialWidth - delta;
+      nextPercent = clamp((nextWidth / containerWidth) * 100, minImageResizePercent, maxImageResizePercent);
+      wrapper.style.setProperty('--block-layout-width', `${nextPercent}%`);
+    }
+
     wrapper.dataset.widthUnit = '%';
     wrapper.dataset.widthValue = formatLayoutNumber(nextPercent);
   };
@@ -691,6 +708,27 @@ function startImageResize(
     delete wrapper.dataset.resizing;
 
     const currentLayout = layoutForWrapper(wrapper, filePath, layoutByKey);
+    if (groupResize) {
+      const roundedCurrent = roundLayoutNumber(nextPercent);
+      const roundedPair = roundLayoutNumber(100 - nextPercent);
+      const current = {
+        ...currentLayout,
+        widthValue: roundedCurrent,
+        widthUnit: '%' as const,
+        heightValue: null,
+        heightUnit: 'auto' as const,
+      };
+      const pair = {
+        ...groupResize.pairLayout,
+        widthValue: roundedPair,
+        widthUnit: '%' as const,
+        heightValue: null,
+        heightUnit: 'auto' as const,
+      };
+      onChange([current, pair]);
+      return;
+    }
+
     onChange({
       ...currentLayout,
       widthValue: roundLayoutNumber(nextPercent),
@@ -703,6 +741,42 @@ function startImageResize(
   window.addEventListener('pointermove', handlePointerMove);
   window.addEventListener('pointerup', handlePointerUp);
   window.addEventListener('pointercancel', handlePointerUp);
+}
+
+type ImageGroupResizeContext = {
+  group: HTMLElement;
+  currentIndex: number;
+  pairLayout: BlockLayout;
+};
+
+function imageGroupResizeContext(
+  root: HTMLElement,
+  wrapper: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+): ImageGroupResizeContext | null {
+  const group = wrapper.closest<HTMLElement>('.preview-layout-group');
+  if (!group) return null;
+
+  const currentLayout = layoutForWrapper(wrapper, filePath, layoutByKey);
+  if (getLayoutGroupColumns(currentLayout) !== 2) return null;
+
+  const groupLayouts = groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey)
+    .filter((layout) => getLayoutGroupId(layout) === getLayoutGroupId(currentLayout))
+    .sort((a, b) => getLayoutGroupIndex(a) - getLayoutGroupIndex(b));
+  if (groupLayouts.length !== 2) return null;
+
+  const currentIndex = getLayoutGroupIndex(currentLayout);
+  const pairLayout = groupLayouts.find((layout) => getLayoutGroupIndex(layout) !== currentIndex);
+  if (!pairLayout) return null;
+
+  return { group, currentIndex, pairLayout };
+}
+
+function applyTwoColumnResizePreview(group: HTMLElement, currentIndex: number, currentPercent: number): void {
+  const pairPercent = 100 - currentPercent;
+  const widths = currentIndex === 0 ? [currentPercent, pairPercent] : [pairPercent, currentPercent];
+  group.style.setProperty('--preview-layout-template', layoutGroupTemplate(widths));
 }
 
 function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
@@ -755,6 +829,18 @@ function widthPercentForLayout(layout: BlockLayout, fallbackWidth: number, conta
   }
 
   return clamp((fallbackWidth / containerWidth) * 100, minImageResizePercent, maxImageResizePercent);
+}
+
+function layoutPercentValue(layout: BlockLayout, fallback: number): number {
+  return layout.widthUnit === '%' && layout.widthValue !== null
+    ? clamp(layout.widthValue, minImageResizePercent, maxImageResizePercent)
+    : fallback;
+}
+
+function layoutGroupTemplate(widths: number[]): string {
+  return widths
+    .map((width) => `minmax(0, ${formatLayoutNumber(Math.max(1, width))}fr)`)
+    .join(' ');
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -1026,7 +1112,11 @@ function unwrapUnsupportedLayoutWrappers(root: HTMLElement): void {
   });
 }
 
-function arrangeLayoutGroups(root: HTMLElement): void {
+function arrangeLayoutGroups(
+  root: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+): void {
   const wrappers = getLayoutWrappers(root);
   const arrangedGroupIds = new Set<string>();
   let index = 0;
@@ -1061,6 +1151,10 @@ function arrangeLayoutGroups(root: HTMLElement): void {
     group.className = 'preview-layout-group';
     group.dataset.columns = String(columns);
     group.style.setProperty('--preview-layout-columns', String(columns));
+    group.style.setProperty(
+      '--preview-layout-template',
+      layoutGroupTemplate(groupWrappers.map((item) => layoutPercentValue(layoutForWrapper(item, filePath, layoutByKey), 100 / columns))),
+    );
     wrapper.before(group);
     groupWrappers.forEach((item) => group.append(item));
     arrangedGroupIds.add(groupId);
