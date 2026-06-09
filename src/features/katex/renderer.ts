@@ -6,6 +6,11 @@ import { escapeHtml } from '../../core/markdown/escape';
 const katexOptions = {
   throwOnError: false,
   errorColor: '#cc3344',
+  strict: false,
+  macros: {
+    '\\implies': '\\Rightarrow',
+    '\\impliedby': '\\Leftarrow',
+  },
 };
 
 registerMarkdownItPlugin({
@@ -49,7 +54,29 @@ function splitKatexBlockEquations(content: string): string[] {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  if (shouldKeepMultilineEquation(normalized, equations)) return [normalized];
+
   return equations.length > 0 ? equations : [normalized];
+}
+
+function shouldKeepMultilineEquation(normalized: string, lines: string[]): boolean {
+  if (lines.length <= 1) return false;
+  if (/\\\\/.test(normalized)) return true;
+
+  return lines.some((line, index) => {
+    const nextLine = lines[index + 1] ?? '';
+    return isContinuedEquationLine(line) || isContinuationStart(nextLine);
+  });
+}
+
+function isContinuedEquationLine(line: string): boolean {
+  const trimmed = line.trim();
+  return /[=+\-*\/,({\[]$/.test(trimmed) || /\\(?:left|right)?[({\[]?$/.test(trimmed);
+}
+
+function isContinuationStart(line: string): boolean {
+  const trimmed = line.trim();
+  return /^[=+\-*\/),\]}]/.test(trimmed) || /^\\(?:right|over|cdot|times|div|pm|mp|land|lor|Rightarrow|Leftarrow|implies|iff)\b/.test(trimmed);
 }
 
 function stableEquationKey(equation: string, counts: Map<string, number>): string {

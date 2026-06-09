@@ -8,9 +8,16 @@ const A4_HEIGHT_PT = 841.89;
 const A4_HEIGHT_PX = (A4_WIDTH_PX * A4_HEIGHT_PT) / A4_WIDTH_PT;
 const CANVAS_WHITE_THRESHOLD = 248;
 const CANVAS_BOTTOM_TRIM_STEP_PX = 2;
+const CANVAS_QUIET_ROW_LUMINANCE_THRESHOLD = 235;
+const CANVAS_QUIET_ROW_MAX_INK_RATIO = 0.012;
 const MIN_PDF_PAGE_SLICE_PX = 8;
+const PDF_PAGE_SLICE_BACKTRACK_PX = 140;
 const IMAGE_INLINE_TIMEOUT_MS = 5000;
 const BASE64_CHUNK_SIZE = 0x8000;
+const PAGE_BREAK_KEEP_MARGIN_PX = 14;
+const PAGE_BREAK_MAX_KEEP_RATIO = 0.92;
+const PAGE_BREAK_REPEAT_LIMIT = 3;
+const PAGE_BREAK_SLOP_PX = 2;
 const UNSUPPORTED_CANVAS_COLOR_PATTERN = /\b(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
 const CSS_COLOR_FUNCTION_PATTERN = /color\(\s*(?:srgb|display-p3)\s+([^)]*)\)/gi;
 const PAGE_BREAK_AVOID_SELECTOR = [
@@ -414,6 +421,7 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
   const pageHeightPx = Math.floor((canvas.width * A4_HEIGHT_PT) / A4_WIDTH_PT);
   const effectiveHeight = trimCanvasBottomWhitespace(canvas);
+  const sourceContext = canvas.getContext('2d', { willReadFrequently: true });
   logPdfExport('canvas trimmed', {
     pageHeightPx,
     effectiveHeight,
@@ -427,11 +435,11 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
 
   pageCanvas.width = canvas.width;
 
-  for (let offsetY = 0, pageIndex = 0; offsetY < effectiveHeight; offsetY += pageHeightPx, pageIndex += 1) {
+  for (let offsetY = 0, pageIndex = 0; offsetY < effectiveHeight; pageIndex += 1) {
     const remainingHeight = effectiveHeight - offsetY;
     if (pageIndex > 0 && remainingHeight < MIN_PDF_PAGE_SLICE_PX) break;
 
-    const sliceHeight = Math.min(pageHeightPx, remainingHeight);
+    const sliceHeight = pageSliceHeight(sourceContext, canvas, offsetY, pageHeightPx, effectiveHeight);
     pageCanvas.height = sliceHeight;
     pageContext.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
     pageContext.drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, pageCanvas.width, sliceHeight);
@@ -442,11 +450,59 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
 
     const sliceHeightPt = (sliceHeight * A4_WIDTH_PT) / canvas.width;
     pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, A4_WIDTH_PT, sliceHeightPt);
+    offsetY += sliceHeight;
   }
 
   const bytes = new Uint8Array(pdf.output('arraybuffer'));
   logPdfExport('jspdf output done', { byteLength: bytes.byteLength });
   return bytes;
+}
+
+function pageSliceHeight(
+  context: CanvasRenderingContext2D | null,
+  canvas: HTMLCanvasElement,
+  offsetY: number,
+  pageHeightPx: number,
+  effectiveHeight: number,
+): number {
+  const remainingHeight = effectiveHeight - offsetY;
+  if (remainingHeight <= pageHeightPx) return remainingHeight;
+  if (!context) return pageHeightPx;
+
+  const scale = canvas.width / A4_WIDTH_PX;
+  const scanStep = Math.max(1, Math.round(CANVAS_BOTTOM_TRIM_STEP_PX * scale));
+  const backtrackPx = Math.max(scanStep, Math.round(PDF_PAGE_SLICE_BACKTRACK_PX * scale));
+  const minSliceHeight = Math.max(MIN_PDF_PAGE_SLICE_PX, pageHeightPx - backtrackPx);
+  const scanStartY = offsetY + pageHeightPx - 1;
+  const scanEndY = offsetY + minSliceHeight;
+
+  for (let y = scanStartY; y >= scanEndY; y -= scanStep) {
+    if (isQuietCanvasRow(context, canvas, y)) {
+      const sliceHeight = y - offsetY + 1;
+      if (sliceHeight >= MIN_PDF_PAGE_SLICE_PX) return sliceHeight;
+    }
+  }
+
+  return pageHeightPx;
+}
+
+function isQuietCanvasRow(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement, y: number): boolean {
+  const row = context.getImageData(0, Math.max(0, Math.min(canvas.height - 1, Math.round(y))), canvas.width, 1).data;
+  let inkPixels = 0;
+  const maxInkPixels = Math.max(1, Math.floor(canvas.width * CANVAS_QUIET_ROW_MAX_INK_RATIO));
+
+  for (let index = 0; index < row.length; index += 4) {
+    const alpha = row[index + 3];
+    if (alpha === 0) continue;
+
+    const luminance = (0.2126 * row[index]) + (0.7152 * row[index + 1]) + (0.0722 * row[index + 2]);
+    if (luminance < CANVAS_QUIET_ROW_LUMINANCE_THRESHOLD) {
+      inkPixels += 1;
+      if (inkPixels > maxInkPixels) return false;
+    }
+  }
+
+  return true;
 }
 
 function normalizeUnsupportedCanvasStyles(root: HTMLElement): number {
@@ -711,24 +767,19 @@ async function waitForTemplateAssets(root: HTMLElement): Promise<void> {
 function applyBlockPageBreaks(root: HTMLElement): void {
   root.querySelectorAll(`.${PAGE_SPACER_CLASS}`).forEach((node) => node.remove());
 
-  const avoidBlocks = Array.from(
-    root.querySelectorAll<HTMLElement>(PAGE_BREAK_AVOID_SELECTOR),
-  ).filter((element) => isPageBreakCandidate(element));
+  for (let passIndex = 0; passIndex < PAGE_BREAK_REPEAT_LIMIT; passIndex += 1) {
+    let insertedCount = 0;
+    const avoidBlocks = Array.from(
+      root.querySelectorAll<HTMLElement>(PAGE_BREAK_AVOID_SELECTOR),
+    ).filter((element) => isPageBreakCandidate(element));
 
-  for (const block of avoidBlocks) {
-    const height = block.offsetHeight;
-    if (height <= 0 || height >= A4_HEIGHT_PX * 0.86) continue;
+    for (const block of avoidBlocks) {
+      if (insertPageSpacerBeforeBlock(root, block)) insertedCount += 1;
+    }
 
-    const top = block.offsetTop;
-    const bottom = top + height;
-    const pageBottom = (Math.floor(top / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
-
-    if (bottom <= pageBottom) continue;
-
-    const spacer = document.createElement('div');
-    spacer.className = PAGE_SPACER_CLASS;
-    spacer.style.height = `${pageBottom - top}px`;
-    block.before(spacer);
+    if (insertedCount === 0) {
+      return;
+    }
   }
 }
 
@@ -736,10 +787,31 @@ function isPageBreakCandidate(element: HTMLElement): boolean {
   if (element.closest(`.${PAGE_SPACER_CLASS}`)) return false;
   if (element.closest('.katex')) return false;
 
-  const parentAvoidBlock = element.parentElement?.closest(PAGE_BREAK_AVOID_SELECTOR);
-  if (!parentAvoidBlock) return true;
+  const parentAvoidBlock = element.parentElement?.closest(
+    'li, p, table, pre, blockquote, .shiki, .mermaid-block, .math-block, .preview-layout-block, .preview-layout-group',
+  );
+  return !parentAvoidBlock;
+}
 
-  return !element.closest('table, pre, blockquote, .shiki, .mermaid-block, .math-block, .katex-display');
+function insertPageSpacerBeforeBlock(root: HTMLElement, block: HTMLElement): boolean {
+  const rect = block.getBoundingClientRect();
+  const rootRect = root.getBoundingClientRect();
+  const height = rect.height;
+  if (height <= 0 || height >= A4_HEIGHT_PX * PAGE_BREAK_MAX_KEEP_RATIO) return false;
+
+  const top = rect.top - rootRect.top;
+  const bottom = top + height;
+  const pageBottom = (Math.floor(top / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
+  if (bottom <= pageBottom - PAGE_BREAK_SLOP_PX) return false;
+
+  const spacerHeight = pageBottom - top + PAGE_BREAK_KEEP_MARGIN_PX;
+  if (spacerHeight <= PAGE_BREAK_SLOP_PX) return false;
+
+  const spacer = document.createElement('div');
+  spacer.className = PAGE_SPACER_CLASS;
+  spacer.style.height = `${spacerHeight}px`;
+  block.before(spacer);
+  return true;
 }
 
 function getDocumentTitle(preview: HTMLElement, suggestedName?: string): string {

@@ -11,6 +11,18 @@
   text-align: center;
 }
 
+.preview-content .katex,
+.preview-content .katex * {
+  box-sizing: content-box;
+}
+
+.preview-content .katex {
+  font: normal 1.21em KaTeX_Main, "Times New Roman", serif;
+  line-height: 1.2;
+  text-indent: 0;
+  text-rendering: auto;
+}
+
 .preview-content .math-block::before {
   position: absolute;
   top: 8px;
@@ -29,6 +41,7 @@
 
 .preview-content .math-block .katex-display {
   margin: 0;
+  overflow: visible;
 }
 
 .preview-content .math-equation-list {
@@ -69,10 +82,17 @@
 }
 
 .preview-content .math-equation .katex-display {
-  display: inline-block;
-  width: auto;
+  display: block;
+  width: max-content;
   max-width: 100%;
+  overflow: visible;
   text-align: inherit;
+}
+
+.preview-content .math-equation .katex-display > .katex {
+  display: block;
+  text-align: inherit;
+  white-space: nowrap;
 }
 
 .math-equation-tools {
