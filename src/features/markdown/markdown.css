@@ -113,7 +113,7 @@
 .preview-content pre,
 .preview-content .shiki {
   --preview-code-font-size: 12.5px;
-  --preview-code-row-height: 14px;
+  --preview-code-row-height: 19px;
   --preview-code-selection-bg: color-mix(in srgb, var(--accent) 42%, transparent);
 
   position: relative;
@@ -136,13 +136,13 @@
 :root[data-editor-font-size="small"] .preview-content pre,
 :root[data-editor-font-size="small"] .preview-content .shiki {
   --preview-code-font-size: 11px;
-  --preview-code-row-height: 12.5px;
+  --preview-code-row-height: 17px;
 }
 
 :root[data-editor-font-size="large"] .preview-content pre,
 :root[data-editor-font-size="large"] .preview-content .shiki {
   --preview-code-font-size: 15px;
-  --preview-code-row-height: 17px;
+  --preview-code-row-height: 23px;
 }
 
 .preview-content .shiki::before {
