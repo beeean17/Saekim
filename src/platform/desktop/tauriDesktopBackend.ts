@@ -110,12 +110,14 @@ async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgr
 
 async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void> {
   const window = getCurrentWindow();
+  const webviewWindow = getCurrentWebviewWindow();
   const registrations: Array<() => void> = [];
   const registerMenuEvent = async (eventName: string, command: string, handler: () => void): Promise<void> => {
     const dedupedHandler = dedupeNativeMenuHandler(command, handler);
     registrations.push(await listen(eventName, dedupedHandler));
     registrations.push(await window.listen(eventName, dedupedHandler));
-    logDesktopEvent('native-menu', 'listener registered', { command, eventName });
+    registrations.push(await webviewWindow.listen(eventName, dedupedHandler));
+    logDesktopEvent('native-menu', 'listener registered', { command, eventName, channels: ['app', 'window', 'webviewWindow'] });
   };
 
   await Promise.all([
