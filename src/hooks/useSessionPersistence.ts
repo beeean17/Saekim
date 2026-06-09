@@ -69,7 +69,6 @@ export function useSessionPersistence(): boolean {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
-  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
   const recentWorkspaces = useWorkspaceStore((state) => state.recentWorkspaces);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
@@ -135,7 +134,6 @@ export function useSessionPersistence(): boolean {
           rootPath,
           tree,
           openFiles,
-          recentFiles,
           activeFileId,
         },
         recentWorkspaces,
@@ -172,7 +170,6 @@ export function useSessionPersistence(): boolean {
     htmlPreviewMode,
     loaded,
     openFiles,
-    recentFiles,
     recentWorkspaces,
     rootPath,
     sidebarMode,

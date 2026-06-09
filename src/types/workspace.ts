@@ -25,12 +25,6 @@ export interface OpenFile {
   eol: 'LF' | 'CRLF';
 }
 
-export interface RecentFile {
-  path: string;
-  name: string;
-  openedAt: number;
-}
-
 export interface RecentWorkspace {
   id: string;
   path: string;

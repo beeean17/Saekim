@@ -76,6 +76,7 @@ export interface NativeMenuCommandHandlers {
   onNewWindow(): void;
   onOpen(): void;
   onOpenFolder(): void;
+  onOpenRecentWorkspace(path: string): void;
   onSave(): void;
   onSaveAs(): void;
   onExportPdf(): void;

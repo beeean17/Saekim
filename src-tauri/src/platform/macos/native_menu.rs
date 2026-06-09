@@ -1,5 +1,5 @@
 use tauri::{
-    menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
+    menu::{AboutMetadata, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
     AppHandle, Emitter, EventTarget, Manager, WebviewWindow, Wry,
 };
 
@@ -10,6 +10,7 @@ const MENU_NEW_FILE: &str = "new-file";
 const MENU_NEW_WINDOW: &str = "new-window";
 const MENU_OPEN_FILE: &str = "open-file";
 const MENU_OPEN_FOLDER: &str = "open-folder";
+const MENU_OPEN_RECENT_WORKSPACE_PREFIX: &str = "open-recent-workspace:";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
@@ -17,6 +18,7 @@ const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
 const EVENT_NEW_WINDOW: &str = "saekim-menu-new-window";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
+const EVENT_OPEN_RECENT_WORKSPACE: &str = "saekim-menu-open-recent-workspace";
 
 pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let package_info = app.package_info();
@@ -56,6 +58,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+Shift+O"),
     )?;
+    let open_recent_workspace = recent_workspace_submenu(app)?;
     let save_as = MenuItem::with_id(
         app,
         MENU_SAVE_AS,
@@ -96,6 +99,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::separator(app)?,
             &open_file,
             &open_folder,
+            &open_recent_workspace,
             &PredefinedMenuItem::separator(app)?,
             &save,
             &save_as,
@@ -151,32 +155,48 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     )
 }
 
+pub(crate) fn refresh_menu(app: &AppHandle) {
+    match build_menu(app).and_then(|menu| app.set_menu(menu)) {
+        Ok(_) => eprintln!("[saekim:native-menu] refreshed menu"),
+        Err(error) => eprintln!("[saekim:native-menu] failed to refresh menu: {error}"),
+    }
+}
+
 pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
     let menu_id = event.id().as_ref();
     eprintln!("[saekim:native-menu] selected id={menu_id}");
+
+    if let Some(workspace_id) = menu_id.strip_prefix(MENU_OPEN_RECENT_WORKSPACE_PREFIX) {
+        let Some(path) = crate::commands::session::recent_workspace_path(app, workspace_id) else {
+            eprintln!("[saekim:native-menu] ignored missing recent workspace id={workspace_id}");
+            return;
+        };
+        emit_menu_event(app, EVENT_OPEN_RECENT_WORKSPACE, MenuPayload::String(path));
+        return;
+    }
 
     let Some(event_name) = menu_event_name(menu_id) else {
         eprintln!("[saekim:native-menu] ignored id={menu_id}");
         return;
     };
 
+    emit_menu_event(app, event_name, MenuPayload::Unit);
+}
+
+fn emit_menu_event(app: &AppHandle, event_name: &str, payload: MenuPayload) {
     let Some((target_label, window)) = target_window(app) else {
         eprintln!("[saekim:native-menu] target window not found for event={event_name}");
         return;
     };
 
-    match app.emit_to(EventTarget::window(&target_label), event_name, ()) {
+    match emit_to_window_target(app, &target_label, event_name, &payload) {
         Ok(()) => eprintln!("[saekim:native-menu] emitted target window event={event_name}"),
         Err(error) => eprintln!(
             "[saekim:native-menu] failed to emit target window event={event_name}: {error}"
         ),
     }
 
-    match app.emit_to(
-        EventTarget::webview_window(&target_label),
-        event_name,
-        (),
-    ) {
+    match emit_to_webview_window_target(app, &target_label, event_name, &payload) {
         Ok(()) => {
             eprintln!("[saekim:native-menu] emitted target webview window event={event_name}")
         }
@@ -185,23 +205,111 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         ),
     }
 
-    match window.emit(event_name, ()) {
+    match emit_to_webview_window(&window, event_name, &payload) {
         Ok(()) => eprintln!("[saekim:native-menu] emitted window event={event_name}"),
         Err(error) => {
             eprintln!("[saekim:native-menu] failed to emit window event={event_name}: {error}")
         }
     }
 
-    dispatch_dom_event(&window, event_name);
+    dispatch_dom_event(&window, event_name, &payload);
 }
 
-fn dispatch_dom_event(window: &WebviewWindow<Wry>, event_name: &str) {
-    let script = format!("window.dispatchEvent(new CustomEvent({event_name:?}));");
+enum MenuPayload {
+    Unit,
+    String(String),
+}
+
+fn emit_to_window_target(
+    app: &AppHandle,
+    target_label: &str,
+    event_name: &str,
+    payload: &MenuPayload,
+) -> tauri::Result<()> {
+    match payload {
+        MenuPayload::Unit => app.emit_to(EventTarget::window(target_label), event_name, ()),
+        MenuPayload::String(value) => {
+            app.emit_to(EventTarget::window(target_label), event_name, value)
+        }
+    }
+}
+
+fn emit_to_webview_window_target(
+    app: &AppHandle,
+    target_label: &str,
+    event_name: &str,
+    payload: &MenuPayload,
+) -> tauri::Result<()> {
+    match payload {
+        MenuPayload::Unit => app.emit_to(EventTarget::webview_window(target_label), event_name, ()),
+        MenuPayload::String(value) => {
+            app.emit_to(EventTarget::webview_window(target_label), event_name, value)
+        }
+    }
+}
+
+fn emit_to_webview_window(
+    window: &WebviewWindow<Wry>,
+    event_name: &str,
+    payload: &MenuPayload,
+) -> tauri::Result<()> {
+    match payload {
+        MenuPayload::Unit => window.emit(event_name, ()),
+        MenuPayload::String(value) => window.emit(event_name, value),
+    }
+}
+
+fn dispatch_dom_event(window: &WebviewWindow<Wry>, event_name: &str, payload: &MenuPayload) {
+    let script = match payload {
+        MenuPayload::Unit => format!("window.dispatchEvent(new CustomEvent({event_name:?}));"),
+        MenuPayload::String(value) => format!(
+            "window.dispatchEvent(new CustomEvent({event_name:?}, {{ detail: {value:?} }}));"
+        ),
+    };
     match window.eval(script) {
         Ok(()) => eprintln!("[saekim:native-menu] dispatched dom event={event_name}"),
         Err(error) => {
             eprintln!("[saekim:native-menu] failed to dispatch dom event={event_name}: {error}")
         }
+    }
+}
+
+fn recent_workspace_submenu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
+    let recent_workspaces = crate::commands::session::recent_workspace_menu_entries(app);
+    let mut items = Vec::new();
+
+    if recent_workspaces.is_empty() {
+        items.push(MenuItem::with_id(
+            app,
+            "open-recent-workspace-empty",
+            "No Recent Workspaces",
+            false,
+            None::<&str>,
+        )?);
+    } else {
+        for workspace in recent_workspaces {
+            items.push(MenuItem::with_id(
+                app,
+                format!("{MENU_OPEN_RECENT_WORKSPACE_PREFIX}{}", workspace.id),
+                recent_workspace_label(&workspace.name, &workspace.path),
+                true,
+                None::<&str>,
+            )?);
+        }
+    }
+
+    let item_refs: Vec<&dyn IsMenuItem<Wry>> = items
+        .iter()
+        .map(|item| item as &dyn IsMenuItem<Wry>)
+        .collect();
+    Submenu::with_items(app, "Open Recent Workspace", true, &item_refs)
+}
+
+fn recent_workspace_label(name: &str, path: &str) -> String {
+    if name.trim().is_empty() {
+        path.to_string()
+    } else {
+        name.to_string()
     }
 }
 

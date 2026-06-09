@@ -15,7 +15,7 @@ import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { useSearchStore } from './features/search';
 import { Backend } from './platform/common/backend';
 import { useUIStore } from './store/ui';
-import { isDirty, selectActiveFile, useWorkspaceStore } from './store/workspace';
+import { useWorkspaceStore } from './store/workspace';
 
 export function App() {
   const bodyRef = useRef<HTMLElement | null>(null);
@@ -23,11 +23,10 @@ export function App() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const openFile = useWorkspaceStore((state) => state.openFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
+  const openWorkspace = useWorkspaceStore((state) => state.openWorkspace);
   const createFile = useWorkspaceStore((state) => state.createFile);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
-  const closeFile = useWorkspaceStore((state) => state.closeFile);
-  const activeFile = useWorkspaceStore(selectActiveFile);
   const openFind = useSearchStore((state) => state.openFind);
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
@@ -51,16 +50,12 @@ export function App() {
       onNewWindow: () => void Backend.runtime.openNewWindow(),
       onOpen: () => void openFile(),
       onOpenFolder: () => void openFolder(),
+      onOpenRecentWorkspace: (path: string) => void openWorkspace(path),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
       onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),
-      onClose: () => {
-        if (!activeFile) return;
-        if (isDirty(activeFile) && !window.confirm(`${activeFile.name} 파일의 저장되지 않은 변경사항을 버리고 닫을까요?`)) return;
-        closeFile(activeFile.id);
-      },
     }),
-    [activeFile, closeFile, commandRegistry, createFile, openFile, openFolder, saveActive, saveActiveAs],
+    [commandRegistry, createFile, openFile, openFolder, openWorkspace, saveActive, saveActiveAs],
   );
 
   useShortcuts(shortcuts, commandRegistry);

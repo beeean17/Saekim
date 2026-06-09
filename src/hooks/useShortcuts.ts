@@ -8,7 +8,6 @@ interface ShortcutHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
-  onClose: () => void;
 }
 
 export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegistry): void {
@@ -43,10 +42,6 @@ export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegist
       }
       if (event.key.toLowerCase() === 'p') {
         if (dispatchShortcut(commands, 'mod+p')) event.preventDefault();
-      }
-      if (event.key.toLowerCase() === 'w') {
-        event.preventDefault();
-        handlers.onClose();
       }
     };
 

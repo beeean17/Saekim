@@ -1,7 +1,6 @@
 import type {
   FileTreeNode,
   OpenFile,
-  RecentFile,
   RecentWorkspace,
   SidebarMode,
   SidebarViewMode,
@@ -15,7 +14,6 @@ export interface WorkspaceSession {
   rootPath: string | null;
   tree: FileTreeNode[];
   openFiles: OpenFile[];
-  recentFiles?: RecentFile[];
   activeFileId: string | null;
 }
 

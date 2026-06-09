@@ -16,7 +16,6 @@ export interface AppMenuHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
-  onClose: () => void;
 }
 
 type AppMenuId = 'file' | 'edit' | 'view' | 'window' | 'help';
@@ -138,8 +137,6 @@ function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; com
             shortcut: formatShortcut(command.defaultShortcut),
             action: () => dispatchCommand(commandRegistry, command.id),
           })),
-          { separator: true },
-          { label: 'Close File', shortcut: 'Ctrl+W', action: handlers.onClose },
         ],
       },
       {

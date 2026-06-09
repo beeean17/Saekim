@@ -4,10 +4,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-#[cfg(target_os = "android")]
 use tauri::Manager;
 
 use super::file::CommandResult;
@@ -211,7 +210,6 @@ fn load_session_for_context(
         &context.workspace_id,
         &context.view_id,
     )?;
-    let recent_files = load_recent_files(connection, &context.workspace_id)?;
     let recent_workspaces = load_recent_workspaces(connection)?;
 
     Ok(json!({
@@ -225,7 +223,6 @@ fn load_session_for_context(
             "rootPath": root_path,
             "tree": tree,
             "openFiles": open_files,
-            "recentFiles": recent_files,
             "activeFileId": context.active_file_id,
         },
         "recentWorkspaces": recent_workspaces,
@@ -253,7 +250,6 @@ fn load_workspace_session_from_metadata(
             "rootPath": canonical_root_path,
             "tree": [],
             "openFiles": [],
-            "recentFiles": [],
             "activeFileId": null,
         })));
     };
@@ -277,13 +273,11 @@ fn load_workspace_session_from_metadata(
         Some(active_file_id) => Some(active_file_id),
         None => active_file_id_for_window_workspace(&connection, window_label, &workspace_id)?,
     };
-    let recent_files = load_recent_files(&connection, &workspace_id)?;
 
     Ok(Some(json!({
         "rootPath": root_path,
         "tree": parse_json_value(tree_json.as_deref(), json!([])),
         "openFiles": open_files,
-        "recentFiles": recent_files,
         "activeFileId": active_file_id,
     })))
 }
@@ -354,6 +348,9 @@ fn save_session_to_metadata(
     session: &Value,
 ) -> Result<(), String> {
     let mut connection = open_metadata_connection(app)?;
+    #[cfg(target_os = "macos")]
+    let recent_workspace_snapshot_before =
+        recent_workspace_menu_snapshot(&connection).unwrap_or_default();
     let transaction = connection
         .transaction()
         .map_err(|error| format!("failed to start metadata transaction: {error}"))?;
@@ -373,11 +370,6 @@ fn save_session_to_metadata(
     let root_path = workspace.get("rootPath").and_then(Value::as_str);
     let open_files = workspace
         .get("openFiles")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let recent_files = workspace
-        .get("recentFiles")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
@@ -441,29 +433,6 @@ fn save_session_to_metadata(
         )
         .map_err(|error| format!("failed to reset window file view state: {error}"))?;
 
-    transaction
-        .execute(
-            "DELETE FROM recent_file_queue WHERE workspace_id = ?1",
-            params![workspace_id],
-        )
-        .map_err(|error| format!("failed to reset recent file queue: {error}"))?;
-
-    for (index, recent_file) in recent_files.iter().enumerate() {
-        save_recent_file(
-            &transaction,
-            &workspace_id,
-            &canonical_root_path,
-            recent_file,
-            index,
-            now,
-        )?;
-    }
-    save_metadata_value(
-        &transaction,
-        &recent_file_queue_initialized_key(&workspace_id),
-        "true",
-    )?;
-
     for (index, open_file) in open_files.iter().enumerate() {
         save_window_open_file(
             &transaction,
@@ -505,6 +474,10 @@ fn save_session_to_metadata(
         )
         .map_err(|error| format!("failed to save window workspace metadata: {error}"))?;
 
+    let open_window_labels = app.webview_windows().keys().cloned().collect::<Vec<_>>();
+    prune_closed_workspace_windows(&transaction, &open_window_labels)?;
+    prune_old_recent_workspaces(&transaction)?;
+
     save_metadata_value(&transaction, "schema_version", &SCHEMA_VERSION.to_string())?;
     save_metadata_value(&transaction, "saved_at", &saved_at)?;
     save_metadata_value(&transaction, "active_workspace_id", &workspace_id)?;
@@ -518,7 +491,18 @@ fn save_session_to_metadata(
 
     transaction
         .commit()
-        .map_err(|error| format!("failed to commit metadata transaction: {error}"))
+        .map_err(|error| format!("failed to commit metadata transaction: {error}"))?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let recent_workspace_snapshot_after =
+            recent_workspace_menu_snapshot(&connection).unwrap_or_default();
+        if recent_workspace_snapshot_before != recent_workspace_snapshot_after {
+            crate::platform::macos::native_menu::refresh_menu(app);
+        }
+    }
+
+    Ok(())
 }
 
 fn load_block_layouts_from_metadata(
@@ -747,16 +731,6 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS recent_file_queue (
-              workspace_id TEXT NOT NULL,
-              file_id TEXT NOT NULL,
-              queue_order INTEGER NOT NULL,
-              updated_at INTEGER NOT NULL,
-              PRIMARY KEY(workspace_id, file_id),
-              FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-              FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
-            );
-
             CREATE TABLE IF NOT EXISTS block_layouts (
               id TEXT PRIMARY KEY,
               file_id TEXT NOT NULL,
@@ -798,8 +772,6 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
 
             CREATE INDEX IF NOT EXISTS idx_files_workspace_opened
               ON files(workspace_id, last_opened_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_recent_file_queue_order
-              ON recent_file_queue(workspace_id, queue_order ASC);
             CREATE INDEX IF NOT EXISTS idx_file_view_state_view_order
               ON file_view_state(workspace_view_id, is_open, open_order);
             CREATE INDEX IF NOT EXISTS idx_workspace_windows_last_active
@@ -923,47 +895,44 @@ fn ensure_workspace(
     Ok(())
 }
 
-fn save_recent_file(
+fn prune_closed_workspace_windows(
     connection: &Connection,
-    workspace_id: &str,
-    canonical_root_path: &str,
-    recent_file: &Value,
-    index: usize,
-    fallback_time: i64,
+    open_window_labels: &[String],
 ) -> Result<(), String> {
-    let Some(path) = recent_file.get("path").and_then(Value::as_str) else {
+    if open_window_labels.is_empty() {
         return Ok(());
-    };
-    let opened_at = recent_file
-        .get("openedAt")
-        .and_then(Value::as_i64)
-        .unwrap_or(fallback_time);
-    let name = recent_file
-        .get("name")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| file_name_from_path(path));
-    let file_id = upsert_file(
-        connection,
-        workspace_id,
-        canonical_root_path,
-        path,
-        &name,
-        None,
-        opened_at,
-    )?;
+    }
 
+    let placeholders = (0..open_window_labels.len())
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
     connection
         .execute(
-            "INSERT INTO recent_file_queue (workspace_id, file_id, queue_order, updated_at)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(workspace_id, file_id) DO UPDATE SET
-               queue_order = excluded.queue_order,
-               updated_at = excluded.updated_at",
-            params![workspace_id, file_id, index as i64, fallback_time],
+            &format!("DELETE FROM workspace_windows WHERE window_label NOT IN ({placeholders})"),
+            params_from_iter(open_window_labels.iter()),
         )
-        .map_err(|error| format!("failed to save recent file queue: {error}"))?;
+        .map_err(|error| format!("failed to prune closed workspace windows: {error}"))?;
+    Ok(())
+}
 
+fn prune_old_recent_workspaces(connection: &Connection) -> Result<(), String> {
+    connection
+        .execute(
+            "DELETE FROM workspaces
+             WHERE canonical_root_path != ''
+               AND id NOT IN (
+                 SELECT id FROM (
+                   SELECT id FROM workspaces
+                   WHERE canonical_root_path != ''
+                   ORDER BY last_opened_at DESC
+                   LIMIT 5
+                 )
+               )
+               AND id NOT IN (SELECT workspace_id FROM workspace_windows)",
+            [],
+        )
+        .map_err(|error| format!("failed to prune old recent workspaces: {error}"))?;
     Ok(())
 }
 
@@ -1103,7 +1072,9 @@ fn load_window_open_files(
         .map_err(|error| format!("failed to prepare window open files query: {error}"))?;
 
     let rows = statement
-        .query_map(params![window_label, workspace_id], |row| row.get::<_, String>(0))
+        .query_map(params![window_label, workspace_id], |row| {
+            row.get::<_, String>(0)
+        })
         .map_err(|error| format!("failed to query window open files: {error}"))?;
 
     read_file_state_rows(rows, "window open file")
@@ -1140,69 +1111,89 @@ fn read_file_state_rows(
     Ok(files)
 }
 
-fn load_recent_files(connection: &Connection, workspace_id: &str) -> Result<Value, String> {
-    let mut queue_statement = connection
-        .prepare(
-            "SELECT files.absolute_path, files.display_name, files.last_opened_at
-             FROM recent_file_queue
-             JOIN files ON files.id = recent_file_queue.file_id
-             WHERE recent_file_queue.workspace_id = ?1
-             ORDER BY recent_file_queue.queue_order ASC
-             LIMIT 50",
-        )
-        .map_err(|error| format!("failed to prepare recent file queue query: {error}"))?;
-
-    let queue_rows = queue_statement
-        .query_map(params![workspace_id], |row| {
-            Ok(json!({
-                "path": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "openedAt": row.get::<_, i64>(2)?,
-            }))
+fn load_recent_workspaces(connection: &Connection) -> Result<Value, String> {
+    let workspaces = load_recent_workspace_rows(connection)?
+        .into_iter()
+        .map(|workspace| {
+            json!({
+                "id": workspace.id,
+                "path": workspace.path,
+                "name": workspace.name,
+                "openedAt": workspace.opened_at,
+                "windowId": workspace.window_id,
+            })
         })
-        .map_err(|error| format!("failed to query recent file queue: {error}"))?;
+        .collect();
 
-    let mut queued_files = Vec::new();
-    for row in queue_rows {
-        queued_files
-            .push(row.map_err(|error| format!("failed to read recent file queue row: {error}"))?);
-    }
-
-    if !queued_files.is_empty() {
-        return Ok(Value::Array(queued_files));
-    }
-    if metadata_value(connection, &recent_file_queue_initialized_key(workspace_id))?.is_some() {
-        return Ok(Value::Array(queued_files));
-    }
-
-    let mut statement = connection
-        .prepare(
-            "SELECT absolute_path, display_name, last_opened_at FROM files
-             WHERE workspace_id = ?1
-             ORDER BY last_opened_at DESC
-             LIMIT 50",
-        )
-        .map_err(|error| format!("failed to prepare recent files query: {error}"))?;
-
-    let rows = statement
-        .query_map(params![workspace_id], |row| {
-            Ok(json!({
-                "path": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "openedAt": row.get::<_, i64>(2)?,
-            }))
-        })
-        .map_err(|error| format!("failed to query recent files: {error}"))?;
-
-    let mut files = Vec::new();
-    for row in rows {
-        files.push(row.map_err(|error| format!("failed to read recent file row: {error}"))?);
-    }
-
-    Ok(Value::Array(files))
+    Ok(Value::Array(workspaces))
 }
 
-fn load_recent_workspaces(connection: &Connection) -> Result<Value, String> {
+#[derive(Clone, Debug)]
+pub(crate) struct RecentWorkspaceMenuEntry {
+    pub id: String,
+    pub path: String,
+    pub name: String,
+}
+
+struct RecentWorkspaceRow {
+    id: String,
+    path: String,
+    name: String,
+    opened_at: i64,
+    window_id: Option<String>,
+}
+
+pub(crate) fn recent_workspace_menu_entries(
+    app: &tauri::AppHandle,
+) -> Vec<RecentWorkspaceMenuEntry> {
+    match open_metadata_connection(app)
+        .and_then(|connection| load_recent_workspace_rows(&connection))
+    {
+        Ok(workspaces) => workspaces
+            .into_iter()
+            .map(|workspace| RecentWorkspaceMenuEntry {
+                id: workspace.id,
+                path: workspace.path,
+                name: workspace.name,
+            })
+            .collect(),
+        Err(error) => {
+            eprintln!("[saekim:native-menu] failed to load recent workspaces: {error}");
+            Vec::new()
+        }
+    }
+}
+
+fn recent_workspace_menu_snapshot(
+    connection: &Connection,
+) -> Result<Vec<(String, String, String)>, String> {
+    Ok(load_recent_workspace_rows(connection)?
+        .into_iter()
+        .map(|workspace| (workspace.id, workspace.path, workspace.name))
+        .collect())
+}
+
+pub(crate) fn recent_workspace_path(app: &tauri::AppHandle, workspace_id: &str) -> Option<String> {
+    open_metadata_connection(app)
+        .and_then(|connection| {
+            connection
+                .query_row(
+                    "SELECT canonical_root_path FROM workspaces
+                     WHERE id = ?1 AND canonical_root_path != ''
+                     LIMIT 1",
+                    params![workspace_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|error| format!("failed to load recent workspace path: {error}"))
+        })
+        .unwrap_or_else(|error| {
+            eprintln!("[saekim:native-menu] failed to resolve recent workspace: {error}");
+            None
+        })
+}
+
+fn load_recent_workspace_rows(connection: &Connection) -> Result<Vec<RecentWorkspaceRow>, String> {
     let mut statement = connection
         .prepare(
             "SELECT workspaces.id, workspaces.canonical_root_path, workspaces.display_name,
@@ -1212,28 +1203,29 @@ fn load_recent_workspaces(connection: &Connection) -> Result<Value, String> {
              WHERE workspaces.canonical_root_path != ''
              GROUP BY workspaces.id
              ORDER BY workspaces.last_opened_at DESC
-             LIMIT 30",
+             LIMIT 5",
         )
         .map_err(|error| format!("failed to prepare recent workspaces query: {error}"))?;
 
     let rows = statement
         .query_map([], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "path": row.get::<_, String>(1)?,
-                "name": row.get::<_, String>(2)?,
-                "openedAt": row.get::<_, i64>(3)?,
-                "windowId": row.get::<_, Option<String>>(4)?,
-            }))
+            Ok(RecentWorkspaceRow {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                name: row.get(2)?,
+                opened_at: row.get(3)?,
+                window_id: row.get(4)?,
+            })
         })
         .map_err(|error| format!("failed to query recent workspaces: {error}"))?;
 
     let mut workspaces = Vec::new();
     for row in rows {
-        workspaces.push(row.map_err(|error| format!("failed to read recent workspace row: {error}"))?);
+        workspaces
+            .push(row.map_err(|error| format!("failed to read recent workspace row: {error}"))?);
     }
 
-    Ok(Value::Array(workspaces))
+    Ok(workspaces)
 }
 
 fn metadata_value(connection: &Connection, key: &str) -> Result<Option<String>, String> {
@@ -1266,10 +1258,6 @@ fn delete_metadata_value(connection: &Connection, key: &str) -> Result<(), Strin
         .execute("DELETE FROM metadata_kv WHERE key = ?1", params![key])
         .map_err(|error| format!("failed to delete metadata value {key}: {error}"))?;
     Ok(())
-}
-
-fn recent_file_queue_initialized_key(workspace_id: &str) -> String {
-    format!("recent_file_queue_initialized:{workspace_id}")
 }
 
 fn load_legacy_session() -> Result<Option<Value>, String> {

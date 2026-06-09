@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
-import type { FileTreeNode, OpenFile, RecentFile, RecentWorkspace } from '../types/workspace';
+import type { FileTreeNode, OpenFile, RecentWorkspace } from '../types/workspace';
 
 const starterContent = `# Saekim 마크다운 에디터
 
@@ -78,7 +78,6 @@ interface WorkspaceState {
   rootPath: string | null;
   tree: FileTreeNode[];
   openFiles: OpenFile[];
-  recentFiles: RecentFile[];
   recentWorkspaces: RecentWorkspace[];
   activeFileId: string | null;
   history: { back: string[]; forward: string[]; current: string | null };
@@ -103,7 +102,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   rootPath: '~/Documents/notes',
   tree: initialTree,
   openFiles: [initialFile],
-  recentFiles: [toRecentFile(initialFile)],
   recentWorkspaces: [],
   activeFileId: initialFile.id,
   history: { back: [], forward: [], current: initialFile.path },
@@ -232,7 +230,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         openFiles,
         activeFileId,
-        recentFiles: closedPath ? state.recentFiles.filter((file) => file.path !== closedPath) : state.recentFiles,
         history: {
           back: closedPath ? state.history.back.filter((path) => path !== closedPath) : state.history.back,
           forward: closedPath ? state.history.forward.filter((path) => path !== closedPath) : state.history.forward,
@@ -271,11 +268,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           : candidate,
       ),
       activeFileId: current.activeFileId === file.id ? savedPath : current.activeFileId,
-      recentFiles: upsertRecentFile(
-        current.recentFiles.filter((candidate) => candidate.path !== file.path),
-        savedPath,
-        savedFile.name,
-      ),
       history: {
         ...current.history,
         current: current.history.current === file.path ? savedPath : current.history.current,
@@ -305,11 +297,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           : candidate,
       ),
       activeFileId: savedPath,
-      recentFiles: upsertRecentFile(
-        current.recentFiles.filter((candidate) => candidate.path !== file.path),
-        savedPath,
-        savedFile.name,
-      ),
       history: {
         ...current.history,
         current: savedPath,
@@ -375,7 +362,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       rootPath: workspace.rootPath,
       tree: workspace.tree.length > 0 ? workspace.tree : initialTree,
       openFiles,
-      recentFiles: normalizeRecentFiles(workspace.recentFiles, openFiles),
       activeFileId,
       recentWorkspaces: workspace.rootPath
         ? upsertRecentWorkspace(get().recentWorkspaces, workspace.rootPath)
@@ -408,14 +394,6 @@ function toOpenFile(path: string, name: string, content: string): OpenFile {
     savedContent: content,
     encoding: 'UTF-8',
     eol,
-  };
-}
-
-function toRecentFile(file: Pick<OpenFile, 'path' | 'name'>): RecentFile {
-  return {
-    path: file.path,
-    name: file.name,
-    openedAt: Date.now(),
   };
 }
 
@@ -459,12 +437,11 @@ function workspaceFolderPatch(
   state: WorkspaceState,
   rootPath: string,
   tree: FileTreeNode[],
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'recentFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
   return {
     rootPath,
     tree,
     openFiles: [],
-    recentFiles: [],
     activeFileId: null,
     history: { back: [], forward: [], current: null },
     recentWorkspaces: upsertRecentWorkspace(state.recentWorkspaces, rootPath),
@@ -474,7 +451,7 @@ function workspaceFolderPatch(
 function workspaceSessionPatch(
   state: WorkspaceState,
   workspace: WorkspaceSession,
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'recentFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
   const openFiles = workspace.openFiles;
   const activeFileId =
     workspace.activeFileId && openFiles.some((file) => file.id === workspace.activeFileId)
@@ -486,7 +463,6 @@ function workspaceSessionPatch(
     rootPath: workspace.rootPath,
     tree: workspace.tree.length > 0 ? workspace.tree : [],
     openFiles,
-    recentFiles: normalizeRecentFiles(workspace.recentFiles, openFiles),
     activeFileId,
     history: { back: [], forward: [], current: activeFile?.path ?? null },
     recentWorkspaces: workspace.rootPath
@@ -543,11 +519,10 @@ function updateTreeFolder(nodes: FileTreeNode[], path: string, patch: Partial<Fi
 function upsertOpenFile(
   state: WorkspaceState,
   file: OpenFile,
-): Pick<WorkspaceState, 'openFiles' | 'recentFiles' | 'activeFileId' | 'history'> {
+): Pick<WorkspaceState, 'openFiles' | 'activeFileId' | 'history'> {
   const exists = state.openFiles.some((candidate) => candidate.id === file.id);
   return {
     openFiles: exists ? state.openFiles.map((candidate) => (candidate.id === file.id ? file : candidate)) : [...state.openFiles, file],
-    recentFiles: upsertRecentFile(state.recentFiles, file.path, file.name),
     activeFileId: file.id,
     history: {
       back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
@@ -560,11 +535,10 @@ function upsertOpenFile(
 function activateOpenFile(
   state: WorkspaceState,
   file: OpenFile,
-): Pick<WorkspaceState, 'recentFiles' | 'activeFileId' | 'history'> {
+): Pick<WorkspaceState, 'activeFileId' | 'history'> {
   if (state.activeFileId === file.id) {
     return {
       activeFileId: file.id,
-      recentFiles: upsertRecentFile(state.recentFiles, file.path, file.name),
       history: {
         ...state.history,
         current: file.path,
@@ -574,7 +548,6 @@ function activateOpenFile(
 
   return {
     activeFileId: file.id,
-    recentFiles: upsertRecentFile(state.recentFiles, file.path, file.name),
     history: {
       back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
       forward: [],
@@ -583,31 +556,12 @@ function activateOpenFile(
   };
 }
 
-function upsertRecentFile(recentFiles: RecentFile[], path: string, name: string): RecentFile[] {
-  return [
-    { path, name, openedAt: Date.now() },
-    ...recentFiles.filter((file) => file.path !== path),
-  ].slice(0, 50);
-}
-
-function normalizeRecentFiles(recentFiles: RecentFile[] | undefined, openFiles: OpenFile[]): RecentFile[] {
-  const merged = [...openFiles.map(toRecentFile), ...(recentFiles ?? [])];
-  const seen = new Set<string>();
-  return merged
-    .filter((file) => {
-      if (seen.has(file.path)) return false;
-      seen.add(file.path);
-      return true;
-    })
-    .slice(0, 50);
-}
-
 function upsertRecentWorkspace(recentWorkspaces: RecentWorkspace[], path: string): RecentWorkspace[] {
   if (isPlaceholderPath(path)) return recentWorkspaces;
   return [
     toRecentWorkspace(path),
     ...recentWorkspaces.filter((workspace) => workspace.path !== path),
-  ].slice(0, 30);
+  ].slice(0, 5);
 }
 
 function normalizeRecentWorkspaces(
@@ -633,7 +587,7 @@ function normalizeRecentWorkspaces(
       openedAt: workspace.openedAt || Date.now(),
       windowId: workspace.windowId,
     }))
-    .slice(0, 30);
+    .slice(0, 5);
 }
 
 function workspaceIdFromPath(path: string): string {

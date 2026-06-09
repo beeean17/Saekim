@@ -31,6 +31,7 @@ const menuEvents = {
   newWindow: 'saekim-menu-new-window',
   openFile: 'saekim-menu-open-file',
   openFolder: 'saekim-menu-open-folder',
+  openRecentWorkspace: 'saekim-menu-open-recent-workspace',
   save: 'saekim-menu-save',
   saveAs: 'saekim-menu-save-as',
   exportPdf: 'saekim-menu-export-pdf',
@@ -115,7 +116,7 @@ async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgr
 async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void> {
   const webviewWindow = getCurrentWebviewWindow();
   const registrations: Array<() => void> = [];
-  const registerMenuEvent = async (eventName: string, command: string, handler: () => void): Promise<void> => {
+  const registerMenuEvent = async <T>(eventName: string, command: string, handler: (payload: T) => void): Promise<void> => {
     const dedupedHandler = dedupeNativeMenuHandler(command, handler);
     const tauriHandler = createTauriEventHandler(dedupedHandler);
     const eventRegistrations: Array<() => void> = [listenDomMenuEvent(eventName, dedupedHandler)];
@@ -133,13 +134,18 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
   };
 
   try {
-    await registerMenuEvent(menuEvents.newFile, 'newFile', handlers.onNewFile);
-    await registerMenuEvent(menuEvents.newWindow, 'newWindow', handlers.onNewWindow);
-    await registerMenuEvent(menuEvents.openFile, 'openFile', handlers.onOpen);
-    await registerMenuEvent(menuEvents.openFolder, 'openFolder', handlers.onOpenFolder);
-    await registerMenuEvent(menuEvents.save, 'save', handlers.onSave);
-    await registerMenuEvent(menuEvents.saveAs, 'saveAs', handlers.onSaveAs);
-    await registerMenuEvent(menuEvents.exportPdf, 'exportPdf', handlers.onExportPdf);
+    await registerMenuEvent<void>(menuEvents.newFile, 'newFile', () => handlers.onNewFile());
+    await registerMenuEvent<void>(menuEvents.newWindow, 'newWindow', () => handlers.onNewWindow());
+    await registerMenuEvent<void>(menuEvents.openFile, 'openFile', () => handlers.onOpen());
+    await registerMenuEvent<void>(menuEvents.openFolder, 'openFolder', () => handlers.onOpenFolder());
+    await registerMenuEvent<string>(
+      menuEvents.openRecentWorkspace,
+      'openRecentWorkspace',
+      handlers.onOpenRecentWorkspace,
+    );
+    await registerMenuEvent<void>(menuEvents.save, 'save', () => handlers.onSave());
+    await registerMenuEvent<void>(menuEvents.saveAs, 'saveAs', () => handlers.onSaveAs());
+    await registerMenuEvent<void>(menuEvents.exportPdf, 'exportPdf', () => handlers.onExportPdf());
   } catch (error) {
     registrations.forEach((unlisten) => unlisten());
     throw error;
@@ -148,14 +154,14 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
   return () => registrations.forEach((unlisten) => unlisten());
 }
 
-function createTauriEventHandler(handler: () => void): EventCallback<void> {
-  return () => handler();
+function createTauriEventHandler<T>(handler: (payload: T) => void): EventCallback<T> {
+  return (event) => handler(event.payload);
 }
 
-function listenDomMenuEvent(eventName: string, handler: () => void): () => void {
+function listenDomMenuEvent<T>(eventName: string, handler: (payload: T) => void): () => void {
   if (typeof globalThis.window === 'undefined') return () => {};
 
-  const listener = () => handler();
+  const listener = (event: Event) => handler((event as CustomEvent<T>).detail);
   globalThis.window.addEventListener(eventName, listener);
   return () => globalThis.window.removeEventListener(eventName, listener);
 }
@@ -176,9 +182,9 @@ function renderDesktopError(error: unknown): Record<string, string> {
   return { message: String(error) };
 }
 
-function dedupeNativeMenuHandler(command: string, handler: () => void): () => void {
+function dedupeNativeMenuHandler<T>(command: string, handler: (payload: T) => void): (payload: T) => void {
   let lastHandledAt = 0;
-  return () => {
+  return (payload) => {
     const now = Date.now();
     if (now - lastHandledAt < 100) {
       logDesktopEvent('native-menu', 'duplicate event ignored', { command });
@@ -187,7 +193,7 @@ function dedupeNativeMenuHandler(command: string, handler: () => void): () => vo
 
     lastHandledAt = now;
     logDesktopEvent('native-menu', 'event received', { command });
-    handler();
+    handler(payload);
   };
 }
 
