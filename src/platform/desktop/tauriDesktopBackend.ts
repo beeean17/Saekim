@@ -110,40 +110,36 @@ async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgr
 }
 
 async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void> {
-  const tauriWindow = getCurrentWindow();
   const webviewWindow = getCurrentWebviewWindow();
   const registrations: Array<() => void> = [];
   const registerMenuEvent = async (eventName: string, command: string, handler: () => void): Promise<void> => {
     const dedupedHandler = dedupeNativeMenuHandler(command, handler);
     const tauriHandler = createTauriEventHandler(dedupedHandler);
-    const channels = [
-      'dom',
-      'any',
-      'app',
-      `window:${tauriWindow.label}`,
-      `webviewWindow:${webviewWindow.label}`,
-      'currentWindow',
-      'currentWebviewWindow',
-    ];
+    const eventRegistrations: Array<() => void> = [listenDomMenuEvent(eventName, dedupedHandler)];
+    const channels = ['dom'];
 
-    registrations.push(listenDomMenuEvent(eventName, dedupedHandler));
-    registrations.push(await listen(eventName, tauriHandler));
-    registrations.push(await listen(eventName, tauriHandler, { target: appEventTarget() }));
-    registrations.push(await listen(eventName, tauriHandler, { target: windowEventTarget(tauriWindow.label) }));
-    registrations.push(await listen(eventName, tauriHandler, { target: webviewWindowEventTarget(webviewWindow.label) }));
-    registrations.push(await tauriWindow.listen(eventName, tauriHandler));
-    registrations.push(await webviewWindow.listen(eventName, tauriHandler));
+    try {
+      eventRegistrations.push(await listen(eventName, tauriHandler, { target: webviewWindowEventTarget(webviewWindow.label) }));
+      channels.push(`webviewWindow:${webviewWindow.label}`);
+    } catch (error) {
+      logDesktopEvent('native-menu', 'tauri listener unavailable', { command, eventName, error: renderDesktopError(error) });
+    }
+
+    registrations.push(...eventRegistrations);
     logDesktopEvent('native-menu', 'listener registered', { command, eventName, channels });
   };
 
-  await Promise.all([
-    registerMenuEvent(menuEvents.newFile, 'newFile', handlers.onNewFile),
-    registerMenuEvent(menuEvents.openFile, 'openFile', handlers.onOpen),
-    registerMenuEvent(menuEvents.openFolder, 'openFolder', handlers.onOpenFolder),
-    registerMenuEvent(menuEvents.save, 'save', handlers.onSave),
-    registerMenuEvent(menuEvents.saveAs, 'saveAs', handlers.onSaveAs),
-    registerMenuEvent(menuEvents.exportPdf, 'exportPdf', handlers.onExportPdf),
-  ]);
+  try {
+    await registerMenuEvent(menuEvents.newFile, 'newFile', handlers.onNewFile);
+    await registerMenuEvent(menuEvents.openFile, 'openFile', handlers.onOpen);
+    await registerMenuEvent(menuEvents.openFolder, 'openFolder', handlers.onOpenFolder);
+    await registerMenuEvent(menuEvents.save, 'save', handlers.onSave);
+    await registerMenuEvent(menuEvents.saveAs, 'saveAs', handlers.onSaveAs);
+    await registerMenuEvent(menuEvents.exportPdf, 'exportPdf', handlers.onExportPdf);
+  } catch (error) {
+    registrations.forEach((unlisten) => unlisten());
+    throw error;
+  }
 
   return () => registrations.forEach((unlisten) => unlisten());
 }
@@ -160,16 +156,20 @@ function listenDomMenuEvent(eventName: string, handler: () => void): () => void 
   return () => globalThis.window.removeEventListener(eventName, listener);
 }
 
-function appEventTarget(): EventTarget {
-  return { kind: 'App' };
-}
-
-function windowEventTarget(label: string): EventTarget {
-  return { kind: 'Window', label };
-}
-
 function webviewWindowEventTarget(label: string): EventTarget {
   return { kind: 'WebviewWindow', label };
+}
+
+function renderDesktopError(error: unknown): Record<string, string> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? '',
+    };
+  }
+
+  return { message: String(error) };
 }
 
 function dedupeNativeMenuHandler(command: string, handler: () => void): () => void {
