@@ -1,8 +1,9 @@
 use tauri::{
     menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
-    AppHandle, Emitter, Manager, Wry,
+    AppHandle, Emitter, EventTarget, Manager, WebviewWindow, Wry,
 };
 
+const MAIN_WINDOW_LABEL: &str = "main";
 const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
 const MENU_EXPORT_PDF: &str = "export-pdf";
@@ -157,7 +158,27 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         }
     }
 
-    let Some(window) = app.get_webview_window("main") else {
+    match app.emit_to(EventTarget::window(MAIN_WINDOW_LABEL), event_name, ()) {
+        Ok(()) => eprintln!("[saekim:native-menu] emitted target window event={event_name}"),
+        Err(error) => eprintln!(
+            "[saekim:native-menu] failed to emit target window event={event_name}: {error}"
+        ),
+    }
+
+    match app.emit_to(
+        EventTarget::webview_window(MAIN_WINDOW_LABEL),
+        event_name,
+        (),
+    ) {
+        Ok(()) => {
+            eprintln!("[saekim:native-menu] emitted target webview window event={event_name}")
+        }
+        Err(error) => eprintln!(
+            "[saekim:native-menu] failed to emit target webview window event={event_name}: {error}"
+        ),
+    }
+
+    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
         eprintln!("[saekim:native-menu] main window not found for event={event_name}");
         return;
     };
@@ -166,6 +187,18 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         Ok(()) => eprintln!("[saekim:native-menu] emitted window event={event_name}"),
         Err(error) => {
             eprintln!("[saekim:native-menu] failed to emit window event={event_name}: {error}")
+        }
+    }
+
+    dispatch_dom_event(&window, event_name);
+}
+
+fn dispatch_dom_event(window: &WebviewWindow<Wry>, event_name: &str) {
+    let script = format!("window.dispatchEvent(new CustomEvent({event_name:?}));");
+    match window.eval(script) {
+        Ok(()) => eprintln!("[saekim:native-menu] dispatched dom event={event_name}"),
+        Err(error) => {
+            eprintln!("[saekim:native-menu] failed to dispatch dom event={event_name}: {error}")
         }
     }
 }
