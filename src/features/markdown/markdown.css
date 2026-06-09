@@ -113,8 +113,8 @@
 .preview-content pre,
 .preview-content .shiki {
   --preview-code-font-size: 12.5px;
-  --preview-code-row-height: 13.5px;
-  --preview-code-selection-height: 12.5px;
+  --preview-code-row-height: 13px;
+  --preview-code-selection-bg: color-mix(in srgb, var(--accent) 42%, transparent);
 
   position: relative;
   margin: 14px 0;
@@ -132,15 +132,13 @@
 :root[data-editor-font-size="small"] .preview-content pre,
 :root[data-editor-font-size="small"] .preview-content .shiki {
   --preview-code-font-size: 11px;
-  --preview-code-row-height: 12px;
-  --preview-code-selection-height: 11px;
+  --preview-code-row-height: 11.75px;
 }
 
 :root[data-editor-font-size="large"] .preview-content pre,
 :root[data-editor-font-size="large"] .preview-content .shiki {
   --preview-code-font-size: 15px;
-  --preview-code-row-height: 16px;
-  --preview-code-selection-height: 15px;
+  --preview-code-row-height: 15.75px;
 }
 
 .preview-content .shiki::before {
@@ -169,6 +167,10 @@
   line-height: var(--preview-code-row-height);
 }
 
+.preview-content .shiki code {
+  white-space: normal;
+}
+
 .preview-content pre.ascii-diagram {
   line-height: 1.25;
 }
@@ -186,25 +188,27 @@
   box-sizing: border-box;
   padding: 0 16px 0 52px;
   line-height: var(--preview-code-row-height);
+  white-space: pre;
 }
 
 .preview-content .shiki .line > span {
-  display: inline-block;
-  height: var(--preview-code-selection-height);
-  line-height: var(--preview-code-selection-height);
-  vertical-align: top;
+  line-height: inherit;
+}
+
+.preview-content .shiki .line::selection,
+.preview-content .shiki .line *::selection {
+  background: var(--preview-code-selection-bg);
 }
 
 .preview-content .shiki .line::before {
   display: inline-block;
   width: 28px;
-  height: var(--preview-code-selection-height);
   margin-left: -42px;
   margin-right: 14px;
   color: var(--text-faint);
   content: attr(data-line);
   font-variant-numeric: tabular-nums;
-  line-height: var(--preview-code-selection-height);
+  line-height: var(--preview-code-row-height);
   text-align: right;
   vertical-align: top;
   user-select: none;

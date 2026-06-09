@@ -192,7 +192,7 @@
 
 .pdf-export-root pre,
 .pdf-export-root .shiki {
-  --preview-code-line-height: 1.22;
+  --preview-code-line-height: 1.12;
 
   position: relative;
   margin: 14px 0;
@@ -218,6 +218,10 @@
   border: 0;
 }
 
+.pdf-export-root .shiki code {
+  white-space: normal;
+}
+
 .pdf-export-root .shiki::before {
   position: absolute;
   top: 8px;
@@ -238,6 +242,7 @@
   display: block;
   padding: 0 16px 0 52px;
   line-height: var(--preview-code-line-height);
+  white-space: pre;
 }
 
 .pdf-export-root .shiki .line > span {
