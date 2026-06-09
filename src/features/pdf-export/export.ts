@@ -15,9 +15,13 @@ const PDF_PAGE_SLICE_BACKTRACK_PX = 140;
 const IMAGE_INLINE_TIMEOUT_MS = 5000;
 const BASE64_CHUNK_SIZE = 0x8000;
 const PAGE_BREAK_KEEP_MARGIN_PX = 14;
-const PAGE_BREAK_MAX_KEEP_RATIO = 0.92;
+const PAGE_BREAK_KEEP_MAX_RATIO = 0.72;
+const PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX = 160;
 const PAGE_BREAK_REPEAT_LIMIT = 3;
 const PAGE_BREAK_SLOP_PX = 2;
+const PAGE_BREAK_ALLOW_CLASS = 'pdf-break-allowed';
+const PAGE_BREAK_KEEP_CLASS = 'pdf-break-keep';
+const PDF_HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6';
 const UNSUPPORTED_CANVAS_COLOR_PATTERN = /\b(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
 const CSS_COLOR_FUNCTION_PATTERN = /color\(\s*(?:srgb|display-p3)\s+([^)]*)\)/gi;
 const PAGE_BREAK_AVOID_SELECTOR = [
@@ -76,6 +80,14 @@ interface PdfExportOptions {
   title?: string;
 }
 
+interface PageBreakSummary {
+  spacerCount: number;
+  headingSpacerCount: number;
+  keepBlockCount: number;
+  allowBreakCount: number;
+  passCount: number;
+}
+
 export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promise<boolean> {
   const preview = document.querySelector<HTMLElement>('.preview-content:not(.pdf-export-root)');
   if (!preview) {
@@ -123,10 +135,8 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
     logPdfExport('wait assets done', readElementMetrics(exportRoot));
 
     logPdfExport('apply page breaks start');
-    applyBlockPageBreaks(exportRoot);
-    logPdfExport('apply page breaks done', {
-      spacerCount: exportRoot.querySelectorAll(`.${PAGE_SPACER_CLASS}`).length,
-    });
+    const pageBreakSummary = applyBlockPageBreaks(exportRoot);
+    logPdfExport('apply page breaks done', pageBreakSummary);
 
     const pdfBytes = await renderTemplateToPdf(exportRoot);
     logPdfExport('pdf bytes rendered', { byteLength: pdfBytes.byteLength });
@@ -789,23 +799,92 @@ async function waitForTemplateAssets(root: HTMLElement): Promise<void> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
-function applyBlockPageBreaks(root: HTMLElement): void {
+function applyBlockPageBreaks(root: HTMLElement): PageBreakSummary {
   root.querySelectorAll(`.${PAGE_SPACER_CLASS}`).forEach((node) => node.remove());
+  resetPageBreakMarkers(root);
+
+  const policySummary = markPageBreakPolicies(root);
+  let spacerCount = 0;
+  let headingSpacerCount = 0;
+  let passCount = 0;
 
   for (let passIndex = 0; passIndex < PAGE_BREAK_REPEAT_LIMIT; passIndex += 1) {
+    passCount = passIndex + 1;
     let insertedCount = 0;
-    const avoidBlocks = Array.from(
-      root.querySelectorAll<HTMLElement>(PAGE_BREAK_AVOID_SELECTOR),
-    ).filter((element) => isPageBreakCandidate(element));
+    const headingInsertions = insertHeadingPageSpacers(root);
+    insertedCount += headingInsertions;
+    headingSpacerCount += headingInsertions;
+
+    const avoidBlocks = pageBreakCandidates(root).filter((element) => !isPageBreakAllowed(element));
 
     for (const block of avoidBlocks) {
-      if (insertPageSpacerBeforeBlock(root, block)) insertedCount += 1;
+      if (insertPageSpacerBeforeBlock(root, block)) {
+        insertedCount += 1;
+        spacerCount += 1;
+      }
     }
 
     if (insertedCount === 0) {
-      return;
+      break;
     }
   }
+
+  return {
+    spacerCount: spacerCount + headingSpacerCount,
+    headingSpacerCount,
+    ...policySummary,
+    passCount,
+  };
+}
+
+function resetPageBreakMarkers(root: HTMLElement): void {
+  pageBreakCandidates(root).forEach((element) => {
+    element.classList.remove(PAGE_BREAK_ALLOW_CLASS, PAGE_BREAK_KEEP_CLASS);
+    element.removeAttribute('data-pdf-break');
+  });
+}
+
+function markPageBreakPolicies(root: HTMLElement): Pick<PageBreakSummary, 'keepBlockCount' | 'allowBreakCount'> {
+  let keepBlockCount = 0;
+  let allowBreakCount = 0;
+
+  pageBreakCandidates(root).forEach((element) => {
+    const height = element.getBoundingClientRect().height;
+    if (height <= 0) return;
+
+    if (height > A4_HEIGHT_PX * PAGE_BREAK_KEEP_MAX_RATIO) {
+      element.classList.add(PAGE_BREAK_ALLOW_CLASS);
+      element.dataset.pdfBreak = 'allow';
+      allowBreakCount += 1;
+      return;
+    }
+
+    element.classList.add(PAGE_BREAK_KEEP_CLASS);
+    element.dataset.pdfBreak = 'keep';
+    keepBlockCount += 1;
+  });
+
+  return { keepBlockCount, allowBreakCount };
+}
+
+function pageBreakCandidates(root: HTMLElement): HTMLElement[] {
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(PAGE_BREAK_AVOID_SELECTOR),
+  ).filter((element) => isPageBreakCandidate(element));
+}
+
+function insertHeadingPageSpacers(root: HTMLElement): number {
+  let insertedCount = 0;
+
+  Array.from(root.querySelectorAll<HTMLElement>(PDF_HEADING_SELECTOR))
+    .filter((heading) => isPageBreakCandidate(heading) && !isPageBreakAllowed(heading))
+    .forEach((heading) => {
+      if (shouldMoveHeadingToNextPage(root, heading) && insertPageSpacerBeforeBlock(root, heading, { force: true })) {
+        insertedCount += 1;
+      }
+    });
+
+  return insertedCount;
 }
 
 function isPageBreakCandidate(element: HTMLElement): boolean {
@@ -818,16 +897,56 @@ function isPageBreakCandidate(element: HTMLElement): boolean {
   return !parentAvoidBlock;
 }
 
-function insertPageSpacerBeforeBlock(root: HTMLElement, block: HTMLElement): boolean {
+function isPageBreakAllowed(element: HTMLElement): boolean {
+  return element.classList.contains(PAGE_BREAK_ALLOW_CLASS);
+}
+
+function shouldMoveHeadingToNextPage(root: HTMLElement, heading: HTMLElement): boolean {
+  const nextBlock = nextPageBreakContentSibling(heading);
+  if (!nextBlock) return false;
+
+  const rect = heading.getBoundingClientRect();
+  const rootRect = root.getBoundingClientRect();
+  const top = rect.top - rootRect.top;
+  const bottom = top + rect.height;
+  const pageBottom = (Math.floor(top / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
+  if (bottom >= pageBottom - PAGE_BREAK_SLOP_PX) return false;
+
+  const remainingAfterHeading = pageBottom - bottom;
+  const nextHeight = Math.max(0, nextBlock.getBoundingClientRect().height);
+  const requiredFollowHeight = Math.min(PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX, Math.max(48, nextHeight));
+  return remainingAfterHeading < requiredFollowHeight;
+}
+
+function nextPageBreakContentSibling(element: HTMLElement): HTMLElement | null {
+  let sibling = element.nextElementSibling;
+
+  while (sibling) {
+    if (
+      sibling instanceof HTMLElement &&
+      !sibling.classList.contains(PAGE_SPACER_CLASS) &&
+      sibling.getBoundingClientRect().height > 0
+    ) {
+      return sibling;
+    }
+    sibling = sibling.nextElementSibling;
+  }
+
+  return null;
+}
+
+function insertPageSpacerBeforeBlock(root: HTMLElement, block: HTMLElement, options: { force?: boolean } = {}): boolean {
+  if (isPageBreakAllowed(block)) return false;
+
   const rect = block.getBoundingClientRect();
   const rootRect = root.getBoundingClientRect();
   const height = rect.height;
-  if (height <= 0 || height >= A4_HEIGHT_PX * PAGE_BREAK_MAX_KEEP_RATIO) return false;
+  if (height <= 0) return false;
 
   const top = rect.top - rootRect.top;
   const bottom = top + height;
   const pageBottom = (Math.floor(top / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
-  if (bottom <= pageBottom - PAGE_BREAK_SLOP_PX) return false;
+  if (!options.force && bottom <= pageBottom - PAGE_BREAK_SLOP_PX) return false;
 
   const spacerHeight = pageBottom - top + PAGE_BREAK_KEEP_MARGIN_PX;
   if (spacerHeight <= PAGE_BREAK_SLOP_PX) return false;

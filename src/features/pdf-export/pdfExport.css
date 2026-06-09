@@ -87,6 +87,11 @@
   page-break-inside: avoid;
 }
 
+.pdf-export-root .pdf-break-allowed {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
 .pdf-export-root strong {
   color: #111827;
   font-weight: 700;
