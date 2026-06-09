@@ -19,8 +19,6 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
   const openFile = useWorkspaceStore((state) => state.openFile);
   const createFile = useWorkspaceStore((state) => state.createFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
-  const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
-  const closeFile = useWorkspaceStore((state) => state.closeFile);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
@@ -55,7 +53,6 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
           onSearch={() => setWorkspaceSearchOpen((open) => !open)}
           onRefresh={() => void refresh()}
         />
-        <RailTabs openFiles={openFiles} activeFileId={activeFile?.id ?? null} onClose={closeFile} onSelect={setActiveFile} />
       </div>
       <FolderPath path={rootPath} />
       {workspaceSearchOpen ? (
@@ -149,69 +146,6 @@ function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
       },
     ];
   });
-}
-
-function RailTabs({
-  openFiles,
-  activeFileId,
-  onClose,
-  onSelect,
-}: {
-  openFiles: OpenFile[];
-  activeFileId: string | null;
-  onClose: (id: string) => void;
-  onSelect: (id: string) => void;
-}) {
-  const [tooltip, setTooltip] = useState<{ name: string; top: number } | null>(null);
-
-  return (
-    <div className="rail-tabs-wrap">
-      <div className="rail-tabs">
-        {openFiles.map((file) => {
-          const dirty = file.content !== file.savedContent;
-          const close = () => {
-            if (dirty && !window.confirm(`${file.name} 파일의 저장되지 않은 변경사항을 버리고 닫을까요?`)) return;
-            onClose(file.id);
-          };
-          return (
-            <div
-              className="rail-tab-wrap"
-              key={file.id}
-              onBlur={() => setTooltip(null)}
-              onFocus={(event) => {
-                const scroller = event.currentTarget.parentElement;
-                setTooltip({ name: file.name, top: event.currentTarget.offsetTop - (scroller?.scrollTop ?? 0) + 18 });
-              }}
-              onMouseEnter={(event) => {
-                const scroller = event.currentTarget.parentElement;
-                setTooltip({ name: file.name, top: event.currentTarget.offsetTop - (scroller?.scrollTop ?? 0) + 18 });
-              }}
-              onMouseLeave={() => setTooltip(null)}
-            >
-              <button
-                aria-label={`${file.name}${dirty ? ', 수정 중' : ''}`}
-                className={`rail-tab ${file.id === activeFileId ? 'active' : ''}`}
-                title={`${file.name}${dirty ? '  ●  수정 중' : ''}`}
-                type="button"
-                onClick={() => onSelect(file.id)}
-              >
-                <Icon name="file" />
-                {dirty ? <span className="dirty-dot" /> : null}
-              </button>
-              <button className="rail-tab-close" title={`${file.name} 닫기`} type="button" onClick={close}>
-                x
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      {tooltip ? (
-        <span className="rail-tab-label" role="tooltip" style={{ top: tooltip.top }}>
-          {tooltip.name}
-        </span>
-      ) : null}
-    </div>
-  );
 }
 
 function FileTreeNodeView({
