@@ -5,9 +5,14 @@ import './blockLayout.css';
 
 type BlockLayoutChange = BlockLayout | BlockLayout[];
 type LayoutChangeHandler = (layout: BlockLayoutChange) => void;
+type ActiveLayoutDrag = {
+  filePath: string;
+  identity: string;
+  source: HTMLElement;
+};
 
 const blockLayoutCache = new Map<string, BlockLayout[]>();
-let activeLayoutDrag: { filePath: string; identity: string } | null = null;
+let activeLayoutDrag: ActiveLayoutDrag | null = null;
 
 export const blockLayoutPreviewEnhancement: PreviewContribution = {
   id: 'block-layout.preview-enhancement',
@@ -69,6 +74,7 @@ type LayoutTarget = {
 const equationAligns: LayoutAlign[] = ['left', 'center', 'right'];
 const minImageResizePercent = 18;
 const maxImageResizePercent = 100;
+const layoutDragThresholdPx = 4;
 
 export function enhancePreviewLayoutBlocks(
   root: HTMLElement,
@@ -216,27 +222,13 @@ function renderLayoutControls(
 
   const dragHandle = document.createElement('div');
   dragHandle.className = 'preview-layout-drag-handle';
-  dragHandle.draggable = true;
+  dragHandle.draggable = false;
   dragHandle.tabIndex = 0;
   dragHandle.setAttribute('role', 'button');
   dragHandle.setAttribute('aria-label', '블록 배치 이동');
   dragHandle.title = '오른쪽 끝으로 드래그해서 2열 배치';
-  dragHandle.addEventListener('dragstart', (event) => {
-    if (!event.dataTransfer) return;
-
-    const identity = layoutIdentity(layout);
-    activeLayoutDrag = { filePath, identity };
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('application/x-saekim-block-layout', identity);
-    event.dataTransfer.setData('text/plain', identity);
-    root.dataset.layoutDragging = 'true';
-    wrapper.dataset.dragging = 'true';
-  });
-  dragHandle.addEventListener('dragend', () => {
-    activeLayoutDrag = null;
-    delete root.dataset.layoutDragging;
-    delete wrapper.dataset.dragging;
-    clearLayoutDropTargets(root);
+  dragHandle.addEventListener('pointerdown', (event) => {
+    startLayoutPointerDrag(event, dragHandle, wrapper, root, filePath, layoutByKey, onChange);
   });
   tools.append(dragHandle);
 
@@ -389,6 +381,115 @@ function clearSelectedKatexEquations(root: HTMLElement): void {
   });
 }
 
+function startLayoutPointerDrag(
+  event: PointerEvent,
+  handle: HTMLElement,
+  wrapper: HTMLElement,
+  root: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+  onChange: LayoutChangeHandler,
+): void {
+  if (event.button !== 0) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const identity = layoutIdentityForWrapper(wrapper);
+  activeLayoutDrag = { filePath, identity, source: wrapper };
+  clearSelectedLayoutBlocks(root);
+  clearSelectedKatexEquations(root);
+  wrapper.dataset.selected = 'true';
+  wrapper.dataset.dragging = 'true';
+
+  const startX = event.clientX;
+  const startY = event.clientY;
+  let started = false;
+
+  handle.setPointerCapture(event.pointerId);
+
+  const handlePointerMove = (moveEvent: PointerEvent) => {
+    moveEvent.preventDefault();
+
+    const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+    if (!started && distance < layoutDragThresholdPx) return;
+
+    started = true;
+    root.dataset.layoutDragging = 'true';
+    updateLayoutDropPreview(root, wrapper, moveEvent.clientX, moveEvent.clientY);
+  };
+
+  const finishPointerDrag = (finishEvent: PointerEvent) => {
+    if (handle.hasPointerCapture(finishEvent.pointerId)) handle.releasePointerCapture(finishEvent.pointerId);
+    handle.removeEventListener('pointermove', handlePointerMove);
+    handle.removeEventListener('pointerup', finishPointerDrag);
+    handle.removeEventListener('pointercancel', cancelPointerDrag);
+
+    const target = currentLayoutDropTarget(root) ?? layoutDropTargetFromPoint(root, wrapper, finishEvent.clientX, finishEvent.clientY);
+    if (started && target && canDropLayoutBlock(root, target, filePath)) {
+      createManualTwoColumnGroup(root, wrapper, target, filePath, layoutByKey, onChange);
+    }
+
+    finishLayoutDrag(root, wrapper);
+  };
+
+  const cancelPointerDrag = (cancelEvent: PointerEvent) => {
+    if (handle.hasPointerCapture(cancelEvent.pointerId)) handle.releasePointerCapture(cancelEvent.pointerId);
+    handle.removeEventListener('pointermove', handlePointerMove);
+    handle.removeEventListener('pointerup', finishPointerDrag);
+    handle.removeEventListener('pointercancel', cancelPointerDrag);
+    finishLayoutDrag(root, wrapper);
+  };
+
+  handle.addEventListener('pointermove', handlePointerMove);
+  handle.addEventListener('pointerup', finishPointerDrag);
+  handle.addEventListener('pointercancel', cancelPointerDrag);
+}
+
+function updateLayoutDropPreview(root: HTMLElement, source: HTMLElement, clientX: number, clientY: number): void {
+  const target = layoutDropTargetFromPoint(root, source, clientX, clientY);
+  clearLayoutDropTargets(root, target ?? undefined);
+  if (target) target.dataset.dropPosition = 'right';
+}
+
+function layoutDropTargetFromPoint(
+  root: HTMLElement,
+  source: HTMLElement,
+  clientX: number,
+  clientY: number,
+): HTMLElement | null {
+  const candidates = getLayoutWrappers(root).filter((item) => item !== source);
+  let best: { wrapper: HTMLElement; score: number } | null = null;
+
+  for (const candidate of candidates) {
+    const rect = candidate.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+
+    const zoneWidth = rightDropZoneWidth(rect);
+    const withinX = clientX >= rect.right - zoneWidth && clientX <= rect.right + 36;
+    const withinY = clientY >= rect.top - 12 && clientY <= rect.bottom + 12;
+    if (!withinX || !withinY) continue;
+
+    const verticalDistance =
+      clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
+    const score = Math.abs(rect.right - clientX) + verticalDistance * 2;
+    if (!best || score < best.score) best = { wrapper: candidate, score };
+  }
+
+  return best?.wrapper ?? null;
+}
+
+function currentLayoutDropTarget(root: HTMLElement): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.preview-layout-block[data-drop-position="right"]');
+}
+
+function finishLayoutDrag(root: HTMLElement, source: HTMLElement): void {
+  activeLayoutDrag = null;
+  delete root.dataset.layoutDragging;
+  delete source.dataset.dragging;
+  clearLayoutDropTargets(root);
+}
+
 function bindLayoutDropTarget(
   root: HTMLElement,
   wrapper: HTMLElement,
@@ -441,7 +542,9 @@ function bindLayoutDropTarget(
 
 function canDropLayoutBlock(root: HTMLElement, target: HTMLElement, filePath: string): boolean {
   if (!activeLayoutDrag || activeLayoutDrag.filePath !== filePath) return false;
-  const source = findLayoutWrapperByIdentity(root, activeLayoutDrag.identity);
+  const source = activeLayoutDrag.source.isConnected
+    ? activeLayoutDrag.source
+    : findLayoutWrapperByIdentity(root, activeLayoutDrag.identity);
   return Boolean(source && source !== target);
 }
 
@@ -449,8 +552,12 @@ function isRightEdgeDrop(wrapper: HTMLElement, event: DragEvent): boolean {
   const rect = wrapper.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return false;
 
-  const zoneWidth = Math.min(140, Math.max(56, rect.width * 0.28));
+  const zoneWidth = rightDropZoneWidth(rect);
   return event.clientX >= rect.right - zoneWidth && event.clientX <= rect.right + 24;
+}
+
+function rightDropZoneWidth(rect: DOMRect): number {
+  return Math.min(180, Math.max(64, rect.width * 0.32));
 }
 
 function clearLayoutDropTargets(root: HTMLElement, except?: HTMLElement): void {
