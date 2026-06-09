@@ -74,6 +74,8 @@
 }
 
 .pdf-export-root p,
+.pdf-export-root ul,
+.pdf-export-root ol,
 .pdf-export-root li,
 .pdf-export-root table,
 .pdf-export-root blockquote,

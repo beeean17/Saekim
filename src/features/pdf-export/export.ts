@@ -16,7 +16,8 @@ const IMAGE_INLINE_TIMEOUT_MS = 5000;
 const BASE64_CHUNK_SIZE = 0x8000;
 const PAGE_BREAK_KEEP_MARGIN_PX = 14;
 const PAGE_BREAK_KEEP_MAX_RATIO = 0.72;
-const PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX = 160;
+const PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX = 220;
+const PAGE_BREAK_LEAD_IN_MAX_COUNT = 2;
 const PAGE_BREAK_REPEAT_LIMIT = 3;
 const PAGE_BREAK_SLOP_PX = 2;
 const PAGE_BREAK_ALLOW_CLASS = 'pdf-break-allowed';
@@ -32,6 +33,8 @@ const PAGE_BREAK_AVOID_SELECTOR = [
   'h5',
   'h6',
   'p',
+  'ul',
+  'ol',
   'li',
   'table',
   'img',
@@ -902,9 +905,6 @@ function isPageBreakAllowed(element: HTMLElement): boolean {
 }
 
 function shouldMoveHeadingToNextPage(root: HTMLElement, heading: HTMLElement): boolean {
-  const nextBlock = nextPageBreakContentSibling(heading);
-  if (!nextBlock) return false;
-
   const rect = heading.getBoundingClientRect();
   const rootRect = root.getBoundingClientRect();
   const top = rect.top - rootRect.top;
@@ -913,49 +913,98 @@ function shouldMoveHeadingToNextPage(root: HTMLElement, heading: HTMLElement): b
   if (bottom >= pageBottom - PAGE_BREAK_SLOP_PX) return false;
 
   const remainingAfterHeading = pageBottom - bottom;
-  const nextHeight = Math.max(0, nextBlock.getBoundingClientRect().height);
+  const nextHeight = followingContentHeight(heading, PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX);
+  if (nextHeight <= 0) return false;
+
   const requiredFollowHeight = Math.min(PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX, Math.max(48, nextHeight));
   return remainingAfterHeading < requiredFollowHeight;
 }
 
-function nextPageBreakContentSibling(element: HTMLElement): HTMLElement | null {
+function followingContentHeight(element: HTMLElement, maxHeight: number): number {
   let sibling = element.nextElementSibling;
+  let totalHeight = 0;
 
-  while (sibling) {
-    if (
-      sibling instanceof HTMLElement &&
-      !sibling.classList.contains(PAGE_SPACER_CLASS) &&
-      sibling.getBoundingClientRect().height > 0
-    ) {
-      return sibling;
+  while (sibling && totalHeight < maxHeight) {
+    if (sibling instanceof HTMLElement && !sibling.classList.contains(PAGE_SPACER_CLASS)) {
+      totalHeight += Math.max(0, sibling.getBoundingClientRect().height);
     }
     sibling = sibling.nextElementSibling;
   }
 
-  return null;
+  return totalHeight;
 }
 
 function insertPageSpacerBeforeBlock(root: HTMLElement, block: HTMLElement, options: { force?: boolean } = {}): boolean {
   if (isPageBreakAllowed(block)) return false;
 
-  const rect = block.getBoundingClientRect();
   const rootRect = root.getBoundingClientRect();
-  const height = rect.height;
+  const blockRect = block.getBoundingClientRect();
+  const height = blockRect.height;
   if (height <= 0) return false;
 
-  const top = rect.top - rootRect.top;
-  const bottom = top + height;
-  const pageBottom = (Math.floor(top / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
+  const blockTop = blockRect.top - rootRect.top;
+  const bottom = blockTop + height;
+  const pageBottom = (Math.floor(blockTop / A4_HEIGHT_PX) + 1) * A4_HEIGHT_PX;
   if (!options.force && bottom <= pageBottom - PAGE_BREAK_SLOP_PX) return false;
 
-  const spacerHeight = pageBottom - top + PAGE_BREAK_KEEP_MARGIN_PX;
+  const anchor = options.force ? block : pageBreakAnchorForBlock(root, block);
+  const anchorTop = anchor.getBoundingClientRect().top - rootRect.top;
+  const spacerHeight = pageBottom - anchorTop + PAGE_BREAK_KEEP_MARGIN_PX;
   if (spacerHeight <= PAGE_BREAK_SLOP_PX) return false;
 
   const spacer = document.createElement('div');
   spacer.className = PAGE_SPACER_CLASS;
   spacer.style.height = `${spacerHeight}px`;
-  block.before(spacer);
+  anchor.before(spacer);
   return true;
+}
+
+function pageBreakAnchorForBlock(root: HTMLElement, block: HTMLElement): HTMLElement {
+  if (!canUseLeadInAnchor(block)) return block;
+
+  const rootRect = root.getBoundingClientRect();
+  const blockRect = block.getBoundingClientRect();
+  const blockTop = blockRect.top - rootRect.top;
+  const blockBottom = blockTop + blockRect.height;
+  const blockPage = Math.floor(blockTop / A4_HEIGHT_PX);
+  let anchor = block;
+  let sibling = block.previousElementSibling;
+  let leadInCount = 0;
+
+  while (sibling instanceof HTMLElement && leadInCount < PAGE_BREAK_LEAD_IN_MAX_COUNT) {
+    if (!isLeadInElement(sibling) || isPageBreakAllowed(sibling)) break;
+
+    const siblingRect = sibling.getBoundingClientRect();
+    const siblingTop = siblingRect.top - rootRect.top;
+    if (Math.floor(siblingTop / A4_HEIGHT_PX) !== blockPage) break;
+    if (blockBottom - siblingTop > A4_HEIGHT_PX * PAGE_BREAK_KEEP_MAX_RATIO) break;
+
+    anchor = sibling;
+    leadInCount += 1;
+    sibling = sibling.previousElementSibling;
+  }
+
+  return anchor;
+}
+
+function canUseLeadInAnchor(block: HTMLElement): boolean {
+  const tagName = block.tagName.toLowerCase();
+  return (
+    tagName === 'ul' ||
+    tagName === 'ol' ||
+    tagName === 'pre' ||
+    tagName === 'table' ||
+    tagName === 'blockquote' ||
+    block.classList.contains('shiki') ||
+    block.classList.contains('math-block') ||
+    block.classList.contains('mermaid-block') ||
+    block.classList.contains('preview-layout-block') ||
+    block.classList.contains('preview-layout-group')
+  );
+}
+
+function isLeadInElement(element: HTMLElement): boolean {
+  return element.matches(PDF_HEADING_SELECTOR) || element.tagName.toLowerCase() === 'p';
 }
 
 function getDocumentTitle(preview: HTMLElement, suggestedName?: string): string {
