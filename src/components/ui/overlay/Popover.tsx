@@ -27,7 +27,7 @@ export function Popover({
   useEffect(() => {
     if (!open) return;
 
-    const closeOnClick = (event: MouseEvent) => {
+    const closeOnPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && ref.current?.contains(target)) return;
       onClose();
@@ -36,10 +36,10 @@ export function Popover({
       if (event.key === 'Escape') onClose();
     };
 
-    window.addEventListener('click', closeOnClick);
+    window.addEventListener('pointerdown', closeOnPointerDown);
     window.addEventListener('keydown', closeOnEscape);
     return () => {
-      window.removeEventListener('click', closeOnClick);
+      window.removeEventListener('pointerdown', closeOnPointerDown);
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [onClose, open]);
