@@ -253,7 +253,11 @@
 .pdf-export-root .shiki .line {
   position: relative;
   display: block;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+  height: auto;
+  min-height: 1.5em;
   box-sizing: border-box;
   padding: 0 16px 0 0;
   line-height: var(--preview-code-line-height);
@@ -276,6 +280,7 @@
   color: #9ca3af;
   content: attr(data-line);
   font-variant-numeric: tabular-nums;
+  line-height: var(--preview-code-line-height);
   text-align: right;
 }
 
