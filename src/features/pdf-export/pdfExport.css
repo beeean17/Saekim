@@ -215,11 +215,17 @@
 .pdf-export-root pre code,
 .pdf-export-root .shiki code {
   display: block;
-  min-width: max-content;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0;
   color: #111827 !important;
   background: transparent !important;
   border: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .pdf-export-root .shiki code {
@@ -247,9 +253,13 @@
 .pdf-export-root .shiki .line {
   position: relative;
   display: block;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0 16px 0 0;
   line-height: var(--preview-code-line-height);
-  white-space: pre;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .pdf-export-root .shiki .line > span {
