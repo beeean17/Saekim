@@ -192,7 +192,7 @@
 
 .pdf-export-root pre,
 .pdf-export-root .shiki {
-  --preview-code-line-height: 1.32;
+  --preview-code-line-height: 1.22;
 
   position: relative;
   margin: 14px 0;
@@ -237,6 +237,10 @@
 .pdf-export-root .shiki .line {
   display: block;
   padding: 0 16px 0 52px;
+  line-height: var(--preview-code-line-height);
+}
+
+.pdf-export-root .shiki .line > span {
   line-height: var(--preview-code-line-height);
 }
 

@@ -26,8 +26,12 @@ interface SettingsState {
 function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
   if (typeof document === 'undefined') return;
 
-  document.documentElement.style.setProperty('--editor-font-size', `${normalizeFontSize(fontSize)}px`);
+  const normalizedFontSize = normalizeFontSize(fontSize);
+  const fontSizeOption = fontSizeOptions.find((option) => option.value === normalizedFontSize) ?? fontSizeOptions[1];
+
+  document.documentElement.style.setProperty('--editor-font-size', `${normalizedFontSize}px`);
   document.documentElement.style.setProperty('--editor-font-family', editorFontFamily);
+  document.documentElement.dataset.editorFontSize = fontSizeOption.id;
 }
 
 export function normalizeFontSize(fontSize: number): number {

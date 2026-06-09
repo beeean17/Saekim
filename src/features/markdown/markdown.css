@@ -112,8 +112,9 @@
 
 .preview-content pre,
 .preview-content .shiki {
-  --preview-code-font-size: clamp(11px, calc(var(--editor-font-size, 13.5px) - 1px), 15px);
-  --preview-code-row-height: max(13px, calc(var(--preview-code-font-size) + 2px));
+  --preview-code-font-size: 12.5px;
+  --preview-code-row-height: 13.5px;
+  --preview-code-selection-height: 12.5px;
 
   position: relative;
   margin: 14px 0;
@@ -126,6 +127,20 @@
   font-family: var(--font-mono);
   font-size: var(--preview-code-font-size);
   line-height: var(--preview-code-row-height);
+}
+
+:root[data-editor-font-size="small"] .preview-content pre,
+:root[data-editor-font-size="small"] .preview-content .shiki {
+  --preview-code-font-size: 11px;
+  --preview-code-row-height: 12px;
+  --preview-code-selection-height: 11px;
+}
+
+:root[data-editor-font-size="large"] .preview-content pre,
+:root[data-editor-font-size="large"] .preview-content .shiki {
+  --preview-code-font-size: 15px;
+  --preview-code-row-height: 16px;
+  --preview-code-selection-height: 15px;
 }
 
 .preview-content .shiki::before {
@@ -151,6 +166,7 @@
   padding: 0;
   background: transparent;
   border: 0;
+  line-height: var(--preview-code-row-height);
 }
 
 .preview-content pre.ascii-diagram {
@@ -166,20 +182,31 @@
   display: block;
   width: max-content;
   min-width: 100%;
+  height: var(--preview-code-row-height);
   box-sizing: border-box;
   padding: 0 16px 0 52px;
   line-height: var(--preview-code-row-height);
 }
 
+.preview-content .shiki .line > span {
+  display: inline-block;
+  height: var(--preview-code-selection-height);
+  line-height: var(--preview-code-selection-height);
+  vertical-align: top;
+}
+
 .preview-content .shiki .line::before {
   display: inline-block;
   width: 28px;
+  height: var(--preview-code-selection-height);
   margin-left: -42px;
   margin-right: 14px;
   color: var(--text-faint);
   content: attr(data-line);
   font-variant-numeric: tabular-nums;
+  line-height: var(--preview-code-selection-height);
   text-align: right;
+  vertical-align: top;
   user-select: none;
 }
 
