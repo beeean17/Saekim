@@ -92,6 +92,62 @@
   color: #374151;
 }
 
+.pdf-export-root li::marker {
+  color: #5f6bff;
+}
+
+.pdf-export-root .task-list-item {
+  list-style: none;
+}
+
+.pdf-export-root .pdf-static-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin: 0 7px 0 -22px;
+  color: #fff;
+  background: #fff;
+  border: 1px solid #9ca3af;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: -2px;
+}
+
+.pdf-export-root .pdf-static-checkbox {
+  border-radius: 3px;
+}
+
+.pdf-export-root .pdf-static-radio {
+  border-radius: 999px;
+}
+
+.pdf-export-root .pdf-static-control[data-checked="true"] {
+  background: #5f6bff;
+  border-color: #5f6bff;
+}
+
+.pdf-export-root .pdf-static-radio[data-checked="true"]::after {
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 999px;
+  content: "";
+}
+
+.pdf-export-root .pdf-static-field {
+  display: inline-block;
+  min-width: 32px;
+  padding: 1px 6px;
+  color: #374151;
+  background: #f9fafb;
+  border: 1px solid #d8dde8;
+  border-radius: 4px;
+}
+
 .pdf-export-root blockquote {
   margin: 16px 0;
   padding: 8px 14px;

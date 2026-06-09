@@ -11,6 +11,8 @@ const CANVAS_BOTTOM_TRIM_STEP_PX = 2;
 const MIN_PDF_PAGE_SLICE_PX = 8;
 const IMAGE_INLINE_TIMEOUT_MS = 5000;
 const BASE64_CHUNK_SIZE = 0x8000;
+const UNSUPPORTED_CANVAS_COLOR_PATTERN = /\b(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
+const CSS_COLOR_FUNCTION_PATTERN = /color\(\s*(?:srgb|display-p3)\s+([^)]*)\)/gi;
 const PAGE_BREAK_AVOID_SELECTOR = [
   'h1',
   'h2',
@@ -31,6 +33,36 @@ const PAGE_BREAK_AVOID_SELECTOR = [
   '.math-block',
   '.katex-display',
 ].join(', ');
+const CANVAS_COLOR_FALLBACKS = [
+  ['accent-color', '#5f6bff'],
+  ['background-color', 'transparent'],
+  ['border-block-color', '#d8dde8'],
+  ['border-block-end-color', '#d8dde8'],
+  ['border-block-start-color', '#d8dde8'],
+  ['border-bottom-color', '#d8dde8'],
+  ['border-color', '#d8dde8'],
+  ['border-inline-color', '#d8dde8'],
+  ['border-inline-end-color', '#d8dde8'],
+  ['border-inline-start-color', '#d8dde8'],
+  ['border-left-color', '#d8dde8'],
+  ['border-right-color', '#d8dde8'],
+  ['border-top-color', '#d8dde8'],
+  ['caret-color', 'transparent'],
+  ['color', '#111827'],
+  ['column-rule-color', '#d8dde8'],
+  ['fill', '#111827'],
+  ['flood-color', '#ffffff'],
+  ['lighting-color', '#ffffff'],
+  ['outline-color', '#d8dde8'],
+  ['stop-color', '#111827'],
+  ['stroke', '#111827'],
+  ['text-decoration-color', '#111827'],
+] as const;
+const CANVAS_EFFECT_FALLBACKS = [
+  ['box-shadow', 'none'],
+  ['filter', 'none'],
+  ['text-shadow', 'none'],
+] as const;
 
 interface PdfExportOptions {
   suggestedName?: string;
@@ -168,13 +200,66 @@ function inlineBrowserFramePreviews(source: HTMLElement, clone: HTMLElement): vo
 }
 
 function sanitizePdfPreviewClone(root: HTMLElement): void {
-  root.querySelectorAll('.preview-layout-tools, .preview-mode-tabs').forEach((node) => node.remove());
+  root.querySelectorAll('.preview-layout-tools, .preview-mode-tabs, .math-equation-tools').forEach((node) => node.remove());
+  replaceFormControlsForPdf(root);
   root.querySelectorAll<HTMLElement>('.preview-layout-block[data-selected="true"]').forEach((node) => {
     delete node.dataset.selected;
   });
   root.querySelectorAll<HTMLElement>('[data-layout-selection-bound]').forEach((node) => {
     delete node.dataset.layoutSelectionBound;
   });
+}
+
+function replaceFormControlsForPdf(root: HTMLElement): void {
+  let replacedCheckboxes = 0;
+  let replacedFields = 0;
+
+  root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select').forEach((control) => {
+    const replacement = staticFormControl(control);
+    if (replacement.classList.contains('pdf-static-checkbox') || replacement.classList.contains('pdf-static-radio')) {
+      replacedCheckboxes += 1;
+    } else {
+      replacedFields += 1;
+    }
+
+    control.replaceWith(replacement);
+  });
+
+  if (replacedCheckboxes > 0 || replacedFields > 0) {
+    logPdfExport('form controls replaced for canvas', {
+      checkboxCount: replacedCheckboxes,
+      fieldCount: replacedFields,
+    });
+  }
+}
+
+function staticFormControl(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): HTMLElement {
+  if (control instanceof HTMLInputElement) {
+    const type = control.type.toLowerCase();
+    if (type === 'checkbox' || type === 'radio') {
+      const marker = document.createElement('span');
+      marker.className = `pdf-static-control pdf-static-${type}`;
+      marker.dataset.checked = String(control.checked);
+      marker.setAttribute('aria-hidden', 'true');
+      marker.textContent = control.checked ? (type === 'radio' ? '' : '\u2713') : '';
+      return marker;
+    }
+
+    return staticFormValue(control.value || control.getAttribute('value') || control.placeholder);
+  }
+
+  if (control instanceof HTMLSelectElement) {
+    return staticFormValue(control.selectedOptions[0]?.textContent?.trim() || control.value);
+  }
+
+  return staticFormValue(control.value || control.textContent || control.placeholder);
+}
+
+function staticFormValue(value: string | null | undefined): HTMLElement {
+  const text = document.createElement('span');
+  text.className = 'pdf-static-field';
+  text.textContent = value?.trim() || '';
+  return text;
 }
 
 function prepareKatexForCanvas(root: HTMLElement): void {
@@ -302,6 +387,10 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
   logPdfExport('render template imports start');
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   const captureHeight = Math.max(exportRoot.scrollHeight, exportRoot.offsetHeight, Math.ceil(A4_HEIGHT_PX));
+  const normalizedDeclarationCount = normalizeUnsupportedCanvasStyles(exportRoot);
+  if (normalizedDeclarationCount > 0) {
+    logPdfExport('canvas styles normalized', { declarationCount: normalizedDeclarationCount });
+  }
   logPdfExport('html2canvas start', {
     ...readElementMetrics(exportRoot),
     captureHeight,
@@ -358,6 +447,95 @@ async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array>
   const bytes = new Uint8Array(pdf.output('arraybuffer'));
   logPdfExport('jspdf output done', { byteLength: bytes.byteLength });
   return bytes;
+}
+
+function normalizeUnsupportedCanvasStyles(root: HTMLElement): number {
+  const elements = [root, ...Array.from(root.querySelectorAll('*'))];
+  let normalizedCount = 0;
+
+  elements.forEach((element) => {
+    const style = editableStyle(element);
+    if (!style) return;
+
+    const computed = window.getComputedStyle(element);
+    CANVAS_COLOR_FALLBACKS.forEach(([property, fallback]) => {
+      const safeValue = canvasSafeStyleValue(computed.getPropertyValue(property), fallback);
+      if (safeValue) {
+        style.setProperty(property, safeValue, 'important');
+        normalizedCount += 1;
+      }
+    });
+    CANVAS_EFFECT_FALLBACKS.forEach(([property, fallback]) => {
+      const safeValue = canvasSafeStyleValue(computed.getPropertyValue(property), fallback);
+      if (safeValue) {
+        style.setProperty(property, safeValue, 'important');
+        normalizedCount += 1;
+      }
+    });
+  });
+
+  return normalizedCount;
+}
+
+function editableStyle(element: Element): CSSStyleDeclaration | null {
+  if (element instanceof HTMLElement || element instanceof SVGElement) return element.style;
+  return null;
+}
+
+function hasUnsupportedCanvasColor(value: string): boolean {
+  return UNSUPPORTED_CANVAS_COLOR_PATTERN.test(value);
+}
+
+function canvasSafeStyleValue(value: string, fallback: string): string | null {
+  if (!hasUnsupportedCanvasColor(value)) return null;
+
+  const converted = value.replace(CSS_COLOR_FUNCTION_PATTERN, (_, body: string) => legacyColorFunctionValue(body) ?? fallback);
+  return hasUnsupportedCanvasColor(converted) ? fallback : converted;
+}
+
+function legacyColorFunctionValue(body: string): string | null {
+  const [colorBody, alphaBody] = body.split('/').map((part) => part.trim());
+  const channels = colorBody.split(/\s+/).filter(Boolean).slice(0, 3).map(colorChannelToByte);
+  if (channels.length !== 3 || channels.some((channel) => channel === null)) return null;
+
+  const alpha = alphaBody ? colorAlpha(alphaBody) : 1;
+  if (alpha === null) return null;
+
+  const [red, green, blue] = channels as [number, number, number];
+  if (alpha < 1) return `rgba(${red}, ${green}, ${blue}, ${roundAlpha(alpha)})`;
+  return `rgb(${red}, ${green}, ${blue})`;
+}
+
+function colorChannelToByte(value: string): number | null {
+  if (value.endsWith('%')) {
+    const percent = Number(value.slice(0, -1));
+    if (!Number.isFinite(percent)) return null;
+    return Math.round(clamp(percent / 100, 0, 1) * 255);
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(clamp(numeric, 0, 1) * 255);
+}
+
+function colorAlpha(value: string): number | null {
+  if (value.endsWith('%')) {
+    const percent = Number(value.slice(0, -1));
+    if (!Number.isFinite(percent)) return null;
+    return clamp(percent / 100, 0, 1);
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return clamp(numeric, 0, 1);
+}
+
+function roundAlpha(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function trimCanvasBottomWhitespace(canvas: HTMLCanvasElement): number {
