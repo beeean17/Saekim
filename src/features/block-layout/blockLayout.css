@@ -62,15 +62,15 @@
 .preview-layout-tools {
   position: absolute;
   top: 6px;
-  right: auto;
   left: 6px;
   z-index: 2;
   display: inline-flex;
   flex-wrap: nowrap;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
   width: max-content;
   max-width: calc(100vw - 24px);
-  padding: 3px;
+  padding: 4px;
   opacity: 0;
   pointer-events: none;
   background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
@@ -82,6 +82,8 @@
   -webkit-user-select: none;
 }
 
+.preview-layout-block:hover > .preview-layout-tools,
+.preview-layout-block[data-dragging="true"] > .preview-layout-tools,
 .preview-layout-block[data-selected="true"] > .preview-layout-tools {
   opacity: 1;
   pointer-events: auto;
@@ -107,4 +109,119 @@
 .preview-layout-tools button.active {
   color: var(--accent);
   background: var(--accent-soft);
+}
+
+.preview-layout-drag-handle {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: grab;
+}
+
+.preview-layout-drag-handle:active {
+  cursor: grabbing;
+}
+
+.preview-layout-drag-handle::before,
+.preview-layout-drag-handle::after {
+  position: absolute;
+  top: 6px;
+  width: 3px;
+  height: 3px;
+  color: var(--text-muted);
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor;
+  content: "";
+}
+
+.preview-layout-drag-handle::before {
+  left: 7px;
+}
+
+.preview-layout-drag-handle::after {
+  left: 13px;
+}
+
+.preview-layout-drag-handle:hover,
+.preview-layout-drag-handle:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.preview-layout-drop-zone {
+  position: absolute;
+  top: 0;
+  right: -7px;
+  bottom: 0;
+  z-index: 1;
+  width: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.preview-layout-drop-zone::before {
+  position: absolute;
+  top: 8px;
+  right: 5px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 99px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  content: "";
+}
+
+.preview-layout-block[data-drop-position="right"] > .preview-layout-drop-zone {
+  opacity: 1;
+}
+
+.preview-layout-block[data-dragging="true"] {
+  opacity: 0.56;
+}
+
+.preview-image-resize-handle {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 10px;
+  height: min(70%, 64px);
+  min-height: 34px;
+  opacity: 0;
+  cursor: ew-resize;
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.preview-image-resize-handle::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: color-mix(in srgb, var(--accent) 82%, var(--bg-base));
+  border-radius: 99px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  content: "";
+}
+
+.preview-image-resize-handle.left {
+  left: -6px;
+}
+
+.preview-image-resize-handle.right {
+  right: -6px;
+}
+
+.preview-image-layout:hover > .preview-image-resize-handle,
+.preview-image-layout[data-selected="true"] > .preview-image-resize-handle,
+.preview-image-layout[data-resizing] > .preview-image-resize-handle {
+  opacity: 1;
+}
+
+.preview-image-resize-handle:focus-visible {
+  opacity: 1;
+  outline: none;
 }

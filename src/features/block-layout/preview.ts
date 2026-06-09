@@ -7,6 +7,7 @@ type BlockLayoutChange = BlockLayout | BlockLayout[];
 type LayoutChangeHandler = (layout: BlockLayoutChange) => void;
 
 const blockLayoutCache = new Map<string, BlockLayout[]>();
+let activeLayoutDrag: { filePath: string; identity: string } | null = null;
 
 export const blockLayoutPreviewEnhancement: PreviewContribution = {
   id: 'block-layout.preview-enhancement',
@@ -65,9 +66,9 @@ type LayoutTarget = {
   occurrenceIndex: number;
 };
 
-const layoutWidths = [100, 75, 50, 33];
-const layoutAligns: LayoutAlign[] = ['left', 'center', 'right'];
 const equationAligns: LayoutAlign[] = ['left', 'center', 'right'];
+const minImageResizePercent = 18;
+const maxImageResizePercent = 100;
 
 export function enhancePreviewLayoutBlocks(
   root: HTMLElement,
@@ -185,7 +186,7 @@ function ensureLayoutSurface(wrapper: HTMLElement): HTMLElement {
   const surface = document.createElement('div');
   surface.className = 'preview-layout-surface';
   Array.from(wrapper.childNodes).forEach((node) => {
-    if (node instanceof HTMLElement && node.classList.contains('preview-layout-tools')) return;
+    if (isLayoutChromeNode(node)) return;
     surface.append(node);
   });
   wrapper.prepend(surface);
@@ -201,83 +202,66 @@ function renderLayoutControls(
   onChange: LayoutChangeHandler,
 ): void {
   wrapper.querySelector('.preview-layout-tools')?.remove();
+  wrapper.querySelector('.preview-layout-drop-zone')?.remove();
+  wrapper.querySelectorAll('.preview-image-resize-handle').forEach((node) => node.remove());
 
   const tools = document.createElement('div');
   tools.className = 'preview-layout-tools';
   tools.setAttribute('aria-label', '블록 레이아웃');
-  tools.addEventListener('mousedown', (event) => {
-    event.preventDefault();
+  tools.addEventListener('click', (event) => {
     event.stopPropagation();
   });
   bindLayoutSelection(root, wrapper);
+  bindLayoutDropTarget(root, wrapper, filePath, layoutByKey, onChange);
 
-  layoutWidths.forEach((width) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = `${width}%`;
-    button.title = `너비 ${width}%`;
-    button.className = layout.widthValue === width && layout.widthUnit === '%' ? 'active' : '';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onChange(clearLayoutGroup({ ...layout, widthValue: width, widthUnit: '%' }));
-    });
-    tools.append(button);
+  const dragHandle = document.createElement('div');
+  dragHandle.className = 'preview-layout-drag-handle';
+  dragHandle.draggable = true;
+  dragHandle.tabIndex = 0;
+  dragHandle.setAttribute('role', 'button');
+  dragHandle.setAttribute('aria-label', '블록 배치 이동');
+  dragHandle.title = '오른쪽 끝으로 드래그해서 2열 배치';
+  dragHandle.addEventListener('dragstart', (event) => {
+    if (!event.dataTransfer) return;
+
+    const identity = layoutIdentity(layout);
+    activeLayoutDrag = { filePath, identity };
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-saekim-block-layout', identity);
+    event.dataTransfer.setData('text/plain', identity);
+    root.dataset.layoutDragging = 'true';
+    wrapper.dataset.dragging = 'true';
   });
+  dragHandle.addEventListener('dragend', () => {
+    activeLayoutDrag = null;
+    delete root.dataset.layoutDragging;
+    delete wrapper.dataset.dragging;
+    clearLayoutDropTargets(root);
+  });
+  tools.append(dragHandle);
 
   if (isGroupedLayout(layout)) {
-    renderGroupPositionButtons(tools, layout, onChange);
-  } else {
-    layoutAligns.forEach((align) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
-      button.title = align === 'left' ? '왼쪽 정렬' : align === 'center' ? '가운데 정렬' : '오른쪽 정렬';
-      button.className = layout.align === align ? 'active' : '';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onChange({ ...layout, align });
-      });
-      tools.append(button);
-    });
-  }
-
-  const twoColumnCandidates = contiguousLayoutWrappers(root, wrapper, 2);
-  const threeColumnCandidates = contiguousLayoutWrappers(root, wrapper, 3);
-  const groupColumns = getLayoutGroupColumns(layout);
-
-  [2, 3].forEach((columns) => {
-    const candidates = columns === 2 ? twoColumnCandidates : threeColumnCandidates;
-    const active = isGroupedLayout(layout) && groupColumns === columns;
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = `${columns}열`;
-    button.title = active ? `${columns}열 묶기 해제` : `${columns}열로 묶기`;
-    button.className = active ? 'active' : '';
-    button.disabled = !active && candidates.length !== columns;
+    button.textContent = '1열';
+    button.title = '열 배치 해제';
+    button.className = 'active';
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-
-      if (active) {
-        onChange(groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' })));
-        return;
-      }
-
-      if (candidates.length !== columns) return;
-
-      const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      onChange(
-        candidates.map((item, index) =>
-          withColumnGroup(layoutForWrapper(item, filePath, layoutByKey), groupId, columns, index),
-        ),
-      );
+      onChange(groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' })));
     });
     tools.append(button);
-  });
+  }
 
   wrapper.append(tools);
+
+  const dropZone = document.createElement('div');
+  dropZone.className = 'preview-layout-drop-zone';
+  dropZone.setAttribute('aria-hidden', 'true');
+  wrapper.append(dropZone);
+
+  renderImageResizeHandles(wrapper, root, filePath, layoutByKey, onChange);
 }
 
 function renderKatexEquationControls(
@@ -405,40 +389,201 @@ function clearSelectedKatexEquations(root: HTMLElement): void {
   });
 }
 
-function renderGroupPositionButtons(
-  tools: HTMLElement,
-  layout: BlockLayout,
+function bindLayoutDropTarget(
+  root: HTMLElement,
+  wrapper: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
   onChange: LayoutChangeHandler,
 ): void {
-  const columns = getLayoutGroupColumns(layout);
-  const labels = columns === 2 ? ['L/C', 'R'] : ['L', 'C', 'R'];
-  const currentIndex = getLayoutGroupIndex(layout);
+  wrapper.ondragover = (event) => {
+    if (!canDropLayoutBlock(root, wrapper, filePath)) {
+      delete wrapper.dataset.dropPosition;
+      return;
+    }
 
-  labels.forEach((label, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.title = `${columns}열 위치: ${label}`;
-    button.className = currentIndex === index ? 'active' : '';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onChange(withGroupIndex(layout, index));
-    });
-    tools.append(button);
+    if (!isRightEdgeDrop(wrapper, event)) {
+      delete wrapper.dataset.dropPosition;
+      return;
+    }
+
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    clearLayoutDropTargets(root, wrapper);
+    wrapper.dataset.dropPosition = 'right';
+  };
+
+  wrapper.ondragleave = (event) => {
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget instanceof Node && wrapper.contains(relatedTarget)) return;
+    delete wrapper.dataset.dropPosition;
+  };
+
+  wrapper.ondrop = (event) => {
+    if (!canDropLayoutBlock(root, wrapper, filePath)) {
+      delete wrapper.dataset.dropPosition;
+      return;
+    }
+
+    if (!isRightEdgeDrop(wrapper, event) && wrapper.dataset.dropPosition !== 'right') return;
+
+    const source = findLayoutWrapperByIdentity(root, activeLayoutDrag?.identity ?? '');
+    if (!source || source === wrapper) return;
+
+    event.preventDefault();
+    createManualTwoColumnGroup(root, source, wrapper, filePath, layoutByKey, onChange);
+    activeLayoutDrag = null;
+    delete root.dataset.layoutDragging;
+    delete source.dataset.dragging;
+    clearLayoutDropTargets(root);
+  };
+}
+
+function canDropLayoutBlock(root: HTMLElement, target: HTMLElement, filePath: string): boolean {
+  if (!activeLayoutDrag || activeLayoutDrag.filePath !== filePath) return false;
+  const source = findLayoutWrapperByIdentity(root, activeLayoutDrag.identity);
+  return Boolean(source && source !== target);
+}
+
+function isRightEdgeDrop(wrapper: HTMLElement, event: DragEvent): boolean {
+  const rect = wrapper.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+
+  const zoneWidth = Math.min(140, Math.max(56, rect.width * 0.28));
+  return event.clientX >= rect.right - zoneWidth && event.clientX <= rect.right + 24;
+}
+
+function clearLayoutDropTargets(root: HTMLElement, except?: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.preview-layout-block[data-drop-position]').forEach((item) => {
+    if (item !== except) delete item.dataset.dropPosition;
   });
 }
 
+function createManualTwoColumnGroup(
+  root: HTMLElement,
+  source: HTMLElement,
+  target: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+  onChange: LayoutChangeHandler,
+): void {
+  const sourceLayout = layoutForWrapper(source, filePath, layoutByKey);
+  const targetLayout = layoutForWrapper(target, filePath, layoutByKey);
+  const sourceIdentity = layoutIdentity(sourceLayout);
+  const targetIdentity = layoutIdentity(targetLayout);
+  if (sourceIdentity === targetIdentity) return;
+
+  const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const previousLayouts = uniqueLayouts([
+    ...groupLayoutsForWrapper(root, source, filePath, layoutByKey),
+    ...groupLayoutsForWrapper(root, target, filePath, layoutByKey),
+  ]);
+
+  const clearedPreviousLayouts = previousLayouts
+    .filter((item) => {
+      const identity = layoutIdentity(item);
+      return identity !== sourceIdentity && identity !== targetIdentity;
+    })
+    .map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }));
+
+  onChange([
+    ...clearedPreviousLayouts,
+    withColumnGroup(clearLayoutGroup(targetLayout), groupId, 2, 0, 'manual'),
+    withColumnGroup(clearLayoutGroup(sourceLayout), groupId, 2, 1, 'manual'),
+  ]);
+}
+
+function renderImageResizeHandles(
+  wrapper: HTMLElement,
+  root: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+  onChange: LayoutChangeHandler,
+): void {
+  if (blockKindFromDataset(wrapper.dataset.blockKind) !== 'image') return;
+
+  const image = wrapper.querySelector<HTMLImageElement>(':scope > .preview-layout-surface > img');
+  if (!image) return;
+  image.draggable = false;
+
+  (['left', 'right'] as const).forEach((side) => {
+    const handle = document.createElement('div');
+    handle.className = `preview-image-resize-handle ${side}`;
+    handle.tabIndex = 0;
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'vertical');
+    handle.setAttribute('aria-label', side === 'left' ? '이미지 왼쪽 크기 조절' : '이미지 오른쪽 크기 조절');
+    handle.title = '이미지 크기 조절';
+    handle.addEventListener('pointerdown', (event) => {
+      startImageResize(event, side, wrapper, root, filePath, layoutByKey, onChange);
+    });
+    wrapper.append(handle);
+  });
+}
+
+function startImageResize(
+  event: PointerEvent,
+  side: 'left' | 'right',
+  wrapper: HTMLElement,
+  root: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+  onChange: LayoutChangeHandler,
+): void {
+  if (event.button !== 0) return;
+
+  const containerWidth = resizeContainerWidth(wrapper);
+  if (containerWidth <= 0) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  clearSelectedLayoutBlocks(root);
+  wrapper.dataset.selected = 'true';
+  wrapper.dataset.resizing = side;
+
+  const initialWidth = wrapper.getBoundingClientRect().width;
+  const startX = event.clientX;
+  let nextPercent = widthPercentForLayout(layoutForWrapper(wrapper, filePath, layoutByKey), initialWidth, containerWidth);
+
+  const handlePointerMove = (moveEvent: PointerEvent) => {
+    moveEvent.preventDefault();
+    const delta = moveEvent.clientX - startX;
+    const nextWidth = side === 'right' ? initialWidth + delta : initialWidth - delta;
+    nextPercent = clamp((nextWidth / containerWidth) * 100, minImageResizePercent, maxImageResizePercent);
+    wrapper.style.setProperty('--block-layout-width', `${nextPercent}%`);
+    wrapper.dataset.widthUnit = '%';
+    wrapper.dataset.widthValue = formatLayoutNumber(nextPercent);
+  };
+
+  const handlePointerUp = () => {
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointercancel', handlePointerUp);
+    delete wrapper.dataset.resizing;
+
+    const currentLayout = layoutForWrapper(wrapper, filePath, layoutByKey);
+    onChange({
+      ...currentLayout,
+      widthValue: roundLayoutNumber(nextPercent),
+      widthUnit: '%',
+      heightValue: null,
+      heightUnit: 'auto',
+    });
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerUp);
+  window.addEventListener('pointercancel', handlePointerUp);
+}
+
 function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
-  const width =
-    layout.widthUnit === 'auto' || layout.widthValue === null
-      ? 'auto'
-      : `${Math.max(10, Math.min(100, layout.widthValue))}${layout.widthUnit}`;
+  const width = layoutWidthCss(layout);
 
   wrapper.style.setProperty('--block-layout-width', width);
   wrapper.dataset.align = layout.align;
   wrapper.dataset.widthUnit = layout.widthUnit;
   wrapper.dataset.widthValue = layout.widthValue === null ? 'auto' : String(layout.widthValue);
+  wrapper.dataset.layoutIdentity = layoutIdentity(layout);
   wrapper.dataset.flow = getLayoutGroupColumns(layout) > 1 ? 'columns' : 'block';
   wrapper.dataset.groupColumns = String(getLayoutGroupColumns(layout));
   wrapper.dataset.groupIndex = String(getLayoutGroupIndex(layout));
@@ -446,9 +591,73 @@ function applyBlockLayout(wrapper: HTMLElement, layout: BlockLayout): void {
   const groupId = getLayoutGroupId(layout);
   if (groupId) {
     wrapper.dataset.groupId = groupId;
+    if (isManualLayoutGroup(layout)) {
+      wrapper.dataset.groupMode = 'manual';
+    } else {
+      delete wrapper.dataset.groupMode;
+    }
   } else {
     delete wrapper.dataset.groupId;
+    delete wrapper.dataset.groupMode;
   }
+}
+
+function layoutWidthCss(layout: BlockLayout): string {
+  if (layout.widthUnit === 'auto' || layout.widthValue === null) return 'auto';
+  if (layout.widthUnit === '%') return `${clamp(layout.widthValue, 10, 100)}%`;
+  return `${Math.max(48, layout.widthValue)}px`;
+}
+
+function resizeContainerWidth(wrapper: HTMLElement): number {
+  const group = wrapper.closest<HTMLElement>('.preview-layout-group');
+  if (group) return group.getBoundingClientRect().width / Math.max(1, Number.parseInt(group.dataset.columns ?? '1', 10));
+
+  const parent = wrapper.parentElement;
+  return parent?.getBoundingClientRect().width ?? wrapper.getBoundingClientRect().width;
+}
+
+function widthPercentForLayout(layout: BlockLayout, fallbackWidth: number, containerWidth: number): number {
+  if (layout.widthUnit === '%' && layout.widthValue !== null) {
+    return clamp(layout.widthValue, minImageResizePercent, maxImageResizePercent);
+  }
+
+  if (layout.widthUnit === 'px' && layout.widthValue !== null && containerWidth > 0) {
+    return clamp((layout.widthValue / containerWidth) * 100, minImageResizePercent, maxImageResizePercent);
+  }
+
+  return clamp((fallbackWidth / containerWidth) * 100, minImageResizePercent, maxImageResizePercent);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function roundLayoutNumber(value: number): number {
+  return Number(formatLayoutNumber(value));
+}
+
+function formatLayoutNumber(value: number): string {
+  return value.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function findLayoutWrapperByIdentity(root: HTMLElement, identity: string): HTMLElement | null {
+  if (!identity) return null;
+  return getLayoutWrappers(root).find((wrapper) => layoutIdentityForWrapper(wrapper) === identity) ?? null;
+}
+
+function layoutIdentityForWrapper(wrapper: HTMLElement): string {
+  const blockKind = blockKindFromDataset(wrapper.dataset.blockKind) ?? 'image';
+  const blockKey = wrapper.dataset.blockKey ?? 'block';
+  const occurrenceIndex = Number.parseInt(wrapper.dataset.occurrenceIndex ?? '0', 10);
+  return layoutIdentity({ blockKind, blockKey, occurrenceIndex: Number.isFinite(occurrenceIndex) ? occurrenceIndex : 0 });
+}
+
+function uniqueLayouts(layouts: BlockLayout[]): BlockLayout[] {
+  const byIdentity = new Map<string, BlockLayout>();
+  layouts.forEach((layout) => {
+    byIdentity.set(layoutIdentity(layout), layout);
+  });
+  return Array.from(byIdentity.values());
 }
 
 function defaultBlockLayout(
@@ -528,7 +737,8 @@ function normalizeLayoutGroups(
 
   groups.forEach((groupWrappers) => {
     const orderedWrappers = groupWrappers.sort((a, b) => getLayoutWrappers(root).indexOf(a) - getLayoutWrappers(root).indexOf(b));
-    const shouldClear = orderedWrappers.length <= 1 || !wrappersAreContiguous(orderedWrappers);
+    const isManualGroup = orderedWrappers.some((wrapper) => isManualLayoutGroup(layoutForWrapper(wrapper, filePath, layoutByKey)));
+    const shouldClear = orderedWrappers.length <= 1 || (!isManualGroup && !wrappersAreContiguous(orderedWrappers));
     if (!shouldClear) return;
 
     orderedWrappers.forEach((wrapper) => {
@@ -548,24 +758,6 @@ function getLayoutWrappers(root: HTMLElement): HTMLElement[] {
   );
 }
 
-function contiguousLayoutWrappers(root: HTMLElement, wrapper: HTMLElement, columns: number): HTMLElement[] {
-  const wrappers = getLayoutWrappers(root);
-  const index = wrappers.indexOf(wrapper);
-  if (index < 0) return [];
-
-  const forward = wrappers.slice(index, index + columns);
-  if (forward.length === columns && wrappersAreContiguous(forward)) return forward;
-
-  for (let start = Math.max(0, index - columns + 1); start <= index; start += 1) {
-    const slice = wrappers.slice(start, start + columns);
-    if (slice.length === columns && slice.includes(wrapper) && wrappersAreContiguous(slice)) {
-      return slice;
-    }
-  }
-
-  return [];
-}
-
 function wrappersAreContiguous(wrappers: HTMLElement[]): boolean {
   for (let index = 1; index < wrappers.length; index += 1) {
     if (!sourceLinesAreContiguous(wrappers[index - 1], wrappers[index])) return false;
@@ -579,7 +771,13 @@ function sourceLinesAreContiguous(previous: HTMLElement, next: HTMLElement): boo
   return previousEndLine !== null && nextStartLine !== null && nextStartLine <= previousEndLine + 1;
 }
 
-function withColumnGroup(layout: BlockLayout, groupId: string, columns: number, index: number): BlockLayout {
+function withColumnGroup(
+  layout: BlockLayout,
+  groupId: string,
+  columns: number,
+  index: number,
+  mode?: 'manual',
+): BlockLayout {
   const width = columns === 2 ? 50 : 33.3333;
   return {
     ...layout,
@@ -591,16 +789,7 @@ function withColumnGroup(layout: BlockLayout, groupId: string, columns: number, 
       groupId,
       groupColumns: columns,
       groupIndex: index,
-    },
-  };
-}
-
-function withGroupIndex(layout: BlockLayout, index: number): BlockLayout {
-  return {
-    ...layout,
-    layoutJson: {
-      ...(layout.layoutJson ?? {}),
-      groupIndex: index,
+      ...(mode ? { groupMode: mode } : {}),
     },
   };
 }
@@ -632,6 +821,7 @@ function clearLayoutGroup(layout: BlockLayout): BlockLayout {
   delete rest.groupId;
   delete rest.groupColumns;
   delete rest.groupIndex;
+  delete rest.groupMode;
   return {
     ...layout,
     layoutJson: Object.keys(rest).length > 0 ? rest : null,
@@ -655,6 +845,10 @@ function getLayoutGroupColumns(layout: BlockLayout): number {
 function getLayoutGroupIndex(layout: BlockLayout): number {
   const value = layout.layoutJson?.groupIndex;
   return typeof value === 'number' && value >= 0 ? value : 0;
+}
+
+function isManualLayoutGroup(layout: BlockLayout): boolean {
+  return layout.layoutJson?.groupMode === 'manual';
 }
 
 function getKatexEquationAlignments(layout: BlockLayout): Record<string, LayoutAlign> {
@@ -695,7 +889,7 @@ function unwrapUnsupportedLayoutWrappers(root: HTMLElement): void {
     const nodes = surface
       ? Array.from(surface.childNodes)
       : Array.from(wrapper.childNodes).filter(
-          (node) => !(node instanceof HTMLElement && node.classList.contains('preview-layout-tools')),
+          (node) => !isLayoutChromeNode(node),
         );
 
     nodes.forEach((node) => parent.insertBefore(node, wrapper));
@@ -705,21 +899,31 @@ function unwrapUnsupportedLayoutWrappers(root: HTMLElement): void {
 
 function arrangeLayoutGroups(root: HTMLElement): void {
   const wrappers = getLayoutWrappers(root);
+  const arrangedGroupIds = new Set<string>();
   let index = 0;
 
   while (index < wrappers.length) {
     const wrapper = wrappers[index];
     const groupId = wrapper.dataset.groupId;
     const columns = Number.parseInt(wrapper.dataset.groupColumns ?? '1', 10);
-    if (!groupId || columns <= 1) {
+    if (!groupId || columns <= 1 || arrangedGroupIds.has(groupId)) {
       index += 1;
       continue;
     }
 
-    const groupWrappers = wrappers
-      .filter((item) => item.dataset.groupId === groupId)
+    const groupWrappersInDom = wrappers.filter((item) => item.dataset.groupId === groupId);
+    const groupWrappers = [...groupWrappersInDom]
       .sort((a, b) => Number.parseInt(a.dataset.groupIndex ?? '0', 10) - Number.parseInt(b.dataset.groupIndex ?? '0', 10));
     if (groupWrappers.length <= 1) {
+      index += 1;
+      continue;
+    }
+
+    const isManualGroup = groupWrappersInDom.some((item) => item.dataset.groupMode === 'manual');
+    const anchor = isManualGroup
+      ? groupWrappers.find((item) => Number.parseInt(item.dataset.groupIndex ?? '0', 10) === 0) ?? groupWrappers[0]
+      : groupWrappersInDom[0];
+    if (wrapper !== anchor) {
       index += 1;
       continue;
     }
@@ -730,7 +934,8 @@ function arrangeLayoutGroups(root: HTMLElement): void {
     group.style.setProperty('--preview-layout-columns', String(columns));
     wrapper.before(group);
     groupWrappers.forEach((item) => group.append(item));
-    index += groupWrappers.length;
+    arrangedGroupIds.add(groupId);
+    index += 1;
   }
 }
 
@@ -816,4 +1021,13 @@ function isSingleImageParagraph(paragraph: HTMLElement): boolean {
     if (node instanceof HTMLBRElement) return true;
     return node instanceof HTMLImageElement;
   });
+}
+
+function isLayoutChromeNode(node: ChildNode): boolean {
+  return (
+    node instanceof HTMLElement &&
+    (node.classList.contains('preview-layout-tools') ||
+      node.classList.contains('preview-layout-drop-zone') ||
+      node.classList.contains('preview-image-resize-handle'))
+  );
 }

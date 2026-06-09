@@ -220,7 +220,9 @@ function inlineBrowserFramePreviews(source: HTMLElement, clone: HTMLElement): vo
 }
 
 function sanitizePdfPreviewClone(root: HTMLElement): void {
-  root.querySelectorAll('.preview-layout-tools, .preview-mode-tabs, .math-equation-tools').forEach((node) => node.remove());
+  root
+    .querySelectorAll('.preview-layout-tools, .preview-layout-drop-zone, .preview-image-resize-handle, .preview-mode-tabs, .math-equation-tools')
+    .forEach((node) => node.remove());
   replaceFormControlsForPdf(root);
   root.querySelectorAll<HTMLElement>('.preview-layout-block[data-selected="true"]').forEach((node) => {
     delete node.dataset.selected;
