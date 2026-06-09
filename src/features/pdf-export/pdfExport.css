@@ -204,7 +204,11 @@
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 12px;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
   line-height: var(--preview-code-line-height);
+  tab-size: 2;
   white-space: pre-wrap;
 }
 

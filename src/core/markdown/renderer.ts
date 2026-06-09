@@ -260,12 +260,23 @@ function enhanceHighlightedCodeBlock(doc: Document, pre: HTMLElement, lang: stri
     if (text.startsWith('-')) line.classList.add('diff-remove');
   });
 
-  const code = pre.querySelector('code');
+  let code = pre.querySelector('code');
   if (!code) {
     const fallbackCode = doc.createElement('code');
     while (pre.firstChild) fallbackCode.append(pre.firstChild);
     pre.append(fallbackCode);
+    code = fallbackCode;
   }
+
+  removeHighlightedLineSeparators(code);
+}
+
+function removeHighlightedLineSeparators(code: Element): void {
+  Array.from(code.childNodes).forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() === '') {
+      node.remove();
+    }
+  });
 }
 
 function formatLanguageLabel(lang: string): string {
