@@ -22,7 +22,7 @@ registerMarkdownItPlugin({
 
 setMarkdownMathRenderer({
   renderInline(content) {
-    return katex.renderToString(content, {
+    return katex.renderToString(normalizeKatexInput(content), {
       ...katexOptions,
       displayMode: false,
     });
@@ -32,17 +32,22 @@ setMarkdownMathRenderer({
     const equationCounts = new Map<string, number>();
     const html = equations
       .map((equation, index) => {
-        const equationHtml = katex.renderToString(equation, {
+        const normalizedEquation = normalizeKatexInput(equation);
+        const equationHtml = katex.renderToString(normalizedEquation, {
           ...katexOptions,
           displayMode: true,
         });
-        const equationKey = stableEquationKey(equation, equationCounts);
+        const equationKey = stableEquationKey(normalizedEquation, equationCounts);
         return `<div class="math-equation" data-equation-index="${index}" data-equation-key="${escapeHtml(equationKey)}">${equationHtml}</div>`;
       })
       .join('');
     return `<div class="math-block"${attrs} data-label="katex"><div class="math-equation-list">${html}</div></div>\n`;
   },
 });
+
+function normalizeKatexInput(content: string): string {
+  return content.replace(/\\\\(?=(?:implies|impliedby|Rightarrow|Leftarrow|rightarrow|leftarrow|iff)\b)/g, () => '\\');
+}
 
 function splitKatexBlockEquations(content: string): string[] {
   const normalized = content.replace(/\r\n?/g, '\n').trim();

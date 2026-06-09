@@ -328,41 +328,41 @@
 }
 
 .pdf-export-root .math-equation-list {
-  display: grid;
-  gap: 8px;
+  display: block;
   width: 100%;
 }
 
 .pdf-export-root .math-equation {
-  display: flex;
+  display: block;
   width: 100%;
-  min-height: 32px;
-  align-items: center;
   padding: 5px 16px;
   box-sizing: border-box;
+  line-height: normal;
+}
+
+.pdf-export-root .math-equation + .math-equation {
+  margin-top: 8px;
 }
 
 .pdf-export-root .math-equation[data-align="left"] {
-  justify-content: flex-start;
   text-align: left;
 }
 
 .pdf-export-root .math-equation[data-align="center"] {
-  justify-content: center;
   text-align: center;
 }
 
 .pdf-export-root .math-equation[data-align="right"] {
-  justify-content: flex-end;
   text-align: right;
 }
 
 .pdf-export-root .math-equation .katex-display {
-  display: block;
-  width: max-content;
+  display: inline-block;
+  width: auto;
   max-width: 100%;
   overflow: visible;
   text-align: inherit;
+  vertical-align: middle;
 }
 
 .pdf-export-root .math-equation .katex-display > .katex {
@@ -433,6 +433,62 @@
 .pdf-export-root .katex,
 .pdf-export-root .katex * {
   box-sizing: content-box;
+}
+
+.pdf-export-root .katex {
+  position: relative;
+  font: normal 1.21em KaTeX_Main, "Times New Roman", serif;
+  line-height: 1.2;
+  text-indent: 0;
+  text-rendering: auto;
+}
+
+.pdf-export-root .katex .base,
+.pdf-export-root .katex .strut {
+  display: inline-block;
+}
+
+.pdf-export-root .katex .base {
+  position: relative;
+  width: min-content;
+  white-space: nowrap;
+}
+
+.pdf-export-root .katex .vlist-t {
+  display: inline-table;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pdf-export-root .katex .vlist-r {
+  display: table-row;
+}
+
+.pdf-export-root .katex .vlist {
+  position: relative;
+  display: table-cell;
+  vertical-align: bottom;
+}
+
+.pdf-export-root .katex .vlist > span {
+  position: relative;
+  display: block;
+  height: 0;
+}
+
+.pdf-export-root .katex .vlist > span > span,
+.pdf-export-root .katex .mspace,
+.pdf-export-root .katex .rule {
+  display: inline-block;
+}
+
+.pdf-export-root .katex .mfrac .frac-line,
+.pdf-export-root .katex .overline .overline-line,
+.pdf-export-root .katex .underline .underline-line,
+.pdf-export-root .katex .sqrt-line {
+  display: inline-block;
+  width: 100%;
+  min-height: 1px;
 }
 
 .pdf-export-root .katex,
