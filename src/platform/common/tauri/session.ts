@@ -1,5 +1,6 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
 import type { BlockLayout } from '../../../types/metadata';
+import type { WorkspaceSession } from '../../../types/session';
 
 export async function loadSession<T>(): Promise<T | null> {
   if (!isTauriRuntime()) return null;
@@ -9,6 +10,11 @@ export async function loadSession<T>(): Promise<T | null> {
 export async function saveSession<T>(session: T): Promise<void> {
   if (!isTauriRuntime()) return;
   await invokeCommand<null>('save_session', { session });
+}
+
+export async function loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null> {
+  if (!isTauriRuntime()) return null;
+  return invokeCommand<WorkspaceSession | null>('load_workspace_session', { workspacePath });
 }
 
 export async function loadBlockLayouts(filePath: string): Promise<BlockLayout[]> {

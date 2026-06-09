@@ -27,6 +27,7 @@ export const browserBackend: BackendAdapter = {
   metadata: {
     loadSession,
     saveSession,
+    loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
   },
@@ -47,6 +48,7 @@ export const browserBackend: BackendAdapter = {
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
+    openNewWindow,
     runWindowAction: noop,
   },
 };
@@ -144,6 +146,10 @@ async function saveSession<T>(session: T): Promise<void> {
   localStorage.setItem(sessionKey, JSON.stringify(session));
 }
 
+async function loadWorkspaceSession(_workspacePath: string): Promise<null> {
+  return null;
+}
+
 async function loadBlockLayouts(filePath: string): Promise<BlockLayout[]> {
   const raw = localStorage.getItem(`${blockLayoutPrefix}${filePath}`);
   return raw ? (JSON.parse(raw) as BlockLayout[]) : [];
@@ -165,6 +171,10 @@ async function saveBlockLayout(layout: BlockLayout): Promise<void> {
 async function openExternalUrl(url: string): Promise<void> {
   if (!isExternalUrl(url)) return;
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+async function openNewWindow(): Promise<void> {
+  window.open(window.location.href, '_blank', 'noopener,noreferrer');
 }
 
 function toFileHref(path: string): string {

@@ -11,6 +11,7 @@ import { MenuSurface } from '../ui/surface/MenuSurface';
 
 export interface AppMenuHandlers {
   onNewFile: () => void;
+  onNewWindow: () => void;
   onOpen: () => void;
   onOpenFolder: () => void;
   onSave: () => void;
@@ -126,6 +127,7 @@ function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; com
         label: 'File',
         items: [
           { label: 'New File', shortcut: 'Ctrl+N', action: handlers.onNewFile },
+          { label: 'New Window', shortcut: 'Ctrl+Shift+N', action: handlers.onNewWindow },
           { label: 'Open File...', shortcut: 'Ctrl+O', action: handlers.onOpen },
           { label: 'Open Folder...', shortcut: 'Ctrl+Shift+O', action: handlers.onOpenFolder },
           { separator: true },

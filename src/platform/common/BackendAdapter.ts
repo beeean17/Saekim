@@ -1,4 +1,5 @@
 import type { BlockLayout } from '../../types/metadata';
+import type { WorkspaceSession } from '../../types/session';
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
 export interface BackendAdapter {
@@ -34,6 +35,7 @@ export interface ImageAssetBackend {
 export interface MetadataBackend {
   loadSession<T>(): Promise<T | null>;
   saveSession<T>(session: T): Promise<void>;
+  loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null>;
   loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;
   saveBlockLayout(layout: BlockLayout): Promise<void>;
 }
@@ -56,6 +58,7 @@ export interface RuntimeBackend {
   setWindowMinSize(width: number, height: number): Promise<void>;
   startWindowDrag(): Promise<void>;
   setWindowBackgroundColor(color: string): Promise<void>;
+  openNewWindow(): Promise<void>;
   runWindowAction(action: WindowAction): Promise<void>;
 }
 
@@ -70,6 +73,7 @@ export interface ImageDownloadProgressPayload {
 
 export interface NativeMenuCommandHandlers {
   onNewFile(): void;
+  onNewWindow(): void;
   onOpen(): void;
   onOpenFolder(): void;
   onSave(): void;

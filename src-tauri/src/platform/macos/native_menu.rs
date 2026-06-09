@@ -3,17 +3,18 @@ use tauri::{
     AppHandle, Emitter, EventTarget, Manager, WebviewWindow, Wry,
 };
 
-const MAIN_WINDOW_LABEL: &str = "main";
 const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
 const MENU_EXPORT_PDF: &str = "export-pdf";
 const MENU_NEW_FILE: &str = "new-file";
+const MENU_NEW_WINDOW: &str = "new-window";
 const MENU_OPEN_FILE: &str = "open-file";
 const MENU_OPEN_FOLDER: &str = "open-folder";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
 const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
+const EVENT_NEW_WINDOW: &str = "saekim-menu-new-window";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 
@@ -34,6 +35,13 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+S"))?;
     let new_file = MenuItem::with_id(app, MENU_NEW_FILE, "New File", true, Some("CmdOrCtrl+N"))?;
+    let new_window = MenuItem::with_id(
+        app,
+        MENU_NEW_WINDOW,
+        "New Window",
+        true,
+        Some("CmdOrCtrl+Shift+N"),
+    )?;
     let open_file = MenuItem::with_id(
         app,
         MENU_OPEN_FILE,
@@ -84,6 +92,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         &[
             &new_file,
+            &new_window,
             &PredefinedMenuItem::separator(app)?,
             &open_file,
             &open_folder,
@@ -151,14 +160,12 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         return;
     };
 
-    match app.emit(event_name, ()) {
-        Ok(()) => eprintln!("[saekim:native-menu] emitted app event={event_name}"),
-        Err(error) => {
-            eprintln!("[saekim:native-menu] failed to emit app event={event_name}: {error}")
-        }
-    }
+    let Some((target_label, window)) = target_window(app) else {
+        eprintln!("[saekim:native-menu] target window not found for event={event_name}");
+        return;
+    };
 
-    match app.emit_to(EventTarget::window(MAIN_WINDOW_LABEL), event_name, ()) {
+    match app.emit_to(EventTarget::window(&target_label), event_name, ()) {
         Ok(()) => eprintln!("[saekim:native-menu] emitted target window event={event_name}"),
         Err(error) => eprintln!(
             "[saekim:native-menu] failed to emit target window event={event_name}: {error}"
@@ -166,7 +173,7 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 
     match app.emit_to(
-        EventTarget::webview_window(MAIN_WINDOW_LABEL),
+        EventTarget::webview_window(&target_label),
         event_name,
         (),
     ) {
@@ -177,11 +184,6 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
             "[saekim:native-menu] failed to emit target webview window event={event_name}: {error}"
         ),
     }
-
-    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
-        eprintln!("[saekim:native-menu] main window not found for event={event_name}");
-        return;
-    };
 
     match window.emit(event_name, ()) {
         Ok(()) => eprintln!("[saekim:native-menu] emitted window event={event_name}"),
@@ -203,12 +205,23 @@ fn dispatch_dom_event(window: &WebviewWindow<Wry>, event_name: &str) {
     }
 }
 
+fn target_window(app: &AppHandle) -> Option<(String, WebviewWindow<Wry>)> {
+    crate::active_window_label(app)
+        .and_then(|label| app.get_webview_window(&label).map(|window| (label, window)))
+        .or_else(|| {
+            app.get_webview_window("main")
+                .map(|window| ("main".to_string(), window))
+        })
+        .or_else(|| app.webview_windows().into_iter().next())
+}
+
 fn menu_event_name(menu_id: &str) -> Option<&'static str> {
     match menu_id {
         MENU_SAVE => Some(EVENT_SAVE),
         MENU_SAVE_AS => Some(EVENT_SAVE_AS),
         MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
         MENU_NEW_FILE => Some(EVENT_NEW_FILE),
+        MENU_NEW_WINDOW => Some(EVENT_NEW_WINDOW),
         MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
         MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
         _ => None,

@@ -32,17 +32,33 @@ pub struct BlockLayoutPayload {
 }
 
 #[tauri::command]
-pub fn load_session(app: tauri::AppHandle) -> CommandResult<Option<Value>> {
-    match load_session_from_metadata(&app).or_else(|_| load_legacy_session()) {
+pub fn load_session(app: tauri::AppHandle, window: tauri::Window) -> CommandResult<Option<Value>> {
+    match load_session_from_metadata(&app, window.label()).or_else(|_| load_legacy_session()) {
         Ok(session) => ok(session),
         Err(error) => fail(error),
     }
 }
 
 #[tauri::command]
-pub fn save_session(app: tauri::AppHandle, session: Value) -> CommandResult<Option<()>> {
-    match save_session_to_metadata(&app, &session) {
+pub fn save_session(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    session: Value,
+) -> CommandResult<Option<()>> {
+    match save_session_to_metadata(&app, window.label(), &session) {
         Ok(()) => ok(Some(())),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn load_workspace_session(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    workspace_path: String,
+) -> CommandResult<Option<Value>> {
+    match load_workspace_session_from_metadata(&app, window.label(), &workspace_path) {
+        Ok(session) => ok(session),
         Err(error) => fail(error),
     }
 }
@@ -61,35 +77,105 @@ pub fn load_block_layouts(
 #[tauri::command]
 pub fn save_block_layout(
     app: tauri::AppHandle,
+    window: tauri::Window,
     layout: BlockLayoutPayload,
 ) -> CommandResult<Option<()>> {
-    match save_block_layout_to_metadata(&app, &layout) {
+    match save_block_layout_to_metadata(&app, window.label(), &layout) {
         Ok(()) => ok(Some(())),
         Err(error) => fail(error),
     }
 }
 
-fn load_session_from_metadata(app: &tauri::AppHandle) -> Result<Option<Value>, String> {
+fn load_session_from_metadata(
+    app: &tauri::AppHandle,
+    window_label: &str,
+) -> Result<Option<Value>, String> {
     let connection = open_metadata_connection(app)?;
-    let saved_at = metadata_value(&connection, "saved_at")?;
-    if saved_at.is_none() {
+    let Some(context) = load_window_session_context(&connection, window_label)? else {
         return Ok(None);
+    };
+
+    load_session_for_context(&connection, window_label, context).map(Some)
+}
+
+struct WindowSessionContext {
+    saved_at: String,
+    workspace_id: String,
+    view_id: String,
+    active_file_id: Option<String>,
+    ui: Value,
+    settings: Value,
+}
+
+fn load_window_session_context(
+    connection: &Connection,
+    window_label: &str,
+) -> Result<Option<WindowSessionContext>, String> {
+    let context = connection
+        .query_row(
+            "SELECT saved_at, workspace_id, workspace_view_id, active_file_id, ui_json, settings_json
+             FROM workspace_windows
+             WHERE window_label = ?1",
+            params![window_label],
+            |row| {
+                let ui_json: String = row.get(4)?;
+                let settings_json: String = row.get(5)?;
+                Ok(WindowSessionContext {
+                    saved_at: row.get(0)?,
+                    workspace_id: row.get(1)?,
+                    view_id: row.get(2)?,
+                    active_file_id: row.get(3)?,
+                    ui: parse_json_value(Some(&ui_json), default_ui()),
+                    settings: parse_json_value(Some(&settings_json), default_settings()),
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to load window session metadata: {error}"))?;
+
+    if context.is_some() {
+        return Ok(context);
     }
 
-    let workspace_id = metadata_value(&connection, "active_workspace_id")?
+    load_legacy_window_session_context(connection)
+}
+
+fn load_legacy_window_session_context(
+    connection: &Connection,
+) -> Result<Option<WindowSessionContext>, String> {
+    let Some(saved_at) = metadata_value(connection, "saved_at")? else {
+        return Ok(None);
+    };
+
+    let workspace_id = metadata_value(connection, "active_workspace_id")?
         .unwrap_or_else(|| DEFAULT_WORKSPACE_ID.to_string());
-    let view_id = metadata_value(&connection, "active_view_id")?
+    let view_id = metadata_value(connection, "active_view_id")?
         .unwrap_or_else(|| DEFAULT_VIEW_ID.to_string());
-    let active_file_id = metadata_value(&connection, "active_file_id")?;
+    let active_file_id = metadata_value(connection, "active_file_id")?;
     let settings = parse_json_value(
-        metadata_value(&connection, "settings_json")?.as_deref(),
+        metadata_value(connection, "settings_json")?.as_deref(),
         default_settings(),
     );
 
+    Ok(Some(WindowSessionContext {
+        saved_at,
+        workspace_id,
+        view_id,
+        active_file_id,
+        ui: default_ui(),
+        settings,
+    }))
+}
+
+fn load_session_for_context(
+    connection: &Connection,
+    window_label: &str,
+    context: WindowSessionContext,
+) -> Result<Value, String> {
     let workspace_row = connection
         .query_row(
             "SELECT canonical_root_path FROM workspaces WHERE id = ?1",
-            params![workspace_id],
+            params![context.workspace_id],
             |row| row.get::<_, String>(0),
         )
         .optional()
@@ -98,7 +184,7 @@ fn load_session_from_metadata(app: &tauri::AppHandle) -> Result<Option<Value>, S
     let view_row = connection
         .query_row(
             "SELECT view_root_relative_path, layout_json, tree_json FROM workspace_views WHERE id = ?1",
-            params![view_id],
+            params![context.view_id],
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -113,31 +199,160 @@ fn load_session_from_metadata(app: &tauri::AppHandle) -> Result<Option<Value>, S
     let (root_path, ui, tree) = match (workspace_row, view_row) {
         (Some(canonical_root_path), Some((view_relative_path, layout_json, tree_json))) => (
             Some(resolve_view_root(&canonical_root_path, &view_relative_path)),
-            parse_json_value(layout_json.as_deref(), default_ui()),
+            parse_json_value(layout_json.as_deref(), context.ui),
             parse_json_value(tree_json.as_deref(), json!([])),
         ),
-        _ => (None, default_ui(), json!([])),
+        _ => (None, context.ui, json!([])),
     };
 
-    let open_files = load_open_files(&connection, &view_id)?;
-    let recent_files = load_recent_files(&connection, &workspace_id)?;
+    let open_files = load_open_files(
+        connection,
+        window_label,
+        &context.workspace_id,
+        &context.view_id,
+    )?;
+    let recent_files = load_recent_files(connection, &context.workspace_id)?;
+    let recent_workspaces = load_recent_workspaces(connection)?;
 
-    Ok(Some(json!({
-        "version": 1,
-        "savedAt": saved_at.unwrap_or_else(|| current_timestamp_millis().to_string()),
+    Ok(json!({
+        "version": 2,
+        "savedAt": context.saved_at,
+        "window": {
+            "id": window_label,
+            "label": window_label,
+        },
         "workspace": {
             "rootPath": root_path,
             "tree": tree,
             "openFiles": open_files,
             "recentFiles": recent_files,
-            "activeFileId": active_file_id,
+            "activeFileId": context.active_file_id,
         },
+        "recentWorkspaces": recent_workspaces,
         "ui": ui,
-        "settings": settings,
+        "settings": context.settings,
+    }))
+}
+
+fn load_workspace_session_from_metadata(
+    app: &tauri::AppHandle,
+    window_label: &str,
+    workspace_path: &str,
+) -> Result<Option<Value>, String> {
+    let connection = open_metadata_connection(app)?;
+    let canonical_root_path = workspace_path.trim();
+    if canonical_root_path.is_empty() {
+        return Ok(None);
+    }
+
+    let workspace_id = stable_id("ws", canonical_root_path);
+    let Some((view_id, active_file_id)) =
+        preferred_workspace_view(&connection, window_label, &workspace_id)?
+    else {
+        return Ok(Some(json!({
+            "rootPath": canonical_root_path,
+            "tree": [],
+            "openFiles": [],
+            "recentFiles": [],
+            "activeFileId": null,
+        })));
+    };
+
+    let view_row = connection
+        .query_row(
+            "SELECT view_root_relative_path, tree_json FROM workspace_views WHERE id = ?1",
+            params![view_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+        .optional()
+        .map_err(|error| format!("failed to load workspace view metadata: {error}"))?;
+
+    let Some((view_relative_path, tree_json)) = view_row else {
+        return Ok(None);
+    };
+
+    let root_path = resolve_view_root(canonical_root_path, &view_relative_path);
+    let open_files = load_open_files(&connection, window_label, &workspace_id, &view_id)?;
+    let active_file_id = match active_file_id {
+        Some(active_file_id) => Some(active_file_id),
+        None => active_file_id_for_window_workspace(&connection, window_label, &workspace_id)?,
+    };
+    let recent_files = load_recent_files(&connection, &workspace_id)?;
+
+    Ok(Some(json!({
+        "rootPath": root_path,
+        "tree": parse_json_value(tree_json.as_deref(), json!([])),
+        "openFiles": open_files,
+        "recentFiles": recent_files,
+        "activeFileId": active_file_id,
     })))
 }
 
-fn save_session_to_metadata(app: &tauri::AppHandle, session: &Value) -> Result<(), String> {
+fn active_file_id_for_window_workspace(
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+) -> Result<Option<String>, String> {
+    connection
+        .query_row(
+            "SELECT state_json
+             FROM window_file_view_state
+             WHERE window_label = ?1 AND workspace_id = ?2 AND is_active = 1
+             ORDER BY open_order ASC
+             LIMIT 1",
+            params![window_label, workspace_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| format!("failed to load active window file metadata: {error}"))
+        .map(|state_json| {
+            state_json.and_then(|value| {
+                serde_json::from_str::<Value>(&value)
+                    .ok()
+                    .and_then(|file| file.get("id").and_then(Value::as_str).map(str::to_string))
+            })
+        })
+}
+
+fn preferred_workspace_view(
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+) -> Result<Option<(String, Option<String>)>, String> {
+    let window_view = connection
+        .query_row(
+            "SELECT workspace_view_id, active_file_id
+             FROM workspace_windows
+             WHERE window_label = ?1 AND workspace_id = ?2",
+            params![window_label, workspace_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+        .optional()
+        .map_err(|error| format!("failed to load window workspace view metadata: {error}"))?;
+
+    if window_view.is_some() {
+        return Ok(window_view);
+    }
+
+    connection
+        .query_row(
+            "SELECT id, NULL
+             FROM workspace_views
+             WHERE workspace_id = ?1
+             ORDER BY last_opened_at DESC
+             LIMIT 1",
+            params![workspace_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+        .optional()
+        .map_err(|error| format!("failed to load recent workspace view metadata: {error}"))
+}
+
+fn save_session_to_metadata(
+    app: &tauri::AppHandle,
+    window_label: &str,
+    session: &Value,
+) -> Result<(), String> {
     let mut connection = open_metadata_connection(app)?;
     let transaction = connection
         .transaction()
@@ -170,7 +385,6 @@ fn save_session_to_metadata(app: &tauri::AppHandle, session: &Value) -> Result<(
         .get("activeFileId")
         .and_then(Value::as_str)
         .map(str::to_string);
-
     let canonical_root_path = canonical_root_path(root_path, &open_files).unwrap_or_default();
     let workspace_id = if canonical_root_path.is_empty() {
         DEFAULT_WORKSPACE_ID.to_string()
@@ -222,10 +436,10 @@ fn save_session_to_metadata(app: &tauri::AppHandle, session: &Value) -> Result<(
 
     transaction
         .execute(
-            "DELETE FROM file_view_state WHERE workspace_view_id = ?1",
-            params![view_id],
+            "DELETE FROM window_file_view_state WHERE window_label = ?1 AND workspace_id = ?2",
+            params![window_label, workspace_id],
         )
-        .map_err(|error| format!("failed to reset file view state: {error}"))?;
+        .map_err(|error| format!("failed to reset window file view state: {error}"))?;
 
     transaction
         .execute(
@@ -251,10 +465,10 @@ fn save_session_to_metadata(app: &tauri::AppHandle, session: &Value) -> Result<(
     )?;
 
     for (index, open_file) in open_files.iter().enumerate() {
-        save_open_file(
+        save_window_open_file(
             &transaction,
+            window_label,
             &workspace_id,
-            &view_id,
             &canonical_root_path,
             open_file,
             index,
@@ -262,6 +476,34 @@ fn save_session_to_metadata(app: &tauri::AppHandle, session: &Value) -> Result<(
             now,
         )?;
     }
+
+    transaction
+        .execute(
+            "INSERT INTO workspace_windows
+               (id, window_label, workspace_id, workspace_view_id, active_file_id,
+                ui_json, settings_json, saved_at, created_at, last_active_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+             ON CONFLICT(window_label) DO UPDATE SET
+               workspace_id = excluded.workspace_id,
+               workspace_view_id = excluded.workspace_view_id,
+               active_file_id = excluded.active_file_id,
+               ui_json = excluded.ui_json,
+               settings_json = excluded.settings_json,
+               saved_at = excluded.saved_at,
+               last_active_at = excluded.last_active_at",
+            params![
+                stable_id("win", window_label),
+                window_label,
+                workspace_id.as_str(),
+                view_id.as_str(),
+                active_file_id.as_deref(),
+                ui_json.as_str(),
+                settings_json.as_str(),
+                saved_at.as_str(),
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to save window workspace metadata: {error}"))?;
 
     save_metadata_value(&transaction, "schema_version", &SCHEMA_VERSION.to_string())?;
     save_metadata_value(&transaction, "saved_at", &saved_at)?;
@@ -328,6 +570,7 @@ fn load_block_layouts_from_metadata(
 
 fn save_block_layout_to_metadata(
     app: &tauri::AppHandle,
+    window_label: &str,
     layout: &BlockLayoutPayload,
 ) -> Result<(), String> {
     if layout.file_path.trim().is_empty()
@@ -339,7 +582,7 @@ fn save_block_layout_to_metadata(
 
     let connection = open_metadata_connection(app)?;
     let (workspace_id, canonical_root_path) =
-        workspace_context_for_file(&connection, &layout.file_path)?;
+        workspace_context_for_file(&connection, window_label, &layout.file_path)?;
     ensure_workspace(&connection, &workspace_id, &canonical_root_path)?;
     let display_name = file_name_from_path(&layout.file_path);
     let file_id = upsert_file(
@@ -446,6 +689,21 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS workspace_windows (
+              id TEXT PRIMARY KEY,
+              window_label TEXT NOT NULL UNIQUE,
+              workspace_id TEXT NOT NULL,
+              workspace_view_id TEXT NOT NULL,
+              active_file_id TEXT,
+              ui_json TEXT NOT NULL,
+              settings_json TEXT NOT NULL,
+              saved_at TEXT NOT NULL,
+              created_at INTEGER NOT NULL,
+              last_active_at INTEGER NOT NULL,
+              FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+              FOREIGN KEY(workspace_view_id) REFERENCES workspace_views(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS files (
               id TEXT PRIMARY KEY,
               workspace_id TEXT NOT NULL,
@@ -471,6 +729,21 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               updated_at INTEGER NOT NULL,
               UNIQUE(workspace_view_id, file_id),
               FOREIGN KEY(workspace_view_id) REFERENCES workspace_views(id) ON DELETE CASCADE,
+              FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS window_file_view_state (
+              id TEXT PRIMARY KEY,
+              window_label TEXT NOT NULL,
+              workspace_id TEXT NOT NULL,
+              file_id TEXT NOT NULL,
+              is_open INTEGER NOT NULL DEFAULT 0,
+              open_order INTEGER NOT NULL DEFAULT 0,
+              is_active INTEGER NOT NULL DEFAULT 0,
+              state_json TEXT NOT NULL,
+              updated_at INTEGER NOT NULL,
+              UNIQUE(window_label, workspace_id, file_id),
+              FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
               FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
             );
 
@@ -529,6 +802,10 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               ON recent_file_queue(workspace_id, queue_order ASC);
             CREATE INDEX IF NOT EXISTS idx_file_view_state_view_order
               ON file_view_state(workspace_view_id, is_open, open_order);
+            CREATE INDEX IF NOT EXISTS idx_workspace_windows_last_active
+              ON workspace_windows(last_active_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_window_file_view_state_order
+              ON window_file_view_state(window_label, workspace_id, is_open, open_order);
             CREATE INDEX IF NOT EXISTS idx_block_layouts_file
               ON block_layouts(file_id, block_kind);
             ",
@@ -552,9 +829,12 @@ fn find_file_for_path(
 
 fn workspace_context_for_file(
     connection: &Connection,
+    window_label: &str,
     file_path: &str,
 ) -> Result<(String, String), String> {
-    if let Some((workspace_id, canonical_root_path)) = active_workspace_context(connection)? {
+    if let Some((workspace_id, canonical_root_path)) =
+        active_workspace_context(connection, Some(window_label))?
+    {
         if path_is_inside(file_path, &canonical_root_path) {
             return Ok((workspace_id, canonical_root_path));
         }
@@ -582,7 +862,28 @@ fn workspace_context_for_file(
     Ok((workspace_id, canonical_root_path))
 }
 
-fn active_workspace_context(connection: &Connection) -> Result<Option<(String, String)>, String> {
+fn active_workspace_context(
+    connection: &Connection,
+    window_label: Option<&str>,
+) -> Result<Option<(String, String)>, String> {
+    if let Some(window_label) = window_label {
+        let context = connection
+            .query_row(
+                "SELECT workspace_windows.workspace_id, workspaces.canonical_root_path
+                 FROM workspace_windows
+                 JOIN workspaces ON workspaces.id = workspace_windows.workspace_id
+                 WHERE workspace_windows.window_label = ?1",
+                params![window_label],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()
+            .map_err(|error| format!("failed to load active window workspace metadata: {error}"))?;
+
+        if context.is_some() {
+            return Ok(context);
+        }
+    }
+
     let Some(workspace_id) = metadata_value(connection, "active_workspace_id")? else {
         return Ok(None);
     };
@@ -666,10 +967,10 @@ fn save_recent_file(
     Ok(())
 }
 
-fn save_open_file(
+fn save_window_open_file(
     connection: &Connection,
+    window_label: &str,
     workspace_id: &str,
-    view_id: &str,
     canonical_root_path: &str,
     open_file: &Value,
     index: usize,
@@ -700,7 +1001,7 @@ fn save_open_file(
     )?;
     let state_json = serde_json::to_string(open_file)
         .map_err(|error| format!("failed to serialize file session metadata: {error}"))?;
-    let state_id = stable_id("fvs", &format!("{view_id}:{file_id}"));
+    let state_id = stable_id("wfvs", &format!("{window_label}:{workspace_id}:{file_id}"));
     let is_active = file_id_from_session
         .zip(active_file_id)
         .map(|(file_id, active_file_id)| file_id == active_file_id)
@@ -708,18 +1009,27 @@ fn save_open_file(
 
     connection
         .execute(
-            "INSERT INTO file_view_state
-               (id, workspace_view_id, file_id, is_open, open_order, is_active, state_json, updated_at)
-             VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7)
-             ON CONFLICT(workspace_view_id, file_id) DO UPDATE SET
+            "INSERT INTO window_file_view_state
+               (id, window_label, workspace_id, file_id, is_open, open_order, is_active, state_json, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)
+             ON CONFLICT(window_label, workspace_id, file_id) DO UPDATE SET
                is_open = excluded.is_open,
                open_order = excluded.open_order,
                is_active = excluded.is_active,
                state_json = excluded.state_json,
                updated_at = excluded.updated_at",
-            params![state_id, view_id, file_id, index as i64, i64::from(is_active), state_json, now],
+            params![
+                state_id,
+                window_label,
+                workspace_id,
+                file_id,
+                index as i64,
+                i64::from(is_active),
+                state_json,
+                now
+            ],
         )
-        .map_err(|error| format!("failed to save file view state: {error}"))?;
+        .map_err(|error| format!("failed to save window file view state: {error}"))?;
 
     Ok(())
 }
@@ -765,7 +1075,41 @@ fn upsert_file(
     Ok(file_id)
 }
 
-fn load_open_files(connection: &Connection, view_id: &str) -> Result<Value, String> {
+fn load_open_files(
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+    view_id: &str,
+) -> Result<Value, String> {
+    let files = load_window_open_files(connection, window_label, workspace_id)?;
+    if !files.is_empty() {
+        return Ok(Value::Array(files));
+    }
+
+    Ok(Value::Array(load_legacy_open_files(connection, view_id)?))
+}
+
+fn load_window_open_files(
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+) -> Result<Vec<Value>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT state_json FROM window_file_view_state
+             WHERE window_label = ?1 AND workspace_id = ?2 AND is_open = 1
+             ORDER BY open_order ASC",
+        )
+        .map_err(|error| format!("failed to prepare window open files query: {error}"))?;
+
+    let rows = statement
+        .query_map(params![window_label, workspace_id], |row| row.get::<_, String>(0))
+        .map_err(|error| format!("failed to query window open files: {error}"))?;
+
+    read_file_state_rows(rows, "window open file")
+}
+
+fn load_legacy_open_files(connection: &Connection, view_id: &str) -> Result<Vec<Value>, String> {
     let mut statement = connection
         .prepare(
             "SELECT state_json FROM file_view_state
@@ -778,15 +1122,22 @@ fn load_open_files(connection: &Connection, view_id: &str) -> Result<Value, Stri
         .query_map(params![view_id], |row| row.get::<_, String>(0))
         .map_err(|error| format!("failed to query open files: {error}"))?;
 
+    read_file_state_rows(rows, "open file")
+}
+
+fn read_file_state_rows(
+    rows: rusqlite::MappedRows<'_, impl FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<String>>,
+    label: &str,
+) -> Result<Vec<Value>, String> {
     let mut files = Vec::new();
     for row in rows {
-        let state_json = row.map_err(|error| format!("failed to read open file row: {error}"))?;
+        let state_json = row.map_err(|error| format!("failed to read {label} row: {error}"))?;
         if let Ok(file) = serde_json::from_str::<Value>(&state_json) {
             files.push(file);
         }
     }
 
-    Ok(Value::Array(files))
+    Ok(files)
 }
 
 fn load_recent_files(connection: &Connection, workspace_id: &str) -> Result<Value, String> {
@@ -849,6 +1200,40 @@ fn load_recent_files(connection: &Connection, workspace_id: &str) -> Result<Valu
     }
 
     Ok(Value::Array(files))
+}
+
+fn load_recent_workspaces(connection: &Connection) -> Result<Value, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT workspaces.id, workspaces.canonical_root_path, workspaces.display_name,
+                    workspaces.last_opened_at, workspace_windows.window_label
+             FROM workspaces
+             LEFT JOIN workspace_windows ON workspace_windows.workspace_id = workspaces.id
+             WHERE workspaces.canonical_root_path != ''
+             GROUP BY workspaces.id
+             ORDER BY workspaces.last_opened_at DESC
+             LIMIT 30",
+        )
+        .map_err(|error| format!("failed to prepare recent workspaces query: {error}"))?;
+
+    let rows = statement
+        .query_map([], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "path": row.get::<_, String>(1)?,
+                "name": row.get::<_, String>(2)?,
+                "openedAt": row.get::<_, i64>(3)?,
+                "windowId": row.get::<_, Option<String>>(4)?,
+            }))
+        })
+        .map_err(|error| format!("failed to query recent workspaces: {error}"))?;
+
+    let mut workspaces = Vec::new();
+    for row in rows {
+        workspaces.push(row.map_err(|error| format!("failed to read recent workspace row: {error}"))?);
+    }
+
+    Ok(Value::Array(workspaces))
 }
 
 fn metadata_value(connection: &Connection, key: &str) -> Result<Option<String>, String> {

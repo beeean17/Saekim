@@ -31,6 +31,14 @@ export interface RecentFile {
   openedAt: number;
 }
 
+export interface RecentWorkspace {
+  id: string;
+  path: string;
+  name: string;
+  openedAt: number;
+  windowId?: string;
+}
+
 export interface CommandResult<T> {
   success: boolean;
   data?: T;

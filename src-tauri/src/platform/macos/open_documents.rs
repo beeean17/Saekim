@@ -165,10 +165,17 @@ fn queue_open_files(paths: Vec<String>) {
     }
 
     let _ = app.emit(EVENT_OPEN_EXTERNAL_FILES, paths.clone());
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = target_window(app) {
         let _ = window.emit(EVENT_OPEN_EXTERNAL_FILES, paths);
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+fn target_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    crate::active_window_label(app)
+        .and_then(|label| app.get_webview_window(&label))
+        .or_else(|| app.get_webview_window("main"))
+        .or_else(|| app.webview_windows().into_values().next())
 }

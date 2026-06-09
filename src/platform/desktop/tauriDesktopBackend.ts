@@ -21,13 +21,14 @@ import {
   writePdfExport,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
-import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../common/tauri/session';
+import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveSession } from '../common/tauri/session';
 import type { BackendAdapter, ImageDownloadProgressPayload, NativeMenuCommandHandlers, WindowAction } from '../common/BackendAdapter';
 
 const externalOpenEvent = 'saekim-open-external-files';
 const imageDownloadProgressEvent = 'image-download-progress';
 const menuEvents = {
   newFile: 'saekim-menu-new-file',
+  newWindow: 'saekim-menu-new-window',
   openFile: 'saekim-menu-open-file',
   openFolder: 'saekim-menu-open-folder',
   save: 'saekim-menu-save',
@@ -57,6 +58,7 @@ export const tauriDesktopBackend: BackendAdapter = {
   metadata: {
     loadSession,
     saveSession,
+    loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
   },
@@ -77,6 +79,7 @@ export const tauriDesktopBackend: BackendAdapter = {
     setWindowMinSize,
     startWindowDrag,
     setWindowBackgroundColor,
+    openNewWindow,
     runWindowAction,
   },
 };
@@ -131,6 +134,7 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
 
   try {
     await registerMenuEvent(menuEvents.newFile, 'newFile', handlers.onNewFile);
+    await registerMenuEvent(menuEvents.newWindow, 'newWindow', handlers.onNewWindow);
     await registerMenuEvent(menuEvents.openFile, 'openFile', handlers.onOpen);
     await registerMenuEvent(menuEvents.openFolder, 'openFolder', handlers.onOpenFolder);
     await registerMenuEvent(menuEvents.save, 'save', handlers.onSave);
@@ -203,6 +207,10 @@ async function startWindowDrag(): Promise<void> {
 
 async function setWindowBackgroundColor(color: string): Promise<void> {
   await getCurrentWebviewWindow().setBackgroundColor(color);
+}
+
+async function openNewWindow(): Promise<void> {
+  await invoke('open_new_window');
 }
 
 async function runWindowAction(action: WindowAction): Promise<void> {

@@ -1,3 +1,9 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use tauri::Manager;
+
+use crate::app_state::AppState;
+
 #[tauri::command]
 pub fn log_frontend_event(scope: String, message: String, details: Option<String>) {
     match details {
@@ -29,6 +35,37 @@ pub fn start_window_drag(_window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+    let mut config = app
+        .config()
+        .app
+        .windows
+        .first()
+        .cloned()
+        .ok_or_else(|| "missing base window config".to_string())?;
+    let label = format!("window{}", current_timestamp_millis());
+    config.label = label.clone();
+
+    let window = tauri::WebviewWindowBuilder::from_config(&app, &config)
+        .map_err(|error| error.to_string())?
+        .build()
+        .map_err(|error| error.to_string())?;
+    let state = app.state::<AppState>();
+    if let Ok(mut active_label) = state.active_window_label.lock() {
+        *active_label = Some(label);
+    }
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub async fn open_new_window(_app: tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), String> {
     if !is_external_url(&url) {
@@ -43,4 +80,11 @@ fn is_external_url(url: &str) -> bool {
         url.split_once(':').map(|(scheme, _)| scheme.to_ascii_lowercase()),
         Some(scheme) if matches!(scheme.as_str(), "http" | "https" | "mailto" | "tel" | "file")
     )
+}
+
+fn current_timestamp_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or_default()
 }

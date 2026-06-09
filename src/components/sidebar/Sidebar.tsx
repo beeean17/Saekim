@@ -3,7 +3,7 @@ import { relativeTime } from '../../core/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import type { FileTreeNode, OpenFile, RecentFile, SidebarViewMode } from '../../types/workspace';
+import type { FileTreeNode, OpenFile, RecentWorkspace, SidebarViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 import { Dialog } from '../ui/overlay/Dialog';
@@ -15,9 +15,10 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
-  const recentFiles = useWorkspaceStore((state) => state.recentFiles);
+  const recentWorkspaces = useWorkspaceStore((state) => state.recentWorkspaces);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
+  const openWorkspace = useWorkspaceStore((state) => state.openWorkspace);
   const openFile = useWorkspaceStore((state) => state.openFile);
   const createFile = useWorkspaceStore((state) => state.createFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
@@ -47,9 +48,9 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
           setRecentSearchOpen(false);
         };
   const visibleTree = useMemo(() => filterTree(tree, workspaceSearchQuery), [workspaceSearchQuery, tree]);
-  const visibleRecentFiles = useMemo(
-    () => filterRecentFiles(getRecentEntries(recentFiles, openFiles), recentSearchQuery),
-    [recentSearchQuery, openFiles, recentFiles],
+  const visibleRecentWorkspaces = useMemo(
+    () => filterRecentWorkspaces(recentWorkspaces, recentSearchQuery),
+    [recentSearchQuery, recentWorkspaces],
   );
   const addImageToDocument = (image: { path: string; name: string }) => {
     if (!activeFile) {
@@ -90,7 +91,7 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
           autoFocus
           className="sidebar-search"
           value={searchQuery}
-          placeholder={sidebarViewMode === 'files' ? '워크스페이스에서 찾기' : '최근 파일에서 찾기'}
+          placeholder={sidebarViewMode === 'files' ? '워크스페이스에서 찾기' : '최근 워크스페이스에서 찾기'}
           onChange={setSearchQuery}
           onEscape={closeSearch}
         />
@@ -110,11 +111,10 @@ export function Sidebar({ textareaRef }: { textareaRef: RefObject<HTMLTextAreaEl
           ))}
         </div>
       ) : (
-        <RecentFilesView
-          activePath={activeFile?.path ?? null}
-          files={visibleRecentFiles}
-          openFiles={openFiles}
-          onOpen={(path) => void openFile(path)}
+        <RecentWorkspacesView
+          activePath={rootPath}
+          workspaces={visibleRecentWorkspaces}
+          onOpen={(path) => void openWorkspace(path)}
         />
       )}
       {imagePreview ? (
@@ -139,7 +139,7 @@ function SidebarViewSwitch({ mode, onChange }: { mode: SidebarViewMode; onChange
       value={mode}
       options={[
         { value: 'files', label: '워크스페이스' },
-        { value: 'recent', label: '최근' },
+        { value: 'recent', label: '최근 워크스페이스' },
       ]}
       onChange={onChange}
     />
@@ -172,7 +172,7 @@ function SidebarActions({
   if (mode === 'recent') {
     return (
       <div className="sidebar-actions">
-        <IconButton label="최근 파일 검색" onClick={onSearch}>
+        <IconButton label="최근 워크스페이스 검색" onClick={onSearch}>
           <Icon name="search" />
         </IconButton>
       </div>
@@ -216,55 +216,44 @@ function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
   });
 }
 
-function getRecentEntries(recentFiles: RecentFile[], openFiles: OpenFile[]): RecentFile[] {
-  const entries = [...recentFiles];
-  const knownPaths = new Set(entries.map((file) => file.path));
-
-  for (const file of openFiles) {
-    if (!knownPaths.has(file.path)) {
-      entries.unshift({ path: file.path, name: file.name, openedAt: Date.now() });
-    }
-  }
-
-  return entries;
-}
-
-function filterRecentFiles(files: RecentFile[], query: string): RecentFile[] {
+function filterRecentWorkspaces(workspaces: RecentWorkspace[], query: string): RecentWorkspace[] {
   const needle = query.trim().toLowerCase();
-  if (!needle) return files;
+  if (!needle) return workspaces;
 
-  return files.filter((file) => `${file.name} ${file.path}`.toLowerCase().includes(needle));
+  return workspaces.filter((workspace) => `${workspace.name} ${workspace.path}`.toLowerCase().includes(needle));
 }
 
-function RecentFilesView({
-  files,
-  openFiles,
+function RecentWorkspacesView({
+  workspaces,
   activePath,
   onOpen,
 }: {
-  files: RecentFile[];
-  openFiles: OpenFile[];
+  workspaces: RecentWorkspace[];
   activePath: string | null;
   onOpen: (path: string) => void;
 }) {
   return (
     <div className="recent-file-list">
-      {files.length === 0 ? (
-        <p className="sidebar-empty">최근 파일 없음</p>
+      {workspaces.length === 0 ? (
+        <p className="sidebar-empty">최근 워크스페이스 없음</p>
       ) : (
-        files.map((file) => {
-          const openFile = openFiles.find((candidate) => candidate.path === file.path);
-          const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
-          const active = file.path === activePath;
+        workspaces.map((workspace) => {
+          const active = workspace.path === activePath;
 
           return (
-            <button className={`recent-file ${active ? 'current' : ''}`} key={file.path} type="button" title={file.path} onClick={() => onOpen(file.path)}>
-              <Icon name="file" />
+            <button
+              className={`recent-file ${active ? 'current' : ''}`}
+              key={workspace.path}
+              type="button"
+              title={workspace.path}
+              onClick={() => onOpen(workspace.path)}
+            >
+              <Icon name="folder" />
               <span className="recent-file-text">
-                <span className="name">{file.name}</span>
-                <span className="path">{parentPath(file.path)}</span>
+                <span className="name">{workspace.name}</span>
+                <span className="path">{parentPath(workspace.path)}</span>
               </span>
-              {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(file.openedAt)}</span>}
+              <span className="meta">{active ? '열림' : relativeTime(workspace.openedAt)}</span>
             </button>
           );
         })

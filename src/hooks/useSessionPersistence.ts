@@ -70,8 +70,10 @@ export function useSessionPersistence(): boolean {
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const recentFiles = useWorkspaceStore((state) => state.recentFiles);
+  const recentWorkspaces = useWorkspaceStore((state) => state.recentWorkspaces);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const restoreWorkspace = useWorkspaceStore((state) => state.restoreWorkspace);
+  const restoreRecentWorkspaces = useWorkspaceStore((state) => state.restoreRecentWorkspaces);
 
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
@@ -102,6 +104,7 @@ export function useSessionPersistence(): boolean {
           return;
         }
         restoreWorkspace(session.workspace);
+        restoreRecentWorkspaces(session.recentWorkspaces);
         restoreUI(session.ui);
         restoreSettings(session.settings);
       })
@@ -112,7 +115,7 @@ export function useSessionPersistence(): boolean {
     return () => {
       alive = false;
     };
-  }, [restoreSettings, restoreUI, restoreWorkspace]);
+  }, [restoreRecentWorkspaces, restoreSettings, restoreUI, restoreWorkspace]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -122,8 +125,12 @@ export function useSessionPersistence(): boolean {
 
     saveTimer.current = window.setTimeout(() => {
       const session: AppSession = {
-        version: 1,
+        version: 2,
         savedAt: new Date().toISOString(),
+        window: {
+          id: 'browser-window',
+          label: 'browser-window',
+        },
         workspace: {
           rootPath,
           tree,
@@ -131,6 +138,7 @@ export function useSessionPersistence(): boolean {
           recentFiles,
           activeFileId,
         },
+        recentWorkspaces,
         ui: {
           sidebarMode,
           sidebarViewMode,
@@ -165,6 +173,7 @@ export function useSessionPersistence(): boolean {
     loaded,
     openFiles,
     recentFiles,
+    recentWorkspaces,
     rootPath,
     sidebarMode,
     sidebarViewMode,

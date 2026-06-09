@@ -6,7 +6,7 @@ import {
   saveFileAs,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
-import { loadBlockLayouts, loadSession, saveBlockLayout, saveSession } from '../common/tauri/session';
+import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveSession } from '../common/tauri/session';
 import type { BackendAdapter } from '../common/BackendAdapter';
 
 export const androidBackend: BackendAdapter = {
@@ -31,6 +31,7 @@ export const androidBackend: BackendAdapter = {
   metadata: {
     loadSession,
     saveSession,
+    loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
   },
@@ -51,6 +52,7 @@ export const androidBackend: BackendAdapter = {
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
+    openNewWindow: noop,
     runWindowAction: noop,
   },
 };

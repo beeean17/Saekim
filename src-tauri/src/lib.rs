@@ -22,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
+            remember_active_window(app.handle(), "main");
             #[cfg(target_os = "macos")]
             platform::macos::open_documents::install(app.handle());
             queue_open_files(app.handle(), startup_document_args());
@@ -51,11 +52,13 @@ pub fn run() {
             commands::file::take_pending_open_files,
             commands::file::write_pdf_export,
             commands::session::load_session,
+            commands::session::load_workspace_session,
             commands::session::load_block_layouts,
             commands::session::save_session,
             commands::session::save_block_layout,
             commands::window::log_frontend_event,
             commands::window::open_external_url,
+            commands::window::open_new_window,
             commands::window::set_window_min_size,
             commands::window::start_window_drag
         ])
@@ -66,6 +69,13 @@ pub fn run() {
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
         tauri::RunEvent::Opened { urls } => {
             queue_open_files(app, document_paths_from_urls(urls));
+        }
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: WindowEvent::Focused(true),
+            ..
+        } => {
+            remember_active_window(app, &label);
         }
         tauri::RunEvent::WindowEvent {
             event: WindowEvent::DragDrop(event),
@@ -102,6 +112,22 @@ fn single_instance_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     {
         tauri::plugin::Builder::new("single-instance-placeholder").build()
     }
+}
+
+pub(crate) fn active_window_label(app: &tauri::AppHandle) -> Option<String> {
+    let state = app.state::<AppState>();
+    state
+        .active_window_label
+        .lock()
+        .ok()
+        .and_then(|label| label.clone())
+}
+
+fn remember_active_window(app: &tauri::AppHandle, label: &str) {
+    let state = app.state::<AppState>();
+    if let Ok(mut active_label) = state.active_window_label.lock() {
+        *active_label = Some(label.to_string());
+    };
 }
 
 fn percent_decode(value: &str) -> String {
@@ -262,10 +288,17 @@ pub(crate) fn queue_open_files(app: &tauri::AppHandle, paths: Vec<String>) {
     }
 
     let _ = app.emit(EVENT_OPEN_EXTERNAL_FILES, paths.clone());
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = target_webview_window(app) {
         let _ = window.emit(EVENT_OPEN_EXTERNAL_FILES, paths);
         focus_opened_document_window(&window);
     }
+}
+
+fn target_webview_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    active_window_label(app)
+        .and_then(|label| app.get_webview_window(&label))
+        .or_else(|| app.get_webview_window("main"))
+        .or_else(|| app.webview_windows().into_values().next())
 }
 
 #[cfg(desktop)]
