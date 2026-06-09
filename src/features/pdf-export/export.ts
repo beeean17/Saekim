@@ -284,7 +284,7 @@ async function renderCodeBlocksForPdf(root: HTMLElement): Promise<void> {
       if (!lang) return;
 
       try {
-        const highlighted = await codeToHtml(block.textContent ?? '', {
+        const highlighted = await codeToHtml(readPdfCodeBlockSource(block), {
           lang,
           theme: 'github-light',
         });
@@ -315,6 +315,31 @@ function enhancePdfCodeBlock(pre: HTMLElement, lang: string): void {
     line.dataset.line = String(index + 1);
     if (text.startsWith('+')) line.classList.add('diff-add');
     if (text.startsWith('-')) line.classList.add('diff-remove');
+  });
+  const code = pre.querySelector('code');
+  if (code) removePdfHighlightedLineSeparators(code);
+}
+
+function readPdfCodeBlockSource(block: HTMLElement): string {
+  const code = block.querySelector('code');
+  const highlightedLines = code
+    ? Array.from(code.children).filter(
+        (child): child is HTMLElement => child instanceof HTMLElement && child.classList.contains('line'),
+      )
+    : [];
+
+  if (highlightedLines.length > 0) {
+    return highlightedLines.map((line) => line.textContent ?? '').join('\n');
+  }
+
+  return block.textContent ?? '';
+}
+
+function removePdfHighlightedLineSeparators(code: Element): void {
+  Array.from(code.childNodes).forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() === '') {
+      node.remove();
+    }
   });
 }
 
