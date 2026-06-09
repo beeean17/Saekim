@@ -75,7 +75,6 @@ export function useSessionPersistence(): boolean {
   const restoreRecentWorkspaces = useWorkspaceStore((state) => state.restoreRecentWorkspaces);
 
   const sidebarMode = useUIStore((state) => state.sidebarMode);
-  const sidebarViewMode = useUIStore((state) => state.sidebarViewMode);
   const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
@@ -139,7 +138,6 @@ export function useSessionPersistence(): boolean {
         recentWorkspaces,
         ui: {
           sidebarMode,
-          sidebarViewMode,
           viewMode,
           sidebarWidth,
           splitRatio,
@@ -173,7 +171,6 @@ export function useSessionPersistence(): boolean {
     recentWorkspaces,
     rootPath,
     sidebarMode,
-    sidebarViewMode,
     sidebarWidth,
     splitRatio,
     syncScroll,

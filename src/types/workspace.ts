@@ -1,6 +1,5 @@
 export type ThemeName = 'default' | 'dark' | 'nord';
 export type SidebarMode = 'expanded' | 'collapsed';
-export type SidebarViewMode = 'files' | 'recent';
 export type ViewMode = 'edit' | 'split' | 'preview';
 export type FileTreeNodeType = 'folder' | 'file';
 

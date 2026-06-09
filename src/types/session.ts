@@ -3,7 +3,6 @@ import type {
   OpenFile,
   RecentWorkspace,
   SidebarMode,
-  SidebarViewMode,
   ThemeName,
   ViewMode,
 } from './workspace';
@@ -24,7 +23,6 @@ export interface WindowSession {
 
 export interface UISession {
   sidebarMode: SidebarMode;
-  sidebarViewMode?: SidebarViewMode;
   viewMode: ViewMode;
   sidebarWidth: number;
   splitRatio: number;
