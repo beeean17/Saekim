@@ -192,7 +192,7 @@
 
 .pdf-export-root pre,
 .pdf-export-root .shiki {
-  --preview-code-line-height: 1.45;
+  --preview-code-line-height: 1.32;
 
   position: relative;
   margin: 14px 0;

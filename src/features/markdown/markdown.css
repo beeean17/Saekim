@@ -113,7 +113,7 @@
 .preview-content pre,
 .preview-content .shiki {
   --preview-code-font-size: clamp(11px, calc(var(--editor-font-size, 13.5px) - 1px), 15px);
-  --preview-code-row-height: max(14px, calc(var(--preview-code-font-size) + 3px));
+  --preview-code-row-height: max(13px, calc(var(--preview-code-font-size) + 2px));
 
   position: relative;
   margin: 14px 0;
