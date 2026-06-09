@@ -449,7 +449,10 @@ function startLayoutPointerDrag(
 function updateLayoutDropPreview(root: HTMLElement, source: HTMLElement, clientX: number, clientY: number): void {
   const target = layoutDropTargetFromPoint(root, source, clientX, clientY);
   clearLayoutDropTargets(root, target ?? undefined);
-  if (target) target.dataset.dropPosition = 'right';
+  if (target) {
+    setLayoutDropPreviewMetrics(source, target);
+    target.dataset.dropPosition = 'right';
+  }
 }
 
 function layoutDropTargetFromPoint(
@@ -462,7 +465,7 @@ function layoutDropTargetFromPoint(
   let best: { wrapper: HTMLElement; score: number } | null = null;
 
   for (const candidate of candidates) {
-    const rect = candidate.getBoundingClientRect();
+    const rect = layoutDropHitRect(candidate);
     if (rect.width <= 0 || rect.height <= 0) continue;
 
     const zoneWidth = rightDropZoneWidth(rect);
@@ -481,6 +484,22 @@ function layoutDropTargetFromPoint(
 
 function currentLayoutDropTarget(root: HTMLElement): HTMLElement | null {
   return root.querySelector<HTMLElement>('.preview-layout-block[data-drop-position="right"]');
+}
+
+function layoutDropHitRect(candidate: HTMLElement): DOMRect {
+  if (candidate.dataset.dropPosition !== 'right') return candidate.getBoundingClientRect();
+
+  return (
+    candidate.querySelector<HTMLElement>(':scope > .preview-layout-surface')?.getBoundingClientRect() ??
+    candidate.getBoundingClientRect()
+  );
+}
+
+function setLayoutDropPreviewMetrics(source: HTMLElement, target: HTMLElement): void {
+  const sourceRect = source.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const height = Math.max(72, Math.min(420, sourceRect.height || targetRect.height));
+  target.style.setProperty('--preview-drop-height', `${Math.round(height)}px`);
 }
 
 function finishLayoutDrag(root: HTMLElement, source: HTMLElement): void {
@@ -562,7 +581,10 @@ function rightDropZoneWidth(rect: DOMRect): number {
 
 function clearLayoutDropTargets(root: HTMLElement, except?: HTMLElement): void {
   root.querySelectorAll<HTMLElement>('.preview-layout-block[data-drop-position]').forEach((item) => {
-    if (item !== except) delete item.dataset.dropPosition;
+    if (item !== except) {
+      delete item.dataset.dropPosition;
+      item.style.removeProperty('--preview-drop-height');
+    }
   });
 }
 
