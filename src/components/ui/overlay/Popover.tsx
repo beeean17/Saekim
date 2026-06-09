@@ -6,6 +6,7 @@ interface PopoverProps {
   labelledBy?: string;
   ariaLabel?: string;
   className?: string;
+  ignoreOutsideSelector?: string;
   role?: 'dialog' | 'menu';
   children: ReactNode;
   onClose(): void;
@@ -17,6 +18,7 @@ export function Popover({
   labelledBy,
   ariaLabel,
   className = 'ui-popover',
+  ignoreOutsideSelector,
   role = 'dialog',
   children,
   onClose,
@@ -30,6 +32,8 @@ export function Popover({
     const closeOnPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && ref.current?.contains(target)) return;
+      const targetElement = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+      if (ignoreOutsideSelector && targetElement?.closest(ignoreOutsideSelector)) return;
       onClose();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -42,7 +46,7 @@ export function Popover({
       window.removeEventListener('pointerdown', closeOnPointerDown);
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [onClose, open]);
+  }, [ignoreOutsideSelector, onClose, open]);
 
   if (!open) return null;
 

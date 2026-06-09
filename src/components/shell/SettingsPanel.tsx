@@ -37,7 +37,13 @@ export function SettingsPanel() {
   const fontSizeId = fontSizeOptions.find((option) => option.value === fontSize)?.id ?? fontSizeOptions[1].id;
 
   return (
-    <Popover open={open} className="settings-popover" ariaLabel="설정" onClose={close}>
+    <Popover
+      open={open}
+      className="settings-popover"
+      ariaLabel="설정"
+      ignoreOutsideSelector="[data-settings-trigger='true']"
+      onClose={close}
+    >
       <PanelHeader
         className="settings-head"
         titleClassName="settings-title"

@@ -36,6 +36,7 @@ interface AppMenuGroup {
 
 export function Header({ menuHandlers, commandRegistry }: { menuHandlers: AppMenuHandlers; commandRegistry: CommandRegistry }) {
   const toggleSettings = useUIStore((state) => state.toggleSettings);
+  const settingsOpen = useUIStore((state) => state.settingsOpen);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
   const parts = activeFile?.path.split(/[\\/]/) ?? [];
@@ -59,7 +60,14 @@ export function Header({ menuHandlers, commandRegistry }: { menuHandlers: AppMen
 
       <div className="titlebar-right">
         <ViewToggle />
-        <IconButton className="header-btn" label="설정" onClick={toggleSettings}>
+        <IconButton
+          aria-expanded={settingsOpen}
+          aria-pressed={settingsOpen}
+          className="header-btn"
+          data-settings-trigger="true"
+          label="설정"
+          onClick={toggleSettings}
+        >
           <Icon name="settings" />
         </IconButton>
       </div>
