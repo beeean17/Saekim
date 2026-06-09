@@ -125,7 +125,7 @@ async function pickPdfExportPath(_suggestedName: string): Promise<string | null>
   return null;
 }
 
-async function writePdfExport(_path: string, _bytes: number[]): Promise<string> {
+async function writePdfExport(_path: string, _pdfData: string): Promise<string> {
   throw new Error('Native PDF export is only available in the desktop app.');
 }
 

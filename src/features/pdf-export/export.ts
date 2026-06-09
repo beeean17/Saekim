@@ -10,6 +10,7 @@ const CANVAS_WHITE_THRESHOLD = 248;
 const CANVAS_BOTTOM_TRIM_STEP_PX = 2;
 const MIN_PDF_PAGE_SLICE_PX = 8;
 const IMAGE_INLINE_TIMEOUT_MS = 5000;
+const BASE64_CHUNK_SIZE = 0x8000;
 const PAGE_BREAK_AVOID_SELECTOR = [
   'h1',
   'h2',
@@ -378,7 +379,7 @@ async function pickExportTarget(suggestedName: string): Promise<string | null> {
 
 async function savePdfBytes(bytes: Uint8Array, suggestedName: string, targetPath: string | null): Promise<void> {
   if (targetPath) {
-    await Backend.export.writePdfExport(targetPath, Array.from(bytes));
+    await Backend.export.writePdfExport(targetPath, uint8ArrayToBase64(bytes));
     return;
   }
 
@@ -389,6 +390,16 @@ async function savePdfBytes(bytes: Uint8Array, suggestedName: string, targetPath
   link.download = suggestedName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += BASE64_CHUNK_SIZE) {
+    const chunk = bytes.subarray(index, index + BASE64_CHUNK_SIZE);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
 }
 
 async function waitForTemplateAssets(root: HTMLElement): Promise<void> {

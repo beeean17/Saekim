@@ -6,6 +6,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use futures_util::StreamExt;
 use reqwest::{
     header::{CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
@@ -366,7 +367,12 @@ pub async fn pick_pdf_export_path(
 }
 
 #[tauri::command]
-pub fn write_pdf_export(path: String, bytes: Vec<u8>) -> CommandResult<String> {
+pub fn write_pdf_export(path: String, pdf_data: String) -> CommandResult<String> {
+    let bytes = match BASE64_STANDARD.decode(pdf_data) {
+        Ok(bytes) => bytes,
+        Err(error) => return fail(format!("failed to decode PDF data: {error}")),
+    };
+
     match fs::write(&path, bytes) {
         Ok(()) => ok(path),
         Err(error) => fail(format!("failed to save PDF: {error}")),

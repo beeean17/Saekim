@@ -70,6 +70,6 @@ export async function pickPdfExportPath(suggestedName: string): Promise<string |
   return invokeCommand<string | null>('pick_pdf_export_path', { suggestedName });
 }
 
-export async function writePdfExport(path: string, bytes: number[]): Promise<string> {
-  return invokeCommand<string>('write_pdf_export', { path, bytes });
+export async function writePdfExport(path: string, pdfData: string): Promise<string> {
+  return invokeCommand<string>('write_pdf_export', { path, pdfData });
 }
