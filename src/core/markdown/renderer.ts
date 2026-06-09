@@ -137,12 +137,16 @@ function trimTaskListMarker(children: Token[], markerLength: number): void {
   }
 }
 
-md.renderer.rules.math_inline = (tokens, idx) => getMarkdownMathRenderer()?.renderInline(tokens[idx].content) ?? escapeHtml(tokens[idx].content);
+installMathRendererRules();
 
-md.renderer.rules.math_block = (tokens, idx) => {
-  const attrs = sourceLineAttributes(tokens[idx]);
-  return getMarkdownMathRenderer()?.renderBlock(tokens[idx].content, attrs) ?? `<pre${attrs}><code>${escapeHtml(tokens[idx].content)}</code></pre>`;
-};
+function installMathRendererRules(): void {
+  md.renderer.rules.math_inline = (tokens, idx) => getMarkdownMathRenderer()?.renderInline(tokens[idx].content) ?? escapeHtml(tokens[idx].content);
+
+  md.renderer.rules.math_block = (tokens, idx) => {
+    const attrs = sourceLineAttributes(tokens[idx]);
+    return getMarkdownMathRenderer()?.renderBlock(tokens[idx].content, attrs) ?? `<pre${attrs}><code>${escapeHtml(tokens[idx].content)}</code></pre>`;
+  };
+}
 
 md.renderer.rules.fence = (tokens, idx) => {
   const token = tokens[idx];
@@ -194,6 +198,7 @@ export async function renderMarkdown(
 function ensureMarkdownPluginsApplied(): void {
   if (markdownPluginsApplied) return;
   getMarkdownItPlugins().forEach((plugin) => plugin.apply(md));
+  installMathRendererRules();
   markdownPluginsApplied = true;
 }
 
