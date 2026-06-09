@@ -465,7 +465,7 @@ function layoutDropTargetFromPoint(
   let best: { wrapper: HTMLElement; score: number } | null = null;
 
   for (const candidate of candidates) {
-    const rect = layoutDropHitRect(candidate);
+    const rect = candidate.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) continue;
 
     const zoneWidth = rightDropZoneWidth(rect);
@@ -484,15 +484,6 @@ function layoutDropTargetFromPoint(
 
 function currentLayoutDropTarget(root: HTMLElement): HTMLElement | null {
   return root.querySelector<HTMLElement>('.preview-layout-block[data-drop-position="right"]');
-}
-
-function layoutDropHitRect(candidate: HTMLElement): DOMRect {
-  if (candidate.dataset.dropPosition !== 'right') return candidate.getBoundingClientRect();
-
-  return (
-    candidate.querySelector<HTMLElement>(':scope > .preview-layout-surface')?.getBoundingClientRect() ??
-    candidate.getBoundingClientRect()
-  );
 }
 
 function setLayoutDropPreviewMetrics(source: HTMLElement, target: HTMLElement): void {
