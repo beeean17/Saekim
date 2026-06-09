@@ -10,7 +10,8 @@
 
   position: fixed;
   top: 0;
-  left: -10000px;
+  left: 0;
+  z-index: -1;
   width: 794px;
   min-height: 1123px;
   box-sizing: border-box;

@@ -9,6 +9,7 @@ const A4_HEIGHT_PX = (A4_WIDTH_PX * A4_HEIGHT_PT) / A4_WIDTH_PT;
 const CANVAS_WHITE_THRESHOLD = 248;
 const CANVAS_BOTTOM_TRIM_STEP_PX = 2;
 const MIN_PDF_PAGE_SLICE_PX = 8;
+const IMAGE_INLINE_TIMEOUT_MS = 5000;
 const PAGE_BREAK_AVOID_SELECTOR = [
   'h1',
   'h2',
@@ -51,6 +52,7 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
     prepareKatexForCanvas(exportRoot);
     await renderCodeBlocksForPdf(exportRoot);
     await renderMermaidForPdf(exportRoot);
+    await inlineImagesForPdf(exportRoot);
     await waitForTemplateAssets(exportRoot);
     applyBlockPageBreaks(exportRoot);
     const pdfBytes = await renderTemplateToPdf(exportRoot);
@@ -229,10 +231,15 @@ async function renderMermaidForPdf(root: HTMLElement): Promise<void> {
 
 async function renderTemplateToPdf(exportRoot: HTMLElement): Promise<Uint8Array> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+  const captureHeight = Math.max(exportRoot.scrollHeight, exportRoot.offsetHeight, Math.ceil(A4_HEIGHT_PX));
   const canvas = await html2canvas(exportRoot, {
     backgroundColor: '#ffffff',
+    height: captureHeight,
     scale: Math.min(2, window.devicePixelRatio || 1),
+    scrollX: 0,
+    scrollY: 0,
     useCORS: true,
+    width: A4_WIDTH_PX,
     windowWidth: A4_WIDTH_PX,
   });
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
@@ -279,6 +286,66 @@ function trimCanvasBottomWhitespace(canvas: HTMLCanvasElement): number {
   }
 
   return Math.min(canvas.height, pageHeightFallback(canvas.width));
+}
+
+async function inlineImagesForPdf(root: HTMLElement): Promise<void> {
+  const images = Array.from(root.querySelectorAll<HTMLImageElement>('img'));
+  await Promise.all(images.map((image) => inlineImageForPdf(image)));
+}
+
+async function inlineImageForPdf(image: HTMLImageElement): Promise<void> {
+  const src = image.currentSrc || image.src;
+  if (!src || /^data:/i.test(src)) return;
+
+  try {
+    const blob = await fetchImageBlob(src);
+    if (!blob.type.startsWith('image/')) return;
+
+    image.removeAttribute('srcset');
+    image.src = await blobToDataUrl(blob);
+    await waitForImage(image);
+  } catch (error) {
+    console.warn('failed to inline image for PDF export', error);
+  }
+}
+
+async function fetchImageBlob(src: string): Promise<Blob> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), IMAGE_INLINE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(src, {
+      credentials: 'include',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`image request failed: ${response.status}`);
+    }
+    return response.blob();
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('image data URL conversion failed'));
+    }, { once: true });
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('image data URL conversion failed')), { once: true });
+    reader.readAsDataURL(blob);
+  });
+}
+
+function waitForImage(image: HTMLImageElement): Promise<void> {
+  if (image.complete) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    image.addEventListener('load', () => resolve(), { once: true });
+    image.addEventListener('error', () => resolve(), { once: true });
+  });
 }
 
 function isWhitePixelRow(row: Uint8ClampedArray): boolean {
