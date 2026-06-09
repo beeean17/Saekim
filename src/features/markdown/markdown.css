@@ -168,6 +168,8 @@
 }
 
 .preview-content .shiki code {
+  position: relative;
+  padding-left: 52px;
   white-space: normal;
 }
 
@@ -181,12 +183,13 @@
 }
 
 .preview-content .shiki .line {
+  position: relative;
   display: block;
   width: max-content;
   min-width: 100%;
   height: var(--preview-code-row-height);
   box-sizing: border-box;
-  padding: 0 16px 0 52px;
+  padding: 0 16px 0 0;
   line-height: var(--preview-code-row-height);
   white-space: pre;
 }
@@ -195,16 +198,26 @@
   line-height: inherit;
 }
 
-.preview-content .shiki .line::selection,
+.preview-content .shiki .line:not(:empty)::selection,
 .preview-content .shiki .line *::selection {
   background: var(--preview-code-selection-bg);
 }
 
+.preview-content .shiki .line:empty {
+  user-select: none;
+}
+
+.preview-content .shiki .line:empty::selection {
+  background: transparent;
+}
+
 .preview-content .shiki .line::before {
-  display: inline-block;
+  position: absolute;
+  top: 0;
+  left: -42px;
+  display: block;
   width: 28px;
-  margin-left: -42px;
-  margin-right: 14px;
+  margin: 0;
   color: var(--text-faint);
   content: attr(data-line);
   font-variant-numeric: tabular-nums;

@@ -219,6 +219,8 @@
 }
 
 .pdf-export-root .shiki code {
+  position: relative;
+  padding-left: 52px;
   white-space: normal;
 }
 
@@ -239,8 +241,9 @@
 }
 
 .pdf-export-root .shiki .line {
+  position: relative;
   display: block;
-  padding: 0 16px 0 52px;
+  padding: 0 16px 0 0;
   line-height: var(--preview-code-line-height);
   white-space: pre;
 }
@@ -250,10 +253,12 @@
 }
 
 .pdf-export-root .shiki .line::before {
-  display: inline-block;
+  position: absolute;
+  top: 0;
+  left: -42px;
+  display: block;
   width: 28px;
-  margin-left: -42px;
-  margin-right: 14px;
+  margin: 0;
   color: #9ca3af;
   content: attr(data-line);
   font-variant-numeric: tabular-nums;
