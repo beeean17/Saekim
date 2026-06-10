@@ -75,6 +75,7 @@ const equationAligns: LayoutAlign[] = ['left', 'center', 'right'];
 const minImageResizePercent = 18;
 const maxImageResizePercent = 100;
 const layoutDragThresholdPx = 4;
+const layoutUngroupThresholdPx = 18;
 
 export function enhancePreviewLayoutBlocks(
   root: HTMLElement,
@@ -226,25 +227,11 @@ function renderLayoutControls(
   dragHandle.tabIndex = 0;
   dragHandle.setAttribute('role', 'button');
   dragHandle.setAttribute('aria-label', '블록 배치 이동');
-  dragHandle.title = '오른쪽 끝으로 드래그해서 2열 배치';
+  dragHandle.title = getLayoutGroupId(layout) ? '드래그해서 1열로 풀거나 다른 블록 오른쪽에 배치' : '오른쪽 끝으로 드래그해서 2열 배치';
   dragHandle.addEventListener('pointerdown', (event) => {
     startLayoutPointerDrag(event, dragHandle, wrapper, root, filePath, layoutByKey, onChange);
   });
   tools.append(dragHandle);
-
-  if (isGroupedLayout(layout)) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = '1열';
-    button.title = '열 배치 해제';
-    button.className = 'active';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onChange(groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' })));
-    });
-    tools.append(button);
-  }
 
   wrapper.append(tools);
 
@@ -425,9 +412,12 @@ function startLayoutPointerDrag(
     handle.removeEventListener('pointerup', finishPointerDrag);
     handle.removeEventListener('pointercancel', cancelPointerDrag);
 
+    const distance = Math.hypot(finishEvent.clientX - startX, finishEvent.clientY - startY);
     const target = currentLayoutDropTarget(root) ?? layoutDropTargetFromPoint(root, wrapper, finishEvent.clientX, finishEvent.clientY);
     if (started && target && canDropLayoutBlock(root, target, filePath)) {
       createManualTwoColumnGroup(root, wrapper, target, filePath, layoutByKey, onChange);
+    } else if (started && distance >= layoutUngroupThresholdPx) {
+      clearLayoutGroupForWrapper(root, wrapper, filePath, layoutByKey, onChange);
     }
 
     finishLayoutDrag(root, wrapper);
@@ -611,6 +601,23 @@ function createManualTwoColumnGroup(
     withColumnGroup(clearLayoutGroup(targetLayout), groupId, 2, 0, 'manual'),
     withColumnGroup(clearLayoutGroup(sourceLayout), groupId, 2, 1, 'manual'),
   ]);
+}
+
+function clearLayoutGroupForWrapper(
+  root: HTMLElement,
+  wrapper: HTMLElement,
+  filePath: string,
+  layoutByKey: Map<string, BlockLayout>,
+  onChange: LayoutChangeHandler,
+): void {
+  const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
+  if (!getLayoutGroupId(layout) || getLayoutGroupColumns(layout) <= 1) return;
+
+  onChange(
+    groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) =>
+      clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }),
+    ),
+  );
 }
 
 function renderImageResizeHandles(
@@ -1032,10 +1039,6 @@ function clearLayoutGroup(layout: BlockLayout): BlockLayout {
     ...layout,
     layoutJson: Object.keys(rest).length > 0 ? rest : null,
   };
-}
-
-function isGroupedLayout(layout: BlockLayout): boolean {
-  return getLayoutGroupColumns(layout) > 1 && Boolean(getLayoutGroupId(layout));
 }
 
 function getLayoutGroupId(layout: BlockLayout): string | null {
