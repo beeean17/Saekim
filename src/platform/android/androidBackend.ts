@@ -1,13 +1,27 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
+  copyImageToAssets,
+  downloadImageToAssets,
+  importImageBytesToAssets,
   openFileDialog,
+  openFolderDialog,
+  pickImagePath,
   readFile,
+  readFolder,
+  readFolderChildren,
+  resolveImageSrc,
   saveFile,
   saveFileAs,
+  takePendingOpenFiles,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
 import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveSession } from '../common/tauri/session';
-import type { BackendAdapter } from '../common/BackendAdapter';
+import type { BackendAdapter, ImageDownloadProgressPayload } from '../common/BackendAdapter';
+
+const externalOpenEvent = 'saekim-open-external-files';
+const imageDownloadProgressEvent = 'image-download-progress';
 
 export const androidBackend: BackendAdapter = {
   files: {
@@ -18,15 +32,16 @@ export const androidBackend: BackendAdapter = {
     saveFileAs,
   },
   folders: {
-    openFolderDialog: unsupported('Folder picker'),
-    readFolder: unsupported('Folder read'),
-    readFolderChildren: unsupported('Folder tree'),
+    openFolderDialog,
+    readFolder,
+    readFolderChildren,
   },
   images: {
-    pickImagePath: unsupported('Image picker'),
-    copyImageToAssets: unsupported('Image asset copy'),
-    importImageBytesToAssets: unsupported('Image byte import'),
-    downloadImageToAssets: unsupported('Remote image import'),
+    pickImagePath,
+    resolveImageSrc,
+    copyImageToAssets,
+    importImageBytesToAssets,
+    downloadImageToAssets,
   },
   metadata: {
     loadSession,
@@ -45,9 +60,9 @@ export const androidBackend: BackendAdapter = {
     toFileSrc: convertFileSrc,
     logEvent,
     openExternalUrl,
-    takePendingOpenFiles: async () => [],
-    listenExternalOpenFiles: listenNoop,
-    listenImageDownloadProgress: listenNoop,
+    takePendingOpenFiles,
+    listenExternalOpenFiles,
+    listenImageDownloadProgress,
     listenNativeMenuCommands: listenNoop,
     setWindowMinSize: noop,
     startWindowDrag: noop,
@@ -66,6 +81,17 @@ async function logEvent(scope: string, message: string, details?: unknown): Prom
 
 async function listenNoop(): Promise<() => void> {
   return () => {};
+}
+
+async function listenExternalOpenFiles(handler: (paths: string[]) => void): Promise<() => void> {
+  const unlisteners: Array<() => void> = [];
+  unlisteners.push(await listen<string[]>(externalOpenEvent, (event) => handler(event.payload)));
+  unlisteners.push(await getCurrentWindow().listen<string[]>(externalOpenEvent, (event) => handler(event.payload)));
+  return () => unlisteners.forEach((unlisten) => unlisten());
+}
+
+async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgressPayload) => void): Promise<() => void> {
+  return listen<ImageDownloadProgressPayload>(imageDownloadProgressEvent, (event) => handler(event.payload));
 }
 
 function unsupported<T>(capability: string): (..._args: unknown[]) => Promise<T> {

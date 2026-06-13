@@ -15,6 +15,7 @@ import {
   readFile,
   readFolder,
   readFolderChildren,
+  resolveImageSrc,
   saveFile,
   saveFileAs,
   takePendingOpenFiles,
@@ -52,6 +53,7 @@ export const tauriDesktopBackend: BackendAdapter = {
   },
   images: {
     pickImagePath,
+    resolveImageSrc,
     copyImageToAssets,
     importImageBytesToAssets,
     downloadImageToAssets,

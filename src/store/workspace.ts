@@ -1,78 +1,7 @@
 import { create } from 'zustand';
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
-import type { FileTreeNode, OpenFile, RecentWorkspace } from '../types/workspace';
-
-const starterContent = `# Saekim 마크다운 에디터
-
-실시간 미리보기와 *Mermaid*, *KaTeX*를 지원하는 한국어 친화 에디터.
-
-## 주요 기능
-
-- **파일 탐색**: 사이드바를 접고 펼치며 집중 모드 전환
-- **확장형 툴바**: 기본 도구 + "모든 도구"로 전체 마크다운 노출
-- **실시간 렌더링**: 입력 즉시 우측에서 결과 확인
-
-## 수식 예시
-
-$E = mc^2$
-
-## 다이어그램 예시
-
-\`\`\`mermaid
-flowchart LR
-  editor[편집기] --> parser[파서]
-  parser --> preview[미리보기]
-\`\`\`
-
-> 탐색기 패널은 헤더 좌측 버튼으로 토글합니다.
-`;
-
-const now = Date.now();
-
-const initialTree: FileTreeNode[] = [
-  {
-    id: 'notes',
-    name: 'notes',
-    type: 'folder',
-    path: '~/Documents/notes',
-    isOpen: true,
-    children: [
-      { id: 'readme', name: 'readme.md', type: 'file', path: '~/Documents/notes/readme.md', modifiedAt: now },
-      { id: 'project-plan', name: 'project_plan.md', type: 'file', path: '~/Documents/notes/project_plan.md', modifiedAt: now - 2 * 60 * 60 * 1000 },
-      { id: 'api-reference', name: 'api-reference.md', type: 'file', path: '~/Documents/notes/api-reference.md', modifiedAt: now - 24 * 60 * 60 * 1000 },
-      { id: 'diagrams', name: 'diagrams.md', type: 'file', path: '~/Documents/notes/diagrams.md', modifiedAt: now - 3 * 24 * 60 * 60 * 1000 },
-    ],
-  },
-  {
-    id: 'drafts',
-    name: 'drafts',
-    type: 'folder',
-    path: '~/Documents/notes/drafts',
-    isOpen: true,
-    children: [
-      { id: 'untitled', name: 'untitled.md', type: 'file', path: '~/Documents/notes/drafts/untitled.md', modifiedAt: now - 7 * 24 * 60 * 60 * 1000 },
-      { id: 'retrospective', name: 'retrospective.md', type: 'file', path: '~/Documents/notes/drafts/retrospective.md', modifiedAt: now - 14 * 24 * 60 * 60 * 1000 },
-    ],
-  },
-  {
-    id: 'archive',
-    name: 'archive',
-    type: 'folder',
-    path: '~/Documents/archive',
-    isOpen: false,
-  },
-];
-
-const initialFile: OpenFile = {
-  id: '~/Documents/notes/readme.md',
-  path: '~/Documents/notes/readme.md',
-  name: 'readme.md',
-  content: starterContent,
-  savedContent: starterContent.replace('실시간 미리보기와', '빠른 미리보기와'),
-  encoding: 'UTF-8',
-  eol: 'LF',
-};
+import type { FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace } from '../types/workspace';
 
 interface WorkspaceState {
   rootPath: string | null;
@@ -96,15 +25,16 @@ interface WorkspaceState {
   historyNext: () => void;
   restoreWorkspace: (workspace: WorkspaceSession) => void;
   restoreRecentWorkspaces: (workspaces: RecentWorkspace[] | undefined) => void;
+  openFileFromPayload: (opened: OpenFilePayload) => Promise<void>;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  rootPath: '~/Documents/notes',
-  tree: initialTree,
-  openFiles: [initialFile],
+  rootPath: null,
+  tree: [],
+  openFiles: [],
   recentWorkspaces: [],
-  activeFileId: initialFile.id,
-  history: { back: [], forward: [], current: initialFile.path },
+  activeFileId: null,
+  history: { back: [], forward: [], current: null },
   openFolder: async () => {
     try {
       const rootPath = await Backend.folders.openFolderDialog();
@@ -139,7 +69,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFile: async (path) => {
     if (!path) {
       try {
-        await Backend.files.openFileDialog();
+        const opened = await Backend.files.openFileDialog();
+        if (opened) {
+          await get().openFileFromPayload(opened);
+        }
       } catch (error) {
         console.error('파일 열기 실패:', error);
       }
@@ -149,27 +82,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const existing = get().openFiles.find((file) => file.path === path);
     if (existing) {
       set((state) => activateOpenFile(state, existing));
-      const folderPatch = await workspaceFolderPatchForFile(existing.path);
+      const folderPatch = await workspaceFolderPatchForOpenFile(existing, get().rootPath);
       if (folderPatch && get().activeFileId === existing.id) set((state) => applyFolderPatch(state, folderPatch));
-      return;
-    }
-
-    if (isPlaceholderPath(path)) {
-      const name = path.split('/').pop() || 'untitled.md';
-      const file = toOpenFile(path, name, starterContent);
-      set((state) => upsertOpenFile(state, file));
       return;
     }
 
     try {
       const opened = await Backend.files.readFile(path);
-      const file = toOpenFile(opened.path, opened.name, opened.content);
-      set((state) => upsertOpenFile(state, file));
-      const folderPatch = await workspaceFolderPatchForFile(opened.path);
-      if (folderPatch && get().activeFileId === file.id) set((state) => applyFolderPatch(state, folderPatch));
+      await get().openFileFromPayload(opened);
     } catch (error) {
       console.error('파일 읽기 실패:', error);
     }
+  },
+  openFileFromPayload: async (opened) => {
+    const file = toOpenFile(opened.path, opened.name, opened.content, opened.displayPath ?? undefined);
+    set((state) => upsertOpenFile(state, file));
+    const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
+    if (folderPatch && get().activeFileId === file.id) set((state) => applyFolderPatch(state, folderPatch));
   },
   createFile: async () => {
     try {
@@ -210,7 +139,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!file) return;
 
     set((state) => activateOpenFile(state, file));
-    void workspaceFolderPatchForFile(file.path).then((folderPatch) => {
+    void workspaceFolderPatchForOpenFile(file, get().rootPath).then((folderPatch) => {
       const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
       if (folderPatch && activeFile?.path === file.path) set((state) => applyFolderPatch(state, folderPatch));
     });
@@ -262,6 +191,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ...candidate,
               id: savedPath,
               path: savedPath,
+              displayPath: savedPath,
               name: savedFile.name,
               savedContent: candidate.content,
             }
@@ -291,6 +221,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ...candidate,
               id: savedPath,
               path: savedPath,
+              displayPath: savedPath,
               name: savedFile.name,
               savedContent: candidate.content,
             }
@@ -352,19 +283,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     }),
   restoreWorkspace: (workspace) => {
-    const openFiles = workspace.openFiles;
+    const normalizedWorkspace = normalizeRestoredWorkspace(workspace);
+    const openFiles = normalizedWorkspace.openFiles;
     const activeFileId =
-      workspace.activeFileId && openFiles.some((file) => file.id === workspace.activeFileId)
-        ? workspace.activeFileId
+      normalizedWorkspace.activeFileId && openFiles.some((file) => file.id === normalizedWorkspace.activeFileId)
+        ? normalizedWorkspace.activeFileId
         : openFiles[0]?.id ?? null;
     const activeFile = openFiles.find((file) => file.id === activeFileId) ?? null;
     set({
-      rootPath: workspace.rootPath,
-      tree: workspace.tree.length > 0 ? workspace.tree : initialTree,
+      rootPath: normalizedWorkspace.rootPath,
+      tree: normalizedWorkspace.tree,
       openFiles,
       activeFileId,
-      recentWorkspaces: workspace.rootPath
-        ? upsertRecentWorkspace(get().recentWorkspaces, workspace.rootPath)
+      recentWorkspaces: normalizedWorkspace.rootPath
+        ? upsertRecentWorkspace(get().recentWorkspaces, normalizedWorkspace.rootPath)
         : get().recentWorkspaces,
       history: { back: [], forward: [], current: activeFile?.path ?? null },
     });
@@ -384,17 +316,37 @@ export function isDirty(file: OpenFile | null): boolean {
   return Boolean(file && file.content !== file.savedContent);
 }
 
-function toOpenFile(path: string, name: string, content: string): OpenFile {
+function toOpenFile(path: string, name: string, content: string, displayPath?: string): OpenFile {
   const eol = content.includes('\r\n') ? 'CRLF' : 'LF';
   return {
     id: path,
     path,
+    displayPath: displayPath ?? readablePathFromRawPath(path, name),
     name,
     content,
     savedContent: content,
     encoding: 'UTF-8',
     eol,
   };
+}
+
+function readablePathFromRawPath(path: string, name: string): string {
+  if (path.startsWith('content://')) {
+    return `${contentAuthorityLabel(path)} / ${name}`;
+  }
+  return path;
+}
+
+function contentAuthorityLabel(path: string): string {
+  try {
+    const url = new URL(path);
+    if (url.hostname === 'com.android.providers.downloads.documents') return 'Downloads';
+    if (url.hostname === 'com.android.externalstorage.documents') return 'Storage';
+    if (url.hostname === 'com.android.providers.media.documents') return 'Media';
+    return url.hostname || 'Android document';
+  } catch {
+    return 'Android document';
+  }
 }
 
 function toRecentWorkspace(path: string, openedAt = Date.now()): RecentWorkspace {
@@ -421,6 +373,39 @@ async function workspaceFolderPatchForFile(path: string): Promise<Pick<Workspace
     console.error('워크스페이스 경로 동기화 실패:', error);
     return null;
   }
+}
+
+async function workspaceFolderPatchForOpenFile(
+  file: OpenFile,
+  currentRootPath: string | null,
+): Promise<Pick<WorkspaceState, 'rootPath' | 'tree'> | null> {
+  if (isAndroidContentTreePath(currentRootPath) && isAndroidContentPath(file.path)) return null;
+
+  const folderPatch = await workspaceFolderPatchForFile(file.path);
+  return folderPatch ?? androidContentWorkspacePatch(file);
+}
+
+function androidContentWorkspacePatch(file: OpenFile): Pick<WorkspaceState, 'rootPath' | 'tree'> | null {
+  if (!file.path.startsWith('content://')) return null;
+
+  return {
+    rootPath: androidContentWorkspaceRoot(file),
+    tree: [
+      {
+        id: file.path,
+        name: file.name,
+        type: 'file',
+        path: file.path,
+      },
+    ],
+  };
+}
+
+function androidContentWorkspaceRoot(file: OpenFile): string {
+  const displayPath = file.displayPath ?? readablePathFromRawPath(file.path, file.name);
+  const parts = displayPath.split('/').map((part) => part.trim()).filter(Boolean);
+  const label = parts.length > 1 ? parts.slice(0, -1).join(' / ') : contentAuthorityLabel(file.path);
+  return `~android/${label || 'Android document'}`;
 }
 
 function applyFolderPatch(
@@ -452,23 +437,57 @@ function workspaceSessionPatch(
   state: WorkspaceState,
   workspace: WorkspaceSession,
 ): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
-  const openFiles = workspace.openFiles;
+  const normalizedWorkspace = normalizeRestoredWorkspace(workspace);
+  const openFiles = normalizedWorkspace.openFiles;
   const activeFileId =
-    workspace.activeFileId && openFiles.some((file) => file.id === workspace.activeFileId)
-      ? workspace.activeFileId
+    normalizedWorkspace.activeFileId && openFiles.some((file) => file.id === normalizedWorkspace.activeFileId)
+      ? normalizedWorkspace.activeFileId
       : openFiles[0]?.id ?? null;
   const activeFile = openFiles.find((file) => file.id === activeFileId) ?? null;
 
   return {
-    rootPath: workspace.rootPath,
-    tree: workspace.tree.length > 0 ? workspace.tree : [],
+    rootPath: normalizedWorkspace.rootPath,
+    tree: normalizedWorkspace.tree,
     openFiles,
     activeFileId,
     history: { back: [], forward: [], current: activeFile?.path ?? null },
-    recentWorkspaces: workspace.rootPath
-      ? upsertRecentWorkspace(state.recentWorkspaces, workspace.rootPath)
+    recentWorkspaces: normalizedWorkspace.rootPath
+      ? upsertRecentWorkspace(state.recentWorkspaces, normalizedWorkspace.rootPath)
       : state.recentWorkspaces,
   };
+}
+
+function normalizeRestoredWorkspace(workspace: WorkspaceSession): WorkspaceSession {
+  if (isLegacyStarterWorkspace(workspace)) {
+    return {
+      rootPath: null,
+      tree: [],
+      openFiles: [],
+      activeFileId: null,
+    };
+  }
+
+  return {
+    rootPath: workspace.rootPath,
+    tree: workspace.tree,
+    openFiles: workspace.openFiles.map(normalizeRestoredOpenFile),
+    activeFileId: workspace.activeFileId,
+  };
+}
+
+function normalizeRestoredOpenFile(file: OpenFile): OpenFile {
+  return {
+    ...file,
+    displayPath: file.displayPath ?? readablePathFromRawPath(file.path, file.name),
+  };
+}
+
+function isLegacyStarterWorkspace(workspace: WorkspaceSession): boolean {
+  return Boolean(
+    workspace.rootPath?.startsWith('~/Documents/notes') &&
+      workspace.openFiles.length > 0 &&
+      workspace.openFiles.every((file) => file.path.startsWith('~/Documents/notes')),
+  );
 }
 
 function confirmDiscardDirtyWorkspace(openFiles: OpenFile[]): boolean {
@@ -479,6 +498,7 @@ function confirmDiscardDirtyWorkspace(openFiles: OpenFile[]): boolean {
 
 function parentFolderFromFilePath(path: string): string | null {
   if (isPlaceholderPath(path)) return null;
+  if (isAndroidContentPath(path)) return null;
 
   const normalized = path.replace(/\\/g, '/');
   const index = normalized.lastIndexOf('/');
@@ -487,7 +507,7 @@ function parentFolderFromFilePath(path: string): string | null {
 }
 
 function isPlaceholderPath(path: string): boolean {
-  return path.startsWith('~') || path.startsWith('browser://');
+  return path.startsWith('~');
 }
 
 function findTreeNode(nodes: FileTreeNode[], path: string): FileTreeNode | null {
@@ -600,6 +620,43 @@ function workspaceIdFromPath(path: string): string {
 }
 
 function workspaceDisplayName(path: string): string {
+  if (path.startsWith('~android/')) return path.slice('~android/'.length);
+  if (isAndroidContentPath(path)) return androidContentWorkspaceDisplayName(path);
+
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
   return normalized.split('/').filter(Boolean).pop() || path || 'Saekim';
+}
+
+function isAndroidContentPath(path: string | null): boolean {
+  return Boolean(path?.startsWith('content://'));
+}
+
+function isAndroidContentTreePath(path: string | null): boolean {
+  return Boolean(path?.startsWith('content://') && path.includes('/tree/'));
+}
+
+function androidContentWorkspaceDisplayName(path: string): string {
+  try {
+    const url = new URL(path);
+    const treeId = androidTreeDocumentId(url);
+    if (treeId) return androidDocumentIdDisplayName(treeId);
+    return contentAuthorityLabel(path);
+  } catch {
+    return 'Android document';
+  }
+}
+
+function androidTreeDocumentId(url: URL): string | null {
+  const parts = url.pathname.split('/').filter(Boolean);
+  const treeIndex = parts.indexOf('tree');
+  if (treeIndex < 0 || treeIndex + 1 >= parts.length) return null;
+  return decodeURIComponent(parts[treeIndex + 1]);
+}
+
+function androidDocumentIdDisplayName(documentId: string): string {
+  const withoutVolume = documentId.startsWith('primary:') ? documentId.slice('primary:'.length) : documentId;
+  const normalized = withoutVolume.replace(/^\/+/, '');
+  if (normalized === 'Download') return 'Downloads';
+  if (normalized.startsWith('Download/')) return normalized.replace('Download', 'Downloads').replace(/\//g, ' / ');
+  return normalized.replace(/\//g, ' / ') || 'Android document';
 }

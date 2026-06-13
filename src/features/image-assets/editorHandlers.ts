@@ -1,6 +1,6 @@
 import type { EditorContribution, EditorHandlerContext, EditorImageInsertMode } from '../../app/feature';
 import { insertTextAtSelection, escapeRegExp, replaceTextRange } from '../../core/editor/textEditing';
-import type { ImageDownloadProgressPayload } from '../../platform/common/BackendAdapter';
+import type { ImageDownloadProgressPayload, ImagePickPayload } from '../../platform/common/BackendAdapter';
 import { Backend } from '../../platform/common/backend';
 import type { OpenFile } from '../../types/workspace';
 
@@ -82,20 +82,20 @@ export async function insertSelectedImage(
     }
   }
 
-  const path = await Backend.images.pickImagePath();
-  if (!path) {
+  const picked = await Backend.images.pickImagePath();
+  if (!picked) {
     textarea.focus();
     return;
   }
 
   if (mode === 'link') {
-    insertTextAtSelection(textarea, markdownImageSnippet(path));
+    insertTextAtSelection(textarea, markdownImageSnippet(picked.path, imageAltText(picked)));
     return;
   }
 
   try {
-    const assetPath = await Backend.images.copyImageToAssets(path, currentFilePath);
-    insertTextAtSelection(textarea, markdownImageSnippet(assetPath));
+    const assetPath = await Backend.images.copyImageToAssets(picked.path, currentFilePath);
+    insertTextAtSelection(textarea, markdownImageSnippet(assetPath, imageAltText(picked)));
   } catch (error) {
     console.error('이미지 복사 실패:', error);
     window.alert(error instanceof Error ? error.message : '이미지 복사에 실패했습니다.');
@@ -220,8 +220,12 @@ function insertDroppedImageHelp(textarea: HTMLTextAreaElement): void {
 
 function markdownImageSnippet(path: string, altText?: string): string {
   const name = fileNameFromPath(path);
-  const alt = altText ?? (name.replace(/\.[^.]+$/, '') || '이미지');
+  const alt = escapeMarkdownAlt((altText ?? name).replace(/\.[^.]+$/, '') || '이미지');
   return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
+}
+
+function imageAltText(picked: ImagePickPayload): string {
+  return picked.name || picked.displayPath || fileNameFromPath(picked.path);
 }
 
 function pendingImageSnippet(id: string, progress: number | null): string {
@@ -236,6 +240,9 @@ function failedImageSnippet(id: string, message: string): string {
 function requireSavedActiveFile(activeFile: OpenFile | null): string {
   if (!activeFile || activeFile.path.startsWith('~') || activeFile.path.startsWith('browser://')) {
     throw new Error('이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+  }
+  if (activeFile.path.startsWith('content://')) {
+    throw new Error('Android에서 단일 문서로 연 파일은 부모 폴더 권한이 없어 옆에 .assets 폴더를 만들 수 없습니다. 문서를 앱이 접근 가능한 위치에 다시 저장한 뒤 assets 복사를 사용하세요.');
   }
   return activeFile.path;
 }

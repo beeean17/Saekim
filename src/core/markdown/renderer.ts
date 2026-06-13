@@ -175,6 +175,7 @@ export interface RenderMarkdownOptions {
   basePath?: string;
   theme?: 'light' | 'dark';
   toFileSrc?: (path: string) => string;
+  resolveImageSrc?: (path: string) => Promise<string | null>;
 }
 
 export async function renderMarkdown(
@@ -192,7 +193,7 @@ export async function renderMarkdown(
   const raw = md.render(footnoteDocument.text);
   const highlighted = await highlightCode(raw, theme);
   const withFootnotes = renderFootnotes(highlighted, footnoteDocument.definitions);
-  return normalizeImageSources(withFootnotes, options.basePath, options.toFileSrc);
+  return normalizeImageSources(withFootnotes, options.basePath, options.toFileSrc, options.resolveImageSrc);
 }
 
 function ensureMarkdownPluginsApplied(): void {
@@ -641,10 +642,17 @@ function footnoteSlug(id: string): string {
   return encodeURIComponent(id).replace(/%/g, '');
 }
 
-function normalizeImageSources(html: string, basePath?: string, toFileSrc: (path: string) => string = toFileHref): string {
+async function normalizeImageSources(
+  html: string,
+  basePath?: string,
+  toFileSrc: (path: string) => string = toFileHref,
+  resolveImageSrc?: (path: string) => Promise<string | null>,
+): Promise<string> {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<main>${html}</main>`, 'text/html');
-  doc.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
+  const images = Array.from(doc.querySelectorAll<HTMLImageElement>('img[src]'));
+
+  await Promise.all(images.map(async (image) => {
     const src = image.getAttribute('src');
     if (!src) return;
     if (src.startsWith('saekim-pending-image://')) {
@@ -662,10 +670,25 @@ function normalizeImageSources(html: string, basePath?: string, toFileSrc: (path
     image.setAttribute('data-original-src', src);
     image.loading = 'lazy';
     image.decoding = 'async';
-    image.src = toFileSrc(localPath);
-  });
+    image.src = await resolvedImageSource(localPath, toFileSrc, resolveImageSrc);
+  }));
 
   return doc.querySelector('main')?.innerHTML ?? html;
+}
+
+async function resolvedImageSource(
+  localPath: string,
+  toFileSrc: (path: string) => string,
+  resolveImageSrc?: (path: string) => Promise<string | null>,
+): Promise<string> {
+  if (!resolveImageSrc || !isContentUri(localPath)) return toFileSrc(localPath);
+
+  try {
+    return (await resolveImageSrc(localPath)) ?? toFileSrc(localPath);
+  } catch (error) {
+    console.warn('failed to resolve image source', error);
+    return toFileSrc(localPath);
+  }
 }
 
 function createPendingImageBlock(doc: Document, alt: string): HTMLElement {
@@ -705,17 +728,77 @@ function isLocalAbsolutePath(src: string): boolean {
 
 function localImagePathFromSrc(src: string, basePath?: string): string | null {
   if (isFileUrl(src)) return fileUrlToPath(src);
+  if (isContentUri(src)) return src;
   if (isLocalAbsolutePath(src)) return decodeUrlPath(src);
   return resolveRelativeImagePath(src, basePath);
+}
+
+function isContentUri(src: string): boolean {
+  return /^content:\/\//i.test(src);
 }
 
 function resolveRelativeImagePath(src: string, basePath?: string): string | null {
   if (!basePath || basePath.startsWith('~') || basePath.startsWith('browser://')) return null;
   if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(src)) return null;
+  if (isContentUri(basePath)) return resolveRelativeContentImagePath(src, basePath);
 
   const documentDir = basePath.replace(/[\\/][^\\/]*$/, '');
   if (!documentDir || documentDir === basePath) return null;
   return normalizeLocalPath(`${documentDir}/${decodeUrlPath(src)}`);
+}
+
+function resolveRelativeContentImagePath(src: string, basePath: string): string | null {
+  const base = parseContentTreeDocumentUri(basePath);
+  if (!base) return null;
+
+  const parentDocumentId = parentContentDocumentId(base.documentId);
+  if (!parentDocumentId) return null;
+
+  const targetParts = normalizeRelativeParts(decodeUrlPath(src));
+  if (targetParts.length === 0) return null;
+
+  const targetDocumentId = `${parentDocumentId}/${targetParts.join('/')}`;
+  return `${base.prefix}/tree/${encodeURIComponent(base.treeId)}/document/${encodeURIComponent(targetDocumentId)}`;
+}
+
+function parseContentTreeDocumentUri(path: string): { prefix: string; treeId: string; documentId: string } | null {
+  try {
+    const url = new URL(path);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const treeIndex = parts.indexOf('tree');
+    const documentIndex = parts.indexOf('document');
+    if (url.protocol !== 'content:' || treeIndex < 0 || documentIndex < 0) return null;
+    if (treeIndex + 1 >= parts.length || documentIndex + 1 >= parts.length) return null;
+    return {
+      prefix: `${url.protocol}//${url.host}`,
+      treeId: decodeURIComponent(parts[treeIndex + 1]),
+      documentId: decodeURIComponent(parts[documentIndex + 1]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parentContentDocumentId(documentId: string): string | null {
+  const index = documentId.lastIndexOf('/');
+  if (index <= 0) return null;
+  return documentId.slice(0, index);
+}
+
+function normalizeRelativeParts(path: string): string[] {
+  const normalized: string[] = [];
+  path
+    .replace(/\\/g, '/')
+    .split('/')
+    .forEach((part) => {
+      if (!part || part === '.') return;
+      if (part === '..') {
+        normalized.pop();
+        return;
+      }
+      normalized.push(part);
+    });
+  return normalized;
 }
 
 function isFileUrl(src: string): boolean {

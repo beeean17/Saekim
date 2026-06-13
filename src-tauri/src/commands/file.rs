@@ -13,16 +13,14 @@ use reqwest::{
     redirect::Policy,
     Client, Url,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{
-    app_state::AppState,
-    core::text_file::{is_known_text_document_path, TEXT_DIALOG_EXTENSIONS},
-    queue_open_files,
-};
+use crate::{app_state::AppState, core::text_file::TEXT_DIALOG_EXTENSIONS};
 
+#[cfg(not(target_os = "android"))]
+use crate::core::text_file::is_known_text_document_path;
 #[cfg(target_os = "android")]
 use crate::core::text_file::{decode_text_bytes, MAX_TEXT_FILE_BYTES};
 #[cfg(not(target_os = "android"))]
@@ -41,20 +39,30 @@ where
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenFilePayload {
     path: String,
     name: String,
     content: String,
+    display_path: Option<String>,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImagePickPayload {
+    path: String,
+    name: String,
+    display_path: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderPayload {
     root_path: String,
     tree: Vec<FileTreeNode>,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileTreeNode {
     id: String,
@@ -82,7 +90,7 @@ const MAX_REMOTE_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_REDIRECTS: usize = 5;
 
 #[tauri::command]
-pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
+pub async fn open_file_dialog(app: AppHandle) -> CommandResult<Option<OpenFilePayload>> {
     let app_handle = app.clone();
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let selected = app.dialog().file().blocking_pick_file();
@@ -96,11 +104,11 @@ pub async fn open_file_dialog(app: AppHandle) -> CommandResult<bool> {
     .await;
 
     match selected {
-        Ok(Ok(Some(path))) => {
-            queue_open_files(&app_handle, vec![path]);
-            ok(true)
-        }
-        Ok(Ok(None)) => ok(false),
+        Ok(Ok(Some(path))) => match read_file_payload(&app_handle, path) {
+            Ok(payload) => ok(Some(payload)),
+            Err(error) => fail(error),
+        },
+        Ok(Ok(None)) => ok(None),
         Ok(Err(error)) => fail(error),
         Err(error) => fail(format!("failed to open file dialog: {error}")),
     }
@@ -125,16 +133,27 @@ pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>>
     }
 }
 
-#[cfg(not(desktop))]
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub async fn open_folder_dialog(app: AppHandle) -> CommandResult<Option<String>> {
+    match crate::platform::android::document_metadata::open_folder_dialog(&app).await {
+        Ok(path) => ok(path),
+        Err(error) => fail(error),
+    }
+}
+
+#[cfg(all(not(desktop), not(target_os = "android")))]
 #[tauri::command]
 pub async fn open_folder_dialog(_app: AppHandle) -> CommandResult<Option<String>> {
     fail("Folder picker is not supported on this platform.".to_string())
 }
 
 #[tauri::command]
-pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<String>> {
+pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<ImagePickPayload>> {
+    let app_handle = app.clone();
     let selected = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
+        let selected = app
+            .dialog()
             .file()
             .add_filter(
                 "Images",
@@ -142,28 +161,42 @@ pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<String>> {
                     "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif",
                 ],
             )
-            .blocking_pick_file()
+            .blocking_pick_file();
+
+        let Some(path) = selected else {
+            return Ok(None);
+        };
+
+        selected_image_path(path)
     })
     .await;
 
     match selected {
-        Ok(Some(path)) => ok(Some(
-            path.into_path()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
-        )),
-        Ok(None) => ok(None),
+        Ok(Ok(Some(path))) => match image_pick_payload(&app_handle, path) {
+            Ok(payload) => ok(Some(payload)),
+            Err(error) => fail(error),
+        },
+        Ok(Ok(None)) => ok(None),
+        Ok(Err(error)) => fail(error),
         Err(error) => fail(format!("failed to pick image path: {error}")),
     }
 }
 
 #[tauri::command]
+pub fn resolve_image_src(app: AppHandle, path: String) -> CommandResult<Option<String>> {
+    match resolve_image_src_impl(&app, path) {
+        Ok(src) => ok(src),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
 pub fn copy_image_to_assets(
+    app: AppHandle,
     source_path: String,
     current_file_path: String,
 ) -> CommandResult<String> {
-    match copy_image_to_assets_impl(PathBuf::from(source_path), PathBuf::from(current_file_path)) {
+    match copy_image_to_assets_impl(&app, source_path, current_file_path) {
         Ok(path) => ok(path),
         Err(error) => fail(error),
     }
@@ -171,17 +204,13 @@ pub fn copy_image_to_assets(
 
 #[tauri::command]
 pub fn import_image_bytes_to_assets(
+    app: AppHandle,
     bytes: Vec<u8>,
     file_name: Option<String>,
     mime_type: Option<String>,
     current_file_path: String,
 ) -> CommandResult<String> {
-    match import_image_bytes_to_assets_impl(
-        bytes,
-        file_name,
-        mime_type,
-        PathBuf::from(current_file_path),
-    ) {
+    match import_image_bytes_to_assets_impl(&app, bytes, file_name, mime_type, current_file_path) {
         Ok(path) => ok(path),
         Err(error) => fail(error),
     }
@@ -230,18 +259,43 @@ pub fn take_pending_open_files(state: tauri::State<AppState>) -> CommandResult<V
 }
 
 #[tauri::command]
-pub fn read_folder(path: String) -> CommandResult<FolderPayload> {
-    match read_folder_payload(PathBuf::from(path)) {
-        Ok(payload) => ok(payload),
-        Err(error) => fail(error),
+pub fn read_folder(app: AppHandle, path: String) -> CommandResult<FolderPayload> {
+    #[cfg(target_os = "android")]
+    {
+        return match crate::platform::android::document_metadata::read_folder(&app, &path) {
+            Ok(payload) => ok(payload),
+            Err(error) => fail(error),
+        };
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        match read_folder_payload(PathBuf::from(path)) {
+            Ok(payload) => ok(payload),
+            Err(error) => fail(error),
+        }
     }
 }
 
 #[tauri::command]
-pub fn read_folder_children(path: String) -> CommandResult<Vec<FileTreeNode>> {
-    match read_folder_children_payload(PathBuf::from(path)) {
-        Ok(payload) => ok(payload),
-        Err(error) => fail(error),
+pub fn read_folder_children(app: AppHandle, path: String) -> CommandResult<Vec<FileTreeNode>> {
+    #[cfg(target_os = "android")]
+    {
+        return match crate::platform::android::document_metadata::read_folder_children(&app, &path)
+        {
+            Ok(payload) => ok(payload),
+            Err(error) => fail(error),
+        };
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        match read_folder_children_payload(PathBuf::from(path)) {
+            Ok(payload) => ok(payload),
+            Err(error) => fail(error),
+        }
     }
 }
 
@@ -421,6 +475,7 @@ fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, 
         path: path.to_string_lossy().to_string(),
         name,
         content,
+        display_path: None,
     })
 }
 
@@ -446,6 +501,81 @@ fn selected_document_path(path: tauri_plugin_dialog::FilePath) -> Result<Option<
     }
 }
 
+fn selected_image_path(path: tauri_plugin_dialog::FilePath) -> Result<Option<String>, String> {
+    #[cfg(target_os = "android")]
+    {
+        return Ok(Some(path.to_string()));
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let path = path.into_path().unwrap_or_default();
+        if !is_supported_image_asset_path(&path) {
+            return Err("unsupported image type".to_string());
+        }
+
+        Ok(Some(path.to_string_lossy().to_string()))
+    }
+}
+
+#[cfg(target_os = "android")]
+fn image_pick_payload(app: &AppHandle, path: String) -> Result<ImagePickPayload, String> {
+    let selected_path = selected_file_path_from_string(path.clone());
+    let name = selected_file_name(app, &selected_path);
+    Ok(ImagePickPayload {
+        path,
+        display_path: selected_display_path(&selected_path, &name),
+        name,
+    })
+}
+
+#[cfg(not(target_os = "android"))]
+fn image_pick_payload(_app: &AppHandle, path: String) -> Result<ImagePickPayload, String> {
+    let local_path = PathBuf::from(&path);
+    let name = local_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("image")
+        .to_string();
+    Ok(ImagePickPayload {
+        path,
+        name,
+        display_path: None,
+    })
+}
+
+#[cfg(target_os = "android")]
+fn resolve_image_src_impl(app: &AppHandle, path: String) -> Result<Option<String>, String> {
+    if !path.starts_with("content://") {
+        return Ok(None);
+    }
+
+    let selected_path = selected_file_path_from_string(path);
+    let bytes = app
+        .fs()
+        .read(selected_path.clone())
+        .map_err(|error| format!("failed to read selected image: {error}"))?;
+    if bytes.is_empty() {
+        return Err("selected image is empty".to_string());
+    }
+    if bytes.len() as u64 > MAX_REMOTE_IMAGE_BYTES {
+        return Err("image is larger than the 20 MB limit".to_string());
+    }
+
+    let name = selected_file_name(app, &selected_path);
+    let extension = selected_image_extension(&selected_path, &name)?;
+    let mime_type = image_mime_type_from_extension(&extension)?;
+    Ok(Some(format!(
+        "data:{mime_type};base64,{}",
+        BASE64_STANDARD.encode(bytes)
+    )))
+}
+
+#[cfg(not(target_os = "android"))]
+fn resolve_image_src_impl(_app: &AppHandle, _path: String) -> Result<Option<String>, String> {
+    Ok(None)
+}
+
 fn selected_file_path_from_string(path: String) -> tauri_plugin_dialog::FilePath {
     path.parse::<tauri_plugin_dialog::FilePath>()
         .unwrap_or_else(|never| match never {})
@@ -465,15 +595,25 @@ fn read_selected_file_payload(app: &AppHandle, path: FilePath) -> Result<OpenFil
     }
 
     let content = decode_text_bytes(bytes)?;
+    let name = selected_file_name(app, &path);
     Ok(OpenFilePayload {
         path: path.to_string(),
-        name: selected_file_name(&path),
+        display_path: selected_display_path(&path, &name),
+        name,
         content,
     })
 }
 
 #[cfg(target_os = "android")]
-fn selected_file_name(path: &FilePath) -> String {
+fn selected_file_name(app: &AppHandle, path: &FilePath) -> String {
+    if let FilePath::Url(url) = path {
+        if let Some(name) =
+            crate::platform::android::document_metadata::display_name(app, url.as_str())
+        {
+            return name;
+        }
+    }
+
     match path {
         FilePath::Path(path) => path
             .file_name()
@@ -483,9 +623,96 @@ fn selected_file_name(path: &FilePath) -> String {
         FilePath::Url(url) => url
             .path_segments()
             .and_then(|mut segments| segments.next_back())
+            .map(percent_decode_uri_component)
             .filter(|segment| !segment.is_empty())
-            .unwrap_or("untitled.md")
-            .to_string(),
+            .unwrap_or_else(|| "untitled.md".to_string()),
+    }
+}
+
+#[cfg(target_os = "android")]
+fn selected_display_path(path: &FilePath, name: &str) -> Option<String> {
+    match path {
+        FilePath::Path(path) => Some(path.to_string_lossy().to_string()),
+        FilePath::Url(url) if url.scheme() == "content" => {
+            Some(content_uri_display_path(url, name))
+        }
+        FilePath::Url(url) => Some(url.to_string()),
+    }
+}
+
+#[cfg(target_os = "android")]
+fn content_uri_display_path(url: &Url, name: &str) -> String {
+    match url.host_str() {
+        Some("com.android.providers.downloads.documents") => format!("Downloads / {name}"),
+        Some("com.android.externalstorage.documents") => external_storage_display_path(url, name),
+        Some("com.android.providers.media.documents") => format!("Media / {name}"),
+        Some(authority) if !authority.is_empty() => format!("{authority} / {name}"),
+        _ => name.to_string(),
+    }
+}
+
+#[cfg(target_os = "android")]
+fn external_storage_display_path(url: &Url, name: &str) -> String {
+    let Some(document_id) = content_document_id(url) else {
+        return format!("Storage / {name}");
+    };
+
+    let path = document_id
+        .strip_prefix("primary:")
+        .unwrap_or(&document_id)
+        .replace('/', " / ");
+
+    if path.is_empty() {
+        format!("Storage / {name}")
+    } else if path == "Download" || path.starts_with("Download / ") {
+        path.replacen("Download", "Downloads", 1)
+    } else {
+        format!("Storage / {path}")
+    }
+}
+
+#[cfg(target_os = "android")]
+fn content_document_id(url: &Url) -> Option<String> {
+    let mut segments = url.path_segments()?;
+    while let Some(segment) = segments.next() {
+        if segment == "document" {
+            return segments.next().map(percent_decode_uri_component);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "android")]
+fn percent_decode_uri_component(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let high = uri_hex_value(bytes[index + 1]);
+            let low = uri_hex_value(bytes[index + 2]);
+            if let (Some(high), Some(low)) = (high, low) {
+                decoded.push((high << 4) | low);
+                index += 3;
+                continue;
+            }
+        }
+
+        decoded.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
+#[cfg(target_os = "android")]
+fn uri_hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -514,6 +741,7 @@ fn write_selected_file(
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn read_folder_payload(path: PathBuf) -> Result<FolderPayload, String> {
     if !path.is_dir() {
         return Err("selected path is not a folder".to_string());
@@ -525,6 +753,7 @@ fn read_folder_payload(path: PathBuf) -> Result<FolderPayload, String> {
     })
 }
 
+#[cfg(not(target_os = "android"))]
 fn read_folder_children_payload(path: PathBuf) -> Result<Vec<FileTreeNode>, String> {
     if !path.is_dir() {
         return Err("selected path is not a folder".to_string());
@@ -533,10 +762,14 @@ fn read_folder_children_payload(path: PathBuf) -> Result<Vec<FileTreeNode>, Stri
     read_tree_children(&path, 0, 0, false)
 }
 
+#[cfg(not(target_os = "android"))]
 fn copy_image_to_assets_impl(
-    source_path: PathBuf,
-    current_file_path: PathBuf,
+    _app: &AppHandle,
+    source_path: String,
+    current_file_path: String,
 ) -> Result<String, String> {
+    let source_path = PathBuf::from(source_path);
+    let current_file_path = PathBuf::from(current_file_path);
     if !source_path.is_file() {
         return Err("selected image is not a file".to_string());
     }
@@ -555,11 +788,60 @@ fn copy_image_to_assets_impl(
     relative_asset_path(&target_path, &current_file_path)
 }
 
+#[cfg(target_os = "android")]
+fn copy_image_to_assets_impl(
+    app: &AppHandle,
+    source_path: String,
+    current_file_path: String,
+) -> Result<String, String> {
+    if current_file_path.starts_with("content://") {
+        return crate::platform::android::document_metadata::copy_image_to_assets(
+            app,
+            &source_path,
+            &current_file_path,
+        );
+    }
+
+    let selected_source = selected_file_path_from_string(source_path);
+    let bytes = app
+        .fs()
+        .read(selected_source.clone())
+        .map_err(|error| format!("failed to read selected image: {error}"))?;
+    if bytes.is_empty() {
+        return Err("selected image is empty".to_string());
+    }
+    if bytes.len() as u64 > MAX_REMOTE_IMAGE_BYTES {
+        return Err("image is larger than the 20 MB limit".to_string());
+    }
+
+    let current_file_path = PathBuf::from(current_file_path);
+    let name = selected_file_name(app, &selected_source);
+    let extension = selected_image_extension(&selected_source, &name)?;
+    let assets_dir = ensure_assets_dir(&current_file_path)?;
+    let temp_path = unique_temp_image_path(&assets_dir, &extension);
+    fs::write(&temp_path, bytes).map_err(|error| format!("failed to write image file: {error}"))?;
+
+    if let Some(existing_path) = find_existing_asset_with_same_content(&assets_dir, &temp_path)? {
+        let _ = fs::remove_file(&temp_path);
+        return relative_asset_path(&existing_path, &current_file_path);
+    }
+
+    let base_name = image_base_name_from_path(Path::new(&name));
+    let target_path =
+        unique_asset_path_for_content(&assets_dir, &base_name, &extension, &temp_path)?;
+    fs::rename(&temp_path, &target_path).map_err(|error| {
+        let _ = fs::remove_file(&temp_path);
+        format!("failed to finalize image file: {error}")
+    })?;
+    relative_asset_path(&target_path, &current_file_path)
+}
+
 fn import_image_bytes_to_assets_impl(
+    app: &AppHandle,
     bytes: Vec<u8>,
     file_name: Option<String>,
     mime_type: Option<String>,
-    current_file_path: PathBuf,
+    current_file_path: String,
 ) -> Result<String, String> {
     if bytes.is_empty() {
         return Err("dropped image is empty".to_string());
@@ -568,6 +850,21 @@ fn import_image_bytes_to_assets_impl(
         return Err("image is larger than the 20 MB limit".to_string());
     }
 
+    #[cfg(target_os = "android")]
+    if current_file_path.starts_with("content://") {
+        return crate::platform::android::document_metadata::import_image_bytes_to_assets(
+            app,
+            bytes,
+            file_name,
+            mime_type,
+            &current_file_path,
+        );
+    }
+
+    #[cfg(not(target_os = "android"))]
+    let _ = app;
+
+    let current_file_path = PathBuf::from(current_file_path);
     let extension = dropped_image_extension(file_name.as_deref(), mime_type.as_deref())?;
     let assets_dir = ensure_assets_dir(&current_file_path)?;
     let temp_path = unique_temp_image_path(&assets_dir, &extension);
@@ -597,6 +894,20 @@ async fn download_image_to_assets_impl(
     image_url: &str,
     current_file_path: PathBuf,
 ) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        let current_file_path_value = current_file_path.to_string_lossy().to_string();
+        if current_file_path_value.starts_with("content://") {
+            return download_image_to_android_assets_impl(
+                app,
+                id,
+                image_url,
+                &current_file_path_value,
+            )
+            .await;
+        }
+    }
+
     let assets_dir = ensure_assets_dir(&current_file_path)?;
     let client = Client::builder()
         .redirect(Policy::none())
@@ -710,6 +1021,114 @@ async fn download_image_to_assets_impl(
     relative_asset_path(&target_path, &current_file_path)
 }
 
+#[cfg(target_os = "android")]
+async fn download_image_to_android_assets_impl(
+    app: &AppHandle,
+    id: &str,
+    image_url: &str,
+    current_file_path: &str,
+) -> Result<String, String> {
+    let client = Client::builder()
+        .redirect(Policy::none())
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|error| format!("failed to create downloader: {error}"))?;
+    let mut url = parse_safe_http_url(image_url)?;
+    let mut response = None;
+
+    for _ in 0..=MAX_REDIRECTS {
+        let next_response = client
+            .get(url.clone())
+            .send()
+            .await
+            .map_err(|error| format!("failed to download image: {error}"))?;
+
+        if next_response.status().is_redirection() {
+            let location = next_response
+                .headers()
+                .get(LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| "redirect response did not include a location".to_string())?;
+            url = url
+                .join(location)
+                .map_err(|error| format!("invalid redirect location: {error}"))?;
+            validate_http_url(&url)?;
+            continue;
+        }
+
+        response = Some(next_response);
+        break;
+    }
+
+    let response =
+        response.ok_or_else(|| "too many redirects while downloading image".to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("image server returned {}", response.status()));
+    }
+
+    validate_http_url(response.url())?;
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    let extension = remote_image_extension(&content_type)?;
+
+    if let Some(content_length) = response
+        .headers()
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        if content_length > MAX_REMOTE_IMAGE_BYTES {
+            return Err("image is larger than the 20 MB limit".to_string());
+        }
+    }
+
+    let file_name = format!("{}.{}", image_base_name_from_url(response.url()), extension);
+    let total_size = response.content_length();
+    let mut downloaded = 0_u64;
+    let mut last_progress = 0_u8;
+    let mut bytes = Vec::new();
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|error| format!("failed to read image data: {error}"))?;
+        downloaded += chunk.len() as u64;
+        if downloaded > MAX_REMOTE_IMAGE_BYTES {
+            return Err("image is larger than the 20 MB limit".to_string());
+        }
+        bytes.extend_from_slice(&chunk);
+
+        if let Some(total_size) = total_size {
+            if total_size > 0 {
+                let progress = ((downloaded as f64 / total_size as f64) * 100.0).floor() as u8;
+                let progress = progress.min(99);
+                if progress >= last_progress.saturating_add(5) {
+                    last_progress = progress;
+                    emit_image_progress(app, id, "progress", Some(progress), None);
+                }
+            }
+        } else if downloaded > 0 && last_progress == 0 {
+            last_progress = 1;
+            emit_image_progress(app, id, "progress", None, None);
+        }
+    }
+
+    crate::platform::android::document_metadata::import_image_bytes_to_assets(
+        app,
+        bytes,
+        Some(file_name),
+        Some(content_type),
+        current_file_path,
+    )
+}
+
 fn ensure_assets_dir(current_file_path: &Path) -> Result<PathBuf, String> {
     if current_file_path.to_string_lossy().starts_with('~') {
         return Err("save the current document before importing image assets".to_string());
@@ -742,6 +1161,29 @@ fn local_image_extension(path: &Path) -> Result<String, String> {
     }
 
     Err("selected file is not a supported image".to_string())
+}
+
+#[cfg(target_os = "android")]
+fn selected_image_extension(path: &FilePath, name: &str) -> Result<String, String> {
+    match path {
+        FilePath::Path(path) => local_image_extension(path),
+        FilePath::Url(_) => local_image_extension(Path::new(name)),
+    }
+}
+
+#[cfg(target_os = "android")]
+fn image_mime_type_from_extension(extension: &str) -> Result<&'static str, String> {
+    match extension {
+        "png" => Ok("image/png"),
+        "jpg" | "jpeg" => Ok("image/jpeg"),
+        "gif" => Ok("image/gif"),
+        "webp" => Ok("image/webp"),
+        "svg" => Ok("image/svg+xml"),
+        "bmp" => Ok("image/bmp"),
+        "ico" => Ok("image/x-icon"),
+        "avif" => Ok("image/avif"),
+        _ => Err("selected file is not a supported image".to_string()),
+    }
 }
 
 fn remote_image_extension(content_type: &str) -> Result<String, String> {
@@ -1051,6 +1493,7 @@ fn emit_image_progress(
     );
 }
 
+#[cfg(not(target_os = "android"))]
 fn read_tree_children(
     path: &Path,
     depth: usize,
@@ -1092,6 +1535,7 @@ fn read_tree_children(
         .collect()
 }
 
+#[cfg(not(target_os = "android"))]
 fn build_tree_node(
     path: PathBuf,
     depth: usize,
@@ -1149,6 +1593,7 @@ fn build_tree_node(
     })
 }
 
+#[cfg(not(target_os = "android"))]
 fn should_include_path(path: &Path, is_dir: bool, is_file: bool) -> bool {
     let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
         return false;
@@ -1181,11 +1626,13 @@ fn should_include_path(path: &Path, is_dir: bool, is_file: bool) -> bool {
     is_dir || (is_file && (is_known_text_document_path(path) || is_image_asset))
 }
 
+#[cfg(not(target_os = "android"))]
 fn is_inside_assets_dir(path: &Path) -> bool {
     path.components()
         .any(|component| component.as_os_str().to_str() == Some(".assets"))
 }
 
+#[cfg(not(target_os = "android"))]
 fn entry_name_lower(entry: &fs::DirEntry) -> String {
     entry.file_name().to_str().unwrap_or("").to_lowercase()
 }

@@ -15,6 +15,7 @@ export const markdownPreviewContribution: PreviewContribution = {
         basePath: file.path,
         theme: mode,
         toFileSrc: Backend.runtime.toFileSrc,
+        resolveImageSrc: Backend.images.resolveImageSrc,
       }),
     };
   },

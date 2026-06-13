@@ -301,6 +301,7 @@ function sanitizeImageSource(value: string, ownerPath: string | undefined, toFil
   if (!trimmed) return null;
 
   if (isSafeDataImage(trimmed)) return trimmed;
+  if (isContentUri(trimmed)) return toFileSrc(trimmed);
 
   const localPath = resolveLocalPath(trimmed, ownerPath);
   if (localPath) return toFileSrc(localPath);
@@ -313,6 +314,7 @@ function sanitizeResourceSource(value: string, ownerPath: string | undefined, to
   if (!trimmed) return null;
 
   if (isSafeDataImage(trimmed)) return trimmed;
+  if (isContentUri(trimmed)) return toFileSrc(trimmed);
 
   const localPath = resolveLocalPath(trimmed, ownerPath);
   if (localPath) return toFileSrc(localPath);
@@ -331,6 +333,10 @@ function isSafeUrl(value: string, protocols: string[]): boolean {
 
 function isSafeDataImage(value: string): boolean {
   return /^data:image\/(?:png|jpe?g|gif|webp|bmp|avif);base64,/i.test(value);
+}
+
+function isContentUri(value: string): boolean {
+  return /^content:\/\//i.test(value);
 }
 
 function isAllowedBrowserLink(element: Element): boolean {

@@ -17,6 +17,7 @@ export interface FileTreeNode {
 export interface OpenFile {
   id: string;
   path: string;
+  displayPath?: string;
   name: string;
   content: string;
   savedContent: string;
@@ -42,6 +43,7 @@ export interface OpenFilePayload {
   path: string;
   name: string;
   content: string;
+  displayPath?: string | null;
 }
 
 export interface FolderPayload {

@@ -1,9 +1,10 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
+import type { ImagePickPayload } from '../BackendAdapter';
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../../types/workspace';
 
-export async function openFileDialog(): Promise<boolean> {
-  if (!isTauriRuntime()) return false;
-  return invokeCommand<boolean>('open_file_dialog');
+export async function openFileDialog(): Promise<OpenFilePayload | null> {
+  if (!isTauriRuntime()) return null;
+  return invokeCommand<OpenFilePayload | null>('open_file_dialog');
 }
 
 export async function openFolderDialog(): Promise<string | null> {
@@ -11,9 +12,14 @@ export async function openFolderDialog(): Promise<string | null> {
   return invokeCommand<string | null>('open_folder_dialog');
 }
 
-export async function pickImagePath(): Promise<string | null> {
+export async function pickImagePath(): Promise<ImagePickPayload | null> {
   if (!isTauriRuntime()) return null;
-  return invokeCommand<string | null>('pick_image_path');
+  return invokeCommand<ImagePickPayload | null>('pick_image_path');
+}
+
+export async function resolveImageSrc(path: string): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  return invokeCommand<string | null>('resolve_image_src', { path });
 }
 
 export async function copyImageToAssets(sourcePath: string, currentFilePath: string): Promise<string> {

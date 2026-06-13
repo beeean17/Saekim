@@ -12,7 +12,7 @@ export interface BackendAdapter {
 }
 
 export interface FileBackend {
-  openFileDialog(): Promise<boolean>;
+  openFileDialog(): Promise<OpenFilePayload | null>;
   importPdf(path: string): Promise<OpenFilePayload>;
   readFile(path: string): Promise<OpenFilePayload>;
   saveFile(path: string | null, content: string): Promise<string | null>;
@@ -26,10 +26,17 @@ export interface FolderBackend {
 }
 
 export interface ImageAssetBackend {
-  pickImagePath(): Promise<string | null>;
+  pickImagePath(): Promise<ImagePickPayload | null>;
+  resolveImageSrc(path: string): Promise<string | null>;
   copyImageToAssets(sourcePath: string, currentFilePath: string): Promise<string>;
   importImageBytesToAssets(bytes: number[], fileName: string | null, mimeType: string | null, currentFilePath: string): Promise<string>;
   downloadImageToAssets(id: string, imageUrl: string, currentFilePath: string): Promise<string>;
+}
+
+export interface ImagePickPayload {
+  path: string;
+  name: string;
+  displayPath?: string | null;
 }
 
 export interface MetadataBackend {

@@ -1,4 +1,4 @@
-import type { BackendAdapter } from '../common/BackendAdapter';
+import type { BackendAdapter, ImagePickPayload } from '../common/BackendAdapter';
 import type { BlockLayout } from '../../types/metadata';
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
@@ -20,6 +20,7 @@ export const browserBackend: BackendAdapter = {
   },
   images: {
     pickImagePath,
+    resolveImageSrc,
     copyImageToAssets,
     importImageBytesToAssets,
     downloadImageToAssets,
@@ -64,15 +65,19 @@ async function listenNoop(): Promise<() => void> {
   return () => {};
 }
 
-async function openFileDialog(): Promise<boolean> {
-  return false;
+async function openFileDialog(): Promise<OpenFilePayload | null> {
+  return null;
 }
 
 async function openFolderDialog(): Promise<string | null> {
   return null;
 }
 
-async function pickImagePath(): Promise<string | null> {
+async function pickImagePath(): Promise<ImagePickPayload | null> {
+  return null;
+}
+
+async function resolveImageSrc(_path: string): Promise<string | null> {
   return null;
 }
 

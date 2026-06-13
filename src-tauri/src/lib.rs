@@ -16,7 +16,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init());
 
     #[cfg(target_os = "android")]
-    let builder = builder.plugin(tauri_plugin_fs::init());
+    let builder = builder
+        .plugin(platform::android::document_metadata::init())
+        .plugin(tauri_plugin_fs::init());
 
     let builder = builder
         .plugin(tauri_plugin_opener::init())
@@ -39,6 +41,7 @@ pub fn run() {
             commands::file::open_file_dialog,
             commands::file::open_folder_dialog,
             commands::file::pick_image_path,
+            commands::file::resolve_image_src,
             commands::file::copy_image_to_assets,
             commands::file::import_image_bytes_to_assets,
             commands::file::download_image_to_assets,
@@ -245,7 +248,7 @@ mod tests {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 fn document_paths_from_urls(urls: Vec<url::Url>) -> Vec<String> {
     urls.into_iter()
         .filter_map(|url| {
@@ -255,6 +258,30 @@ fn document_paths_from_urls(urls: Vec<url::Url>) -> Vec<String> {
         })
         .filter(|path| is_supported_document_path(path))
         .map(|path| path.to_string_lossy().to_string())
+        .collect()
+}
+
+#[cfg(target_os = "android")]
+fn document_paths_from_urls(urls: Vec<url::Url>) -> Vec<String> {
+    urls.into_iter()
+        .filter_map(|url| {
+            if let Ok(path) = url.to_file_path() {
+                return is_supported_document_path(&path)
+                    .then(|| path.to_string_lossy().to_string());
+            }
+
+            if url.scheme() == "file" {
+                let path = PathBuf::from(percent_decode(url.path()));
+                return is_supported_document_path(&path)
+                    .then(|| path.to_string_lossy().to_string());
+            }
+
+            if url.scheme() == "content" {
+                return Some(url.to_string());
+            }
+
+            None
+        })
         .collect()
 }
 
