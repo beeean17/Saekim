@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import type { PreviewRenderContext, PreviewResult } from '../../app/feature';
+import type { PreviewContribution, PreviewRenderContext, PreviewResult } from '../../app/feature';
 import { enabledFeatures } from '../../app/featureRegistry';
 import { getFileTypeInfo } from '../../core/document/fileType';
 import { selectPreviewEnhancements, selectPreviewRenderer } from '../../core/preview/registry';
+import { reusePreviewLayoutBlocks } from '../../features/block-layout/preview';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -11,6 +12,8 @@ import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../ui/feedback/EmptyState';
 import { ToolbarButton } from '../ui/toolbar/Toolbar';
 import { bindHtmlPreviewFrame, notifyPreviewRendered, previewDomEnhancements } from './domLifecycle';
+
+const CONTENT_RENDER_DEBOUNCE_MS = 180;
 
 export function PreviewPane({ previewRef }: { previewRef: MutableRefObject<HTMLDivElement | null> }) {
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -48,6 +51,11 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
   const localRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const frameCleanupRef = useRef<(() => void) | null>(null);
+  const renderSequenceRef = useRef(0);
+  const previousRenderContextKeyRef = useRef<string | null>(null);
+  const renderedPreviewContextRef = useRef<PreviewRenderContext | null>(null);
+  const renderedRendererRef = useRef<PreviewContribution | null>(null);
+  const renderedEnhancementsRef = useRef<PreviewContribution[]>([]);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const theme = useSettingsStore((state) => state.theme);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
@@ -62,44 +70,79 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
     [activeFile, fileType.label, fileType.language, fileType.previewKind, htmlPreviewMode, setHtmlPreviewMode, theme],
   );
   const renderer = previewContext ? selectPreviewRenderer(enabledFeatures, previewContext) : null;
-  const enhancements = previewContext ? selectPreviewEnhancements(enabledFeatures, previewContext, previewDomEnhancements) : [];
-  const enhancementIds = enhancements.map((contribution) => contribution.id).join('|');
   const usesBrowserFrame = previewResult?.kind === 'html' && previewResult.renderMode === 'browser-frame';
+  const renderContextKey = previewContext && renderer
+    ? [
+        activeFile?.id ?? '',
+        activeFile?.path ?? '',
+        activeFile?.name ?? '',
+        fileType.language,
+        fileType.previewKind,
+        htmlPreviewMode,
+        renderer.id,
+        theme,
+      ].join('\n')
+    : null;
 
   useEffect(() => {
     if (!previewContext || !renderer?.render) {
       setPreviewResult(null);
+      previousRenderContextKeyRef.current = null;
+      renderedPreviewContextRef.current = null;
+      renderedRendererRef.current = null;
+      renderedEnhancementsRef.current = [];
       return;
     }
 
-    const controller = new AbortController();
-    const renderContext = { ...previewContext, signal: controller.signal };
-    void Promise.resolve(renderer.render(renderContext))
-      .then((result) => {
-        if (!controller.signal.aborted) setPreviewResult(result);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          console.error(`failed to render preview contribution "${renderer.id}"`, error);
-          setPreviewResult({
-            kind: 'html',
-            html: '<div class="preview-error-panel compact"><strong>Preview failed</strong><pre>미리보기를 렌더링하지 못했습니다.</pre></div>',
-          });
-        }
-      });
+    const render = renderer.render;
+    const sequence = renderSequenceRef.current + 1;
+    renderSequenceRef.current = sequence;
+    let controller: AbortController | null = null;
+    const shouldDebounce = previousRenderContextKeyRef.current === renderContextKey;
+    previousRenderContextKeyRef.current = renderContextKey;
+
+    const renderPreview = () => {
+      controller = new AbortController();
+      const renderContext = { ...previewContext, signal: controller.signal };
+      void Promise.resolve(render(renderContext))
+        .then((result) => {
+          if (!controller?.signal.aborted && renderSequenceRef.current === sequence) {
+            renderedPreviewContextRef.current = previewContext;
+            renderedRendererRef.current = renderer;
+            renderedEnhancementsRef.current = selectPreviewEnhancements(enabledFeatures, previewContext, previewDomEnhancements);
+            setPreviewResult(result);
+          }
+        })
+        .catch((error) => {
+          if (!controller?.signal.aborted && renderSequenceRef.current === sequence) {
+            console.error(`failed to render preview contribution "${renderer.id}"`, error);
+            renderedPreviewContextRef.current = previewContext;
+            renderedRendererRef.current = renderer;
+            renderedEnhancementsRef.current = selectPreviewEnhancements(enabledFeatures, previewContext, previewDomEnhancements);
+            setPreviewResult({
+              kind: 'html',
+              html: '<div class="preview-error-panel compact"><strong>Preview failed</strong><pre>미리보기를 렌더링하지 못했습니다.</pre></div>',
+            });
+          }
+        });
+    };
+
+    const timer = window.setTimeout(
+      renderPreview,
+      shouldDebounce ? CONTENT_RENDER_DEBOUNCE_MS : 0,
+    );
 
     return () => {
-      controller.abort();
+      window.clearTimeout(timer);
+      controller?.abort();
     };
   }, [
     activeFile?.content,
-    activeFile?.id,
-    activeFile?.name,
-    activeFile?.path,
     fileType.language,
     fileType.previewKind,
     htmlPreviewMode,
     previewContext,
+    renderContextKey,
     renderer,
     theme,
   ]);
@@ -108,6 +151,13 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
     previewResult?.kind === 'react'
       ? `${renderer?.id ?? 'react'}:${previewResult.renderKey ?? activeFile?.id ?? ''}:${activeFile?.content ?? ''}`
       : previewResult?.html ?? '';
+  const inlineHtml = previewResult?.kind === 'html' && !usesBrowserFrame ? previewResult.html : null;
+
+  useLayoutEffect(() => {
+    const root = localRef.current;
+    if (!root || inlineHtml === null) return;
+    replacePreviewHtml(root, inlineHtml);
+  }, [inlineHtml]);
 
   useLayoutEffect(() => {
     notifyPreviewRendered(localRef.current);
@@ -121,19 +171,24 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
     [],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = localRef.current;
-    if (!root || !previewContext || !renderer) return;
+    const renderedPreviewContext = renderedPreviewContextRef.current;
+    const renderedRenderer = renderedRendererRef.current;
+    const renderedEnhancements = renderedEnhancementsRef.current;
+    if (!root || !renderedPreviewContext || !renderedRenderer) return;
 
     const controller = new AbortController();
-    const renderContext = { ...previewContext, signal: controller.signal };
+    const renderContext = { ...renderedPreviewContext, signal: controller.signal };
 
     void (async () => {
       try {
-        await renderer.afterRender?.(root, renderContext, controller.signal);
-        for (const enhancement of enhancements) {
+        const rendererResult = renderedRenderer.afterRender?.(root, renderContext, controller.signal);
+        if (isPromiseLike(rendererResult)) await rendererResult;
+        for (const enhancement of renderedEnhancements) {
           if (controller.signal.aborted) return;
-          await enhancement.afterRender?.(root, renderContext, controller.signal);
+          const enhancementResult = enhancement.afterRender?.(root, renderContext, controller.signal);
+          if (isPromiseLike(enhancementResult)) await enhancementResult;
         }
         if (!controller.signal.aborted) notifyPreviewRendered(root);
       } catch (error) {
@@ -143,16 +198,10 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
 
     return () => {
       controller.abort();
-      renderer.cleanup?.(root);
-      enhancements.forEach((enhancement) => enhancement.cleanup?.(root));
+      renderedRenderer.cleanup?.(root);
+      renderedEnhancements.forEach((enhancement) => enhancement.cleanup?.(root));
     };
-  }, [
-    activeFile?.path,
-    enhancementIds,
-    previewContext,
-    previewRenderKey,
-    renderer,
-  ]);
+  }, [previewRenderKey]);
 
   const className = usesBrowserFrame ? 'preview-content html-preview-browser' : 'preview-content';
   const setPreviewElement = (element: HTMLDivElement | null) => {
@@ -162,23 +211,23 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
 
   if (!activeFile) {
     return (
-      <div className={`${className} empty-document-content`} ref={setPreviewElement}>
+      <div key="empty" className={`${className} empty-document-content`} ref={setPreviewElement}>
         <EmptyState
           className="empty-document-state"
-          title="열린 문서가 없습니다"
-          description="워크스페이스에서 파일을 선택하거나 파일을 열어주세요."
+          title="아무것도 열려 있지 않습니다"
+          description="파일을 열어 시작하세요."
         />
       </div>
     );
   }
 
   if (!previewResult) {
-    return <div className={className} ref={setPreviewElement} />;
+    return <div key="pending" className={className} ref={setPreviewElement} />;
   }
 
   if (usesBrowserFrame && previewResult.kind === 'html') {
     return (
-      <div className={className} ref={setPreviewElement}>
+      <div key="browser-frame" className={className} ref={setPreviewElement}>
         <iframe
           ref={frameRef}
           className="html-preview-frame"
@@ -193,7 +242,7 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
 
   if (previewResult.kind === 'react') {
     return (
-      <div className={className} ref={setPreviewElement}>
+      <div key="react" className={className} ref={setPreviewElement}>
         {previewResult.node}
       </div>
     );
@@ -201,9 +250,69 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
 
   return (
     <div
+      key="html"
       className={className}
       ref={setPreviewElement}
-      dangerouslySetInnerHTML={{ __html: previewResult.html }}
     />
   );
+}
+
+function replacePreviewHtml(root: HTMLElement, html: string): void {
+  const reusableImages = collectReusableImages(root);
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  reuseExistingImages(template.content, reusableImages);
+  reusePreviewLayoutBlocks(root, template.content);
+  root.replaceChildren(...Array.from(template.content.childNodes));
+}
+
+function collectReusableImages(root: HTMLElement): Map<string, HTMLImageElement[]> {
+  const imagesByKey = new Map<string, HTMLImageElement[]>();
+  root.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
+    const key = imageReuseKey(image);
+    if (!key) return;
+    const images = imagesByKey.get(key) ?? [];
+    images.push(image);
+    imagesByKey.set(key, images);
+  });
+  return imagesByKey;
+}
+
+function reuseExistingImages(root: ParentNode, reusableImages: Map<string, HTMLImageElement[]>): void {
+  root.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
+    const key = imageReuseKey(image);
+    const reusableImage = key ? reusableImages.get(key)?.shift() : null;
+    if (!reusableImage) return;
+
+    syncReusableImageAttributes(reusableImage, image);
+    image.replaceWith(reusableImage);
+  });
+}
+
+function syncReusableImageAttributes(target: HTMLImageElement, source: HTMLImageElement): void {
+  const sameOriginalSrc =
+    Boolean(target.getAttribute('data-original-src')) &&
+    target.getAttribute('data-original-src') === source.getAttribute('data-original-src');
+
+  Array.from(target.attributes).forEach((attribute) => {
+    if (!source.hasAttribute(attribute.name)) target.removeAttribute(attribute.name);
+  });
+  Array.from(source.attributes).forEach((attribute) => {
+    if (attribute.name === 'src' && (sameOriginalSrc || target.getAttribute('src') === attribute.value)) return;
+    target.setAttribute(attribute.name, attribute.value);
+  });
+  target.className = source.className;
+}
+
+function imageReuseKey(image: HTMLImageElement): string | null {
+  const originalSrc = image.getAttribute('data-original-src');
+  if (originalSrc) return originalSrc;
+
+  const src = image.getAttribute('src');
+  if (!src) return null;
+  return src;
+}
+
+function isPromiseLike(value: void | Promise<void>): value is Promise<void> {
+  return Boolean(value && typeof value.then === 'function');
 }

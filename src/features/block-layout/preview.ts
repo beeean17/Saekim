@@ -133,7 +133,82 @@ export function enhancePreviewLayoutBlocks(
   arrangeLayoutGroups(root, filePath, layoutByKey);
 }
 
-function collectLayoutTargets(root: HTMLElement): LayoutTarget[] {
+export function reusePreviewLayoutBlocks(currentRoot: HTMLElement, nextRoot: ParentNode): void {
+  const reusableBlocks = new Map<string, HTMLElement[]>();
+  getLayoutWrappers(currentRoot).forEach((wrapper) => {
+    const identity = layoutIdentityForWrapper(wrapper);
+    const blocks = reusableBlocks.get(identity) ?? [];
+    blocks.push(wrapper);
+    reusableBlocks.set(identity, blocks);
+  });
+
+  if (reusableBlocks.size === 0) return;
+
+  collectLayoutTargets(nextRoot).forEach((target) => {
+    const identity = layoutIdentity(target);
+    const reusableWrapper = reusableBlocks.get(identity)?.shift();
+    if (!reusableWrapper) return;
+
+    const parent = target.element.parentElement;
+    const sourceElement =
+      target.blockKind === 'image' && parent?.tagName === 'P' && isSingleImageParagraph(parent)
+        ? parent
+        : target.element;
+    const surface = ensureLayoutSurface(reusableWrapper);
+
+    reusableWrapper.dataset.blockKind = target.blockKind;
+    reusableWrapper.dataset.blockKey = target.blockKey;
+    reusableWrapper.dataset.occurrenceIndex = String(target.occurrenceIndex);
+    copySourceLineDataset(sourceElement, reusableWrapper);
+    replaceLayoutSurfaceContent(surface, target.element, target.blockKind);
+    sourceElement.replaceWith(reusableWrapper);
+  });
+}
+
+function replaceLayoutSurfaceContent(surface: HTMLElement, source: HTMLElement, blockKind: BlockKind): void {
+  const reusableContent = reusableSurfaceContent(surface, source, blockKind);
+  if (!reusableContent) {
+    surface.replaceChildren(source);
+    return;
+  }
+
+  syncElementAttributes(reusableContent, source);
+  reusableContent.replaceChildren(...Array.from(source.childNodes));
+}
+
+function reusableSurfaceContent(surface: HTMLElement, source: HTMLElement, blockKind: BlockKind): HTMLElement | null {
+  const current = surface.firstElementChild;
+  if (!(current instanceof HTMLElement)) return null;
+
+  if (blockKind === 'code') {
+    return current.tagName === 'PRE' && source.tagName === 'PRE' ? current : null;
+  }
+
+  if (blockKind === 'table') {
+    return current.tagName === 'TABLE' && source.tagName === 'TABLE' ? current : null;
+  }
+
+  if (blockKind === 'mermaid') {
+    return current.classList.contains('mermaid-block') && source.classList.contains('mermaid-block') ? current : null;
+  }
+
+  if (blockKind === 'katex') {
+    return current.classList.contains('math-block') && source.classList.contains('math-block') ? current : null;
+  }
+
+  return null;
+}
+
+function syncElementAttributes(target: HTMLElement, source: HTMLElement): void {
+  Array.from(target.attributes).forEach((attribute) => {
+    if (!source.hasAttribute(attribute.name)) target.removeAttribute(attribute.name);
+  });
+  Array.from(source.attributes).forEach((attribute) => {
+    target.setAttribute(attribute.name, attribute.value);
+  });
+}
+
+function collectLayoutTargets(root: ParentNode): LayoutTarget[] {
   const targets: LayoutTarget[] = [];
   const imageCounts = new Map<string, number>();
   const genericCounts = new Map<string, number>();
@@ -1215,6 +1290,10 @@ function isLayoutControlBlockKind(value: BlockKind | null): boolean {
 function stableBlockKey(element: HTMLElement, kind: BlockKind): string {
   const sourceLine = element.getAttribute('data-source-line') ?? '0';
   const sourceEndLine = element.getAttribute('data-source-end-line') ?? sourceLine;
+  if (kind === 'code' && sourceLine !== '0') {
+    const language = element.getAttribute('data-lang') ?? element.getAttribute('data-label') ?? '';
+    return `${kind}:${sourceLine}:${language}`;
+  }
   const text = element.dataset.source ?? element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
   return `${kind}:${sourceLine}-${sourceEndLine}:${stableHash(text)}`;
 }

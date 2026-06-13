@@ -118,7 +118,7 @@
 
   position: relative;
   margin: 14px 0;
-  padding: 34px 0 14px;
+  padding: 22px 0 10px;
   overflow-x: auto;
   color: var(--text-primary);
   background: var(--bg-code) !important;
@@ -147,18 +147,22 @@
 
 .preview-content .shiki::before {
   position: absolute;
-  top: 8px;
-  right: 12px;
-  padding: 2px 6px;
+  top: 5px;
+  right: 8px;
+  display: inline-flex;
+  min-height: 12px;
+  align-items: center;
+  padding: 1px 4px 0;
   color: var(--text-muted);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 4px;
   content: attr(data-label);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 600;
-  letter-spacing: .04em;
+  line-height: 12px;
+  letter-spacing: 0;
 }
 
 .preview-content pre code,

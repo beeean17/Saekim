@@ -151,7 +151,7 @@
   z-index: 1;
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   opacity: 0;
   pointer-events: none;
   background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
@@ -171,12 +171,12 @@
 }
 
 .math-equation-tools button {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   color: var(--text-muted);
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;

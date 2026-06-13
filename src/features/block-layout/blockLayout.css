@@ -49,12 +49,21 @@
   width: 100%;
 }
 
+.preview-code-layout > .preview-layout-surface {
+  contain: layout paint;
+}
+
 .preview-layout-surface > img,
 .preview-layout-surface > table,
 .preview-layout-surface > pre,
 .preview-layout-surface > .mermaid-block,
 .preview-layout-surface > .math-block {
   width: 100%;
+  margin: 0;
+}
+
+.preview-content .preview-layout-surface > pre,
+.preview-content .preview-layout-surface > .shiki {
   margin: 0;
 }
 
@@ -65,16 +74,16 @@
 
 .preview-layout-tools {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 4px;
+  left: 4px;
   z-index: 2;
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   width: max-content;
   max-width: calc(100vw - 24px);
-  padding: 4px;
+  padding: 2px;
   opacity: 0;
   pointer-events: none;
   background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
@@ -94,16 +103,41 @@
 }
 
 .preview-code-layout .preview-layout-tools {
+  top: 5px;
+  left: 6px;
+  padding: 1px 0 0;
+  border-radius: 4px;
+}
+
+.preview-code-layout .preview-layout-drag-handle {
+  width: 24px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.preview-code-layout .preview-layout-drag-handle::before,
+.preview-code-layout .preview-layout-drag-handle::after {
+  top: 2px;
+  width: 2px;
+  height: 2px;
+  box-shadow: 0 4px 0 currentColor, 0 8px 0 currentColor;
+}
+
+.preview-code-layout .preview-layout-drag-handle::before {
   left: 8px;
+}
+
+.preview-code-layout .preview-layout-drag-handle::after {
+  left: 14px;
 }
 
 .preview-layout-tools button {
   min-width: max-content;
-  height: 22px;
-  padding: 0 6px;
+  height: 16px;
+  padding: 0 4px;
   color: var(--text-muted);
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -117,8 +151,8 @@
 
 .preview-layout-drag-handle {
   position: relative;
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border-radius: 4px;
   cursor: grab;
 }
@@ -130,7 +164,7 @@
 .preview-layout-drag-handle::before,
 .preview-layout-drag-handle::after {
   position: absolute;
-  top: 6px;
+  top: 3px;
   width: 3px;
   height: 3px;
   color: var(--text-muted);
@@ -141,11 +175,11 @@
 }
 
 .preview-layout-drag-handle::before {
-  left: 7px;
+  left: 4px;
 }
 
 .preview-layout-drag-handle::after {
-  left: 13px;
+  left: 10px;
 }
 
 .preview-layout-drag-handle:hover,
@@ -217,9 +251,9 @@
   position: absolute;
   top: 50%;
   z-index: 3;
-  width: 10px;
-  height: min(70%, 64px);
-  min-height: 34px;
+  width: 7px;
+  height: min(48%, 42px);
+  min-height: 20px;
   opacity: 0;
   cursor: ew-resize;
   transform: translateY(-50%);
@@ -230,7 +264,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 4px;
+  left: 2px;
   width: 2px;
   background: color-mix(in srgb, var(--accent) 82%, var(--bg-base));
   border-radius: 99px;
@@ -239,11 +273,11 @@
 }
 
 .preview-image-resize-handle.left {
-  left: -6px;
+  left: -4px;
 }
 
 .preview-image-resize-handle.right {
-  right: -6px;
+  right: -4px;
 }
 
 .preview-image-layout:hover > .preview-image-resize-handle,
