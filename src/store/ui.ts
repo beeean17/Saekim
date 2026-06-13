@@ -39,6 +39,7 @@ interface UIState {
   setSidebarWidth: (width: number) => void;
   setSplitRatio: (ratio: number) => void;
   setEditorWidth: (width: number) => void;
+  setSyncScroll: (enabled: boolean) => void;
   toggleSyncScroll: () => void;
   toggleSettings: () => void;
   closeSettings: () => void;
@@ -62,6 +63,7 @@ export const useUIStore = create<UIState>()((set) => ({
   setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
   setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
   setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
+  setSyncScroll: (enabled) => set({ syncScroll: enabled }),
   toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),

@@ -41,11 +41,12 @@ export function useScrollSync(
   previewRef: RefObject<HTMLElement>,
   enabled: boolean,
   syncKey: string | null = null,
+  previewElement: HTMLElement | null = null,
 ): void {
   useEffect(() => {
     const editor = editorRef.current;
     const editorScroller = editorScrollRef.current;
-    const preview = previewRef.current;
+    const preview = previewElement ?? previewRef.current;
     if (!editor || !editorScroller || !preview || !enabled) return;
 
     let pendingFrame = 0;
@@ -253,7 +254,7 @@ export function useScrollSync(
       document.removeEventListener('selectionchange', onSelectionChange);
       resizeObserver.disconnect();
     };
-  }, [enabled, editorRef, editorScrollRef, previewRef, syncKey]);
+  }, [enabled, editorRef, editorScrollRef, previewElement, previewRef, syncKey]);
 }
 
 function collectPreviewAnchors(preview: HTMLElement): PreviewAnchor[] {

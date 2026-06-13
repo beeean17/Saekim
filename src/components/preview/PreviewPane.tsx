@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import type { PreviewContribution, PreviewRenderContext, PreviewResult } from '../../app/feature';
 import { enabledFeatures } from '../../app/featureRegistry';
@@ -15,7 +15,12 @@ import { bindHtmlPreviewFrame, notifyPreviewRendered, previewDomEnhancements } f
 
 const CONTENT_RENDER_DEBOUNCE_MS = 180;
 
-export function PreviewPane({ previewRef }: { previewRef: MutableRefObject<HTMLDivElement | null> }) {
+interface PreviewPaneProps {
+  readonly previewRef: MutableRefObject<HTMLDivElement | null>;
+  readonly onPreviewElementChange: (element: HTMLDivElement | null) => void;
+}
+
+export function PreviewPane({ previewRef, onPreviewElementChange }: PreviewPaneProps) {
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -42,12 +47,18 @@ export function PreviewPane({ previewRef }: { previewRef: MutableRefObject<HTMLD
           <Icon name={syncScroll ? 'link' : 'unlink'} />
         </ToolbarButton>
       </div>
-      <PreviewContent previewRef={previewRef} />
+      <PreviewContent previewRef={previewRef} onPreviewElementChange={onPreviewElementChange} />
     </section>
   );
 }
 
-function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivElement | null> }) {
+function PreviewContent({
+  previewRef,
+  onPreviewElementChange,
+}: {
+  readonly previewRef: MutableRefObject<HTMLDivElement | null>;
+  readonly onPreviewElementChange: (element: HTMLDivElement | null) => void;
+}) {
   const localRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const frameCleanupRef = useRef<(() => void) | null>(null);
@@ -204,10 +215,11 @@ function PreviewContent({ previewRef }: { previewRef: MutableRefObject<HTMLDivEl
   }, [previewRenderKey]);
 
   const className = usesBrowserFrame ? 'preview-content html-preview-browser' : 'preview-content';
-  const setPreviewElement = (element: HTMLDivElement | null) => {
+  const setPreviewElement = useCallback((element: HTMLDivElement | null) => {
     localRef.current = element;
     previewRef.current = element;
-  };
+    onPreviewElementChange(element);
+  }, [onPreviewElementChange, previewRef]);
 
   if (!activeFile) {
     return (

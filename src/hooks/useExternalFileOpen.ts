@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Backend } from '../platform/common/backend';
 import { currentPlatformCapabilities } from '../platform/common/capabilities';
+import { useUIStore } from '../store/ui';
 
 export function useExternalFileOpen(openFile: (path: string) => Promise<void>, enabled: boolean): void {
   const enabledRef = useRef(enabled);
   const queuedPathsRef = useRef<string[]>([]);
   const openingRef = useRef(false);
   const disposedRef = useRef(false);
+  const startupFlushRef = useRef(true);
+  const setSyncScroll = useUIStore((state) => state.setSyncScroll);
 
   const flushQueuedPaths = useCallback(async () => {
     if (
@@ -21,9 +24,14 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
     openingRef.current = true;
     try {
       const pendingPaths = await Backend.runtime.takePendingOpenFiles();
+      const isStartupFlush = startupFlushRef.current;
+      startupFlushRef.current = false;
       if (disposedRef.current || !enabledRef.current) return;
       const uniquePaths = [...new Set([...queuedPathsRef.current, ...pendingPaths].filter(Boolean))];
       queuedPathsRef.current = [];
+      if (isStartupFlush && uniquePaths.length > 0) {
+        setSyncScroll(true);
+      }
       for (const path of uniquePaths) {
         await openFile(path);
       }
@@ -35,7 +43,7 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
         void flushQueuedPaths();
       }
     }
-  }, [openFile]);
+  }, [openFile, setSyncScroll]);
 
   useEffect(() => {
     enabledRef.current = enabled;

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
@@ -25,6 +25,7 @@ export function App() {
   const editorScrollRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const [previewElement, setPreviewElement] = useState<HTMLDivElement | null>(null);
   const openFile = useWorkspaceStore((state) => state.openFile);
   const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openWorkspace = useWorkspaceStore((state) => state.openWorkspace);
@@ -70,7 +71,10 @@ export function App() {
   useNativeMenuCommands(shortcuts);
   const sessionLoaded = useSessionPersistence();
   useExternalFileOpen(openFile, sessionLoaded);
-  useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null);
+  const handlePreviewElementChange = useCallback((element: HTMLDivElement | null) => {
+    setPreviewElement(element);
+  }, []);
+  useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null, previewElement);
   useResponsiveSplitWidth(bodyRef, effectiveViewMode, sidebarMode, sidebarWidth, editorWidth, viewportProfile.profile);
   useWindowSizeConstraints(effectiveViewMode, sidebarMode, sidebarWidth);
   const { startSidebarResize, startPaneResize } = usePaneResizers({
@@ -110,7 +114,7 @@ export function App() {
         />
         <EditorPane editorScrollRef={editorScrollRef} textareaRef={editorRef} commandRegistry={commandRegistry} />
         <PaneResizer hidden={false} kind="pane" label={paneResizerLabel(effectiveViewMode)} onPointerDown={startPaneResize} />
-        <PreviewPane previewRef={previewRef} />
+        <PreviewPane previewRef={previewRef} onPreviewElementChange={handlePreviewElementChange} />
       </main>
     </AppShell>
   );
