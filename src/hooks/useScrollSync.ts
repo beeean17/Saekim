@@ -1,4 +1,5 @@
 import { RefObject, useEffect } from 'react';
+import { editorLineMetricStyleKey, measureEditorLineMetrics, type EditorLineMetrics } from '../core/editor/lineMetrics';
 
 type ScrollSource = 'editor' | 'preview';
 
@@ -21,6 +22,13 @@ interface RenderAnchor {
   time: number;
 }
 
+interface EditorLineMetricsCache {
+  text: string;
+  width: number;
+  styleKey: string;
+  metrics: EditorLineMetrics;
+}
+
 const PROGRAMMATIC_SCROLL_MS = 120;
 const INPUT_RENDER_WINDOW_MS = 700;
 const BOTTOM_THRESHOLD_PX = 48;
@@ -28,14 +36,17 @@ const ANCHOR_OFFSET_PX = 8;
 const INPUT_AUTOSCROLL_THRESHOLD_PX = 160;
 
 export function useScrollSync(
-  editorRef: RefObject<HTMLElement>,
+  editorRef: RefObject<HTMLTextAreaElement>,
+  editorScrollRef: RefObject<HTMLElement>,
   previewRef: RefObject<HTMLElement>,
   enabled: boolean,
+  syncKey: string | null = null,
 ): void {
   useEffect(() => {
-    const editor = editorRef.current as HTMLTextAreaElement | null;
+    const editor = editorRef.current;
+    const editorScroller = editorScrollRef.current;
     const preview = previewRef.current;
-    if (!editor || !preview || !enabled) return;
+    if (!editor || !editorScroller || !preview || !enabled) return;
 
     let pendingFrame = 0;
     let pendingSync: PendingSync | null = null;
@@ -43,6 +54,7 @@ export function useScrollSync(
     let programmaticTarget: HTMLElement | null = null;
     let programmaticUntil = 0;
     let renderAnchor: RenderAnchor | null = null;
+    let editorMetricsCache: EditorLineMetricsCache | null = null;
 
     const isProgrammaticEvent = (target: HTMLElement) => {
       if (target !== programmaticTarget) return false;
@@ -58,16 +70,49 @@ export function useScrollSync(
       target.scrollTop = nextScrollTop;
     };
 
+    const getEditorMetrics = () => {
+      const computedStyle = window.getComputedStyle(editor);
+      const styleKey = editorLineMetricStyleKey(computedStyle);
+      const text = editor.value;
+      const width = editor.clientWidth;
+      if (
+        editorMetricsCache &&
+        editorMetricsCache.text === text &&
+        editorMetricsCache.width === width &&
+        editorMetricsCache.styleKey === styleKey
+      ) {
+        return editorMetricsCache.metrics;
+      }
+
+      const metrics = measureEditorLineMetrics(editor, text, computedStyle);
+      editorMetricsCache = { text, width, styleKey, metrics };
+      return metrics;
+    };
+
+    const invalidateEditorMetrics = () => {
+      editorMetricsCache = null;
+    };
+
+    const isWithinInputRenderWindow = () =>
+      Boolean(renderAnchor && performance.now() - renderAnchor.time < INPUT_RENDER_WINDOW_MS);
+
     const syncFromEditor = (reason: PendingSync['reason']) => {
       const maxPreview = getMaxScroll(preview);
       if (maxPreview <= 0) return;
 
-      const line = reason === 'render' ? renderAnchor?.line ?? getCaretLine(editor) : getEditorVisibleLine(editor);
+      if (isNearBottom(editorScroller, BOTTOM_THRESHOLD_PX)) {
+        applyScrollTop(preview, maxPreview);
+        return;
+      }
+
+      const metrics = getEditorMetrics();
+      const line =
+        reason === 'render' ? renderAnchor?.line ?? getCaretLine(editor) : getEditorVisibleLine(editorScroller.scrollTop, metrics);
       const shouldKeepBottom =
         reason === 'render' &&
         Boolean(renderAnchor?.keepBottom) &&
-        getCaretLine(editor) >= getEditorLineCount(editor) - 1 &&
-        isNearBottom(editor, BOTTOM_THRESHOLD_PX * 2);
+        getCaretLine(editor) >= getEditorLineCount(editor, metrics) - 1 &&
+        isNearBottom(editorScroller, BOTTOM_THRESHOLD_PX * 2);
 
       if (shouldKeepBottom) {
         applyScrollTop(preview, maxPreview);
@@ -77,23 +122,33 @@ export function useScrollSync(
       const anchors = collectPreviewAnchors(preview);
       const targetTop =
         anchors.length > 0
-          ? getPreviewTopForLine(line, anchors, getEditorLineCount(editor), maxPreview)
-          : getScrollByRatio(editor, preview);
+          ? getPreviewTopForLine(line, anchors, getEditorLineCount(editor, metrics), maxPreview)
+          : getScrollByRatio(editorScroller, preview);
 
       applyScrollTop(preview, targetTop);
     };
 
     const syncFromPreview = () => {
-      const maxEditor = getMaxScroll(editor);
+      const maxEditor = getMaxScroll(editorScroller);
       if (maxEditor <= 0) return;
 
+      if (isNearBottom(preview, BOTTOM_THRESHOLD_PX)) {
+        applyScrollTop(editorScroller, maxEditor);
+        return;
+      }
+
+      const metrics = getEditorMetrics();
       const anchors = collectPreviewAnchors(preview);
       const targetTop =
         anchors.length > 0
-          ? getEditorTopForLine(editor, getLineForPreviewTop(preview.scrollTop + ANCHOR_OFFSET_PX, anchors, getEditorLineCount(editor), getMaxScroll(preview)))
-          : getScrollByRatio(preview, editor);
+          ? getEditorTopForLine(
+              editor,
+              getLineForPreviewTop(preview.scrollTop + ANCHOR_OFFSET_PX, anchors, getEditorLineCount(editor, metrics), getMaxScroll(preview)),
+              metrics,
+            )
+          : getScrollByRatio(preview, editorScroller);
 
-      applyScrollTop(editor, targetTop);
+      applyScrollTop(editorScroller, targetTop);
     };
 
     const flush = () => {
@@ -122,12 +177,12 @@ export function useScrollSync(
     };
 
     const onEditorScroll = () => {
-      if (isProgrammaticEvent(editor)) return;
+      if (isProgrammaticEvent(editorScroller)) return;
       activeScroller = 'editor';
       if (
         renderAnchor &&
         performance.now() - renderAnchor.time < INPUT_RENDER_WINDOW_MS &&
-        Math.abs(editor.scrollTop - renderAnchor.scrollTop) < INPUT_AUTOSCROLL_THRESHOLD_PX
+        Math.abs(editorScroller.scrollTop - renderAnchor.scrollTop) < INPUT_AUTOSCROLL_THRESHOLD_PX
       ) {
         return;
       }
@@ -141,11 +196,12 @@ export function useScrollSync(
     };
 
     const onEditorInput = () => {
+      invalidateEditorMetrics();
       activeScroller = 'editor';
       renderAnchor = {
-        line: getEditorVisibleLine(editor),
-        keepBottom: isNearBottom(editor, BOTTOM_THRESHOLD_PX),
-        scrollTop: editor.scrollTop,
+        line: getEditorVisibleLine(editorScroller.scrollTop, getEditorMetrics()),
+        keepBottom: isNearBottom(editorScroller, BOTTOM_THRESHOLD_PX),
+        scrollTop: editorScroller.scrollTop,
         time: performance.now(),
       };
     };
@@ -158,7 +214,7 @@ export function useScrollSync(
     };
 
     const onPreviewRendered = () => {
-      if (renderAnchor && performance.now() - renderAnchor.time < INPUT_RENDER_WINDOW_MS) {
+      if (isWithinInputRenderWindow()) {
         activeScroller = 'editor';
         return;
       }
@@ -172,26 +228,32 @@ export function useScrollSync(
     };
 
     const resizeObserver = new ResizeObserver(() => {
+      invalidateEditorMetrics();
+      if (isWithinInputRenderWindow()) return;
       scheduleSync(activeScroller ?? 'editor', 'resize');
     });
 
-    editor.addEventListener('scroll', onEditorScroll, { passive: true });
+    editorScroller.addEventListener('scroll', onEditorScroll, { passive: true });
     editor.addEventListener('input', onEditorInput);
     preview.addEventListener('scroll', onPreviewScroll, { passive: true });
     preview.addEventListener('saekim-preview-rendered', onPreviewRendered);
     document.addEventListener('selectionchange', onSelectionChange);
+    resizeObserver.observe(editor);
+    resizeObserver.observe(editorScroller);
     resizeObserver.observe(preview);
+    const initialFrame = window.requestAnimationFrame(() => syncNow('editor', 'render'));
 
     return () => {
       if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
-      editor.removeEventListener('scroll', onEditorScroll);
+      window.cancelAnimationFrame(initialFrame);
+      editorScroller.removeEventListener('scroll', onEditorScroll);
       editor.removeEventListener('input', onEditorInput);
       preview.removeEventListener('scroll', onPreviewScroll);
       preview.removeEventListener('saekim-preview-rendered', onPreviewRendered);
       document.removeEventListener('selectionchange', onSelectionChange);
       resizeObserver.disconnect();
     };
-  }, [enabled, editorRef, previewRef]);
+  }, [enabled, editorRef, editorScrollRef, previewRef, syncKey]);
 }
 
 function collectPreviewAnchors(preview: HTMLElement): PreviewAnchor[] {
@@ -263,25 +325,21 @@ function getLineForPreviewTop(top: number, anchors: PreviewAnchor[], lineCount: 
   return Math.round(last.line + (lineCount - last.line) * tailRatio);
 }
 
-function getEditorVisibleLine(editor: HTMLTextAreaElement): number {
-  const style = window.getComputedStyle(editor);
-  const paddingTop = parseFloat(style.paddingTop) || 0;
-  const lineHeight = getLineHeight(editor, style);
-  return clamp(Math.floor((editor.scrollTop + ANCHOR_OFFSET_PX - paddingTop) / lineHeight) + 1, 1, getEditorLineCount(editor));
+function getEditorVisibleLine(scrollTop: number, metrics: EditorLineMetrics): number {
+  return getEditorLineForTop(scrollTop + ANCHOR_OFFSET_PX, metrics);
 }
 
 function getCaretLine(editor: HTMLTextAreaElement): number {
   return getLineAtIndex(editor.value, editor.selectionStart);
 }
 
-function getEditorTopForLine(editor: HTMLTextAreaElement, line: number): number {
-  const style = window.getComputedStyle(editor);
-  const paddingTop = parseFloat(style.paddingTop) || 0;
-  return paddingTop + (clamp(line, 1, getEditorLineCount(editor)) - 1) * getLineHeight(editor, style);
+function getEditorTopForLine(editor: HTMLTextAreaElement, line: number, metrics: EditorLineMetrics): number {
+  const targetLine = clamp(line, 1, getEditorLineCount(editor, metrics));
+  return metrics.lineTops[targetLine - 1] ?? metrics.paddingTop;
 }
 
-function getEditorLineCount(editor: HTMLTextAreaElement): number {
-  return Math.max(1, editor.value.split('\n').length);
+function getEditorLineCount(editor: HTMLTextAreaElement, metrics?: EditorLineMetrics): number {
+  return metrics?.lineHeights.length ?? Math.max(1, editor.value.split('\n').length);
 }
 
 function getLineAtIndex(text: string, index: number): number {
@@ -293,11 +351,17 @@ function getLineAtIndex(text: string, index: number): number {
   return line;
 }
 
-function getLineHeight(editor: HTMLTextAreaElement, style = window.getComputedStyle(editor)): number {
-  const parsed = parseFloat(style.lineHeight);
-  if (Number.isFinite(parsed)) return parsed;
-  const fontSize = parseFloat(style.fontSize) || 13.5;
-  return fontSize * 1.75;
+function getEditorLineForTop(top: number, metrics: EditorLineMetrics): number {
+  const lineCount = Math.max(1, metrics.lineTops.length);
+  if (top <= metrics.lineTops[0]) return 1;
+
+  for (let index = 0; index < metrics.lineTops.length; index += 1) {
+    const currentTop = metrics.lineTops[index];
+    const nextTop = metrics.lineTops[index + 1] ?? Number.POSITIVE_INFINITY;
+    if (top >= currentTop && top < nextTop) return index + 1;
+  }
+
+  return lineCount;
 }
 
 function getScrollByRatio(source: HTMLElement, target: HTMLElement): number {

@@ -1,7 +1,9 @@
 import { RefObject, useEffect } from 'react';
+import type { ViewportProfile } from './useViewportProfile';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
-const PANE_MIN_WIDTH = 280;
+const DEFAULT_PANE_MIN_WIDTH = 280;
+const MEDIUM_PANE_MIN_WIDTH = 240;
 const PANE_RESIZER_WIDTH = 6;
 const SIDEBAR_COLLAPSED_WIDTH = 56;
 
@@ -11,6 +13,7 @@ export function useResponsiveSplitWidth(
   sidebarMode: SidebarMode,
   sidebarWidth: number,
   editorWidth: number,
+  viewportProfile: ViewportProfile,
 ): void {
   useEffect(() => {
     const body = bodyRef.current;
@@ -23,9 +26,10 @@ export function useResponsiveSplitWidth(
       frame = 0;
       const activeSidebarWidth = sidebarMode === 'collapsed' ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
       const sidebarResizerWidth = sidebarMode === 'collapsed' ? 0 : PANE_RESIZER_WIDTH;
+      const paneMinWidth = viewportProfile === 'medium' ? MEDIUM_PANE_MIN_WIDTH : DEFAULT_PANE_MIN_WIDTH;
       const availableWidth = body.clientWidth - activeSidebarWidth - sidebarResizerWidth - PANE_RESIZER_WIDTH;
-      const maxEditorWidth = Math.max(PANE_MIN_WIDTH, availableWidth - PANE_MIN_WIDTH);
-      const nextEditorWidth = clamp(editorWidth, PANE_MIN_WIDTH, maxEditorWidth);
+      const maxEditorWidth = Math.max(paneMinWidth, availableWidth - paneMinWidth);
+      const nextEditorWidth = clamp(editorWidth, paneMinWidth, maxEditorWidth);
       app.style.setProperty('--effective-editor-w', `${nextEditorWidth}px`);
     };
     const scheduleUpdate = () => {
@@ -44,7 +48,7 @@ export function useResponsiveSplitWidth(
       window.removeEventListener('resize', scheduleUpdate);
       app.style.removeProperty('--effective-editor-w');
     };
-  }, [bodyRef, editorWidth, sidebarMode, sidebarWidth, viewMode]);
+  }, [bodyRef, editorWidth, sidebarMode, sidebarWidth, viewMode, viewportProfile]);
 }
 
 function clamp(value: number, min: number, max: number): number {

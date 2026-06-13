@@ -20,10 +20,15 @@ const viewModes: Array<{ id: ViewMode; label: string }> = [
 
 const fontFamilies = ['Pretendard Variable', 'Pretendard', 'IBM Plex Sans KR', 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'ui-monospace'];
 
-export function SettingsPanel() {
+export function SettingsPanel({
+  effectiveViewMode,
+  availableViewModes,
+}: {
+  effectiveViewMode: ViewMode;
+  availableViewModes: readonly ViewMode[];
+}) {
   const open = useUIStore((state) => state.settingsOpen);
   const close = useUIStore((state) => state.closeSettings);
-  const viewMode = useUIStore((state) => state.viewMode);
   const setViewMode = useUIStore((state) => state.setViewMode);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
@@ -98,8 +103,10 @@ export function SettingsPanel() {
         <SegmentedControl
           ariaLabel="보기 모드"
           className="settings-segmented"
-          value={viewMode}
-          options={viewModes.map((mode) => ({ value: mode.id, label: mode.label }))}
+          value={effectiveViewMode}
+          options={viewModes
+            .filter((mode) => availableViewModes.includes(mode.id))
+            .map((mode) => ({ value: mode.id, label: mode.label }))}
           onChange={setViewMode}
         />
       </section>

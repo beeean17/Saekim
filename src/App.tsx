@@ -9,16 +9,20 @@ import { useExternalFileOpen } from './hooks/useExternalFileOpen';
 import { useNativeMenuCommands } from './hooks/useNativeMenuCommands';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useResponsiveSplitWidth } from './hooks/useResponsiveSplitWidth';
+import { useResponsiveViewMode } from './hooks/useResponsiveViewMode';
+import { usePaneResizers } from './hooks/usePaneResizers';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { useSearchStore } from './features/search';
 import { Backend } from './platform/common/backend';
 import { useUIStore } from './store/ui';
-import { useWorkspaceStore } from './store/workspace';
+import { selectActiveFile, useWorkspaceStore } from './store/workspace';
+import type { ViewMode } from './types/workspace';
 
 export function App() {
   const bodyRef = useRef<HTMLElement | null>(null);
+  const editorScrollRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const openFile = useWorkspaceStore((state) => state.openFile);
@@ -27,6 +31,7 @@ export function App() {
   const createFile = useWorkspaceStore((state) => state.createFile);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
+  const activeFile = useWorkspaceStore(selectActiveFile);
   const openFind = useSearchStore((state) => state.openFind);
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
@@ -34,7 +39,10 @@ export function App() {
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const editorWidth = useUIStore((state) => state.editorWidth);
   const setSidebarWidth = useUIStore((state) => state.setSidebarWidth);
+  const setSidebarMode = useUIStore((state) => state.setSidebarMode);
   const setEditorWidth = useUIStore((state) => state.setEditorWidth);
+  const setViewMode = useUIStore((state) => state.setViewMode);
+  const { viewportProfile, availableViewModes, effectiveViewMode } = useResponsiveViewMode(viewMode);
 
   const commandRegistry = useMemo(
     () =>
@@ -62,57 +70,46 @@ export function App() {
   useNativeMenuCommands(shortcuts);
   const sessionLoaded = useSessionPersistence();
   useExternalFileOpen(openFile, sessionLoaded);
-  useScrollSync(editorRef, previewRef, syncScroll && viewMode === 'split');
-  useResponsiveSplitWidth(bodyRef, viewMode, sidebarMode, sidebarWidth, editorWidth);
-  useWindowSizeConstraints(viewMode, sidebarMode, sidebarWidth);
-
-  const startSidebarResize = (event: React.PointerEvent<HTMLDivElement>) => {
-    const body = bodyRef.current;
-    if (!body || sidebarMode === 'collapsed') return;
-    event.preventDefault();
-    const app = body.closest<HTMLElement>('.app');
-    const rect = body.getBoundingClientRect();
-    let nextWidth = sidebarWidth;
-
-    beginHorizontalDrag({
-      onMove: (clientX) => {
-        nextWidth = clamp(clientX - rect.left, 180, 420);
-        app?.style.setProperty('--sidebar-w', `${nextWidth}px`);
-      },
-      onEnd: () => setSidebarWidth(nextWidth),
-    });
-  };
-
-  const startSplitResize = (event: React.PointerEvent<HTMLDivElement>) => {
-    const body = bodyRef.current;
-    if (!body || viewMode !== 'split') return;
-    event.preventDefault();
-    const app = body.closest<HTMLElement>('.app');
-    const rect = body.getBoundingClientRect();
-    const sidebarHandleWidth = sidebarMode === 'collapsed' ? 0 : 6;
-    const splitHandleWidth = 6;
-    const activeSidebarWidth = sidebarMode === 'collapsed' ? 56 : sidebarWidth;
-    const maxEditorWidth = Math.max(280, rect.width - activeSidebarWidth - sidebarHandleWidth - splitHandleWidth - 280);
-    let nextWidth = clamp(editorWidth, 280, maxEditorWidth);
-
-    beginHorizontalDrag({
-      onMove: (clientX) => {
-        const rawWidth = clientX - rect.left - activeSidebarWidth - sidebarHandleWidth - splitHandleWidth / 2;
-        nextWidth = clamp(rawWidth, 280, maxEditorWidth);
-        app?.style.setProperty('--editor-w', `${nextWidth}px`);
-        app?.style.setProperty('--effective-editor-w', `${nextWidth}px`);
-      },
-      onEnd: () => setEditorWidth(nextWidth),
-    });
-  };
+  useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null);
+  useResponsiveSplitWidth(bodyRef, effectiveViewMode, sidebarMode, sidebarWidth, editorWidth, viewportProfile.profile);
+  useWindowSizeConstraints(effectiveViewMode, sidebarMode, sidebarWidth);
+  const { startSidebarResize, startPaneResize } = usePaneResizers({
+    bodyRef,
+    sidebarMode,
+    sidebarWidth,
+    editorWidth,
+    effectiveViewMode,
+    viewportProfile: viewportProfile.profile,
+    setSidebarMode,
+    setSidebarWidth,
+    setEditorWidth,
+    setViewMode,
+  });
 
   return (
-    <AppShell menuHandlers={shortcuts} commandRegistry={commandRegistry}>
+    <AppShell
+      menuHandlers={shortcuts}
+      commandRegistry={commandRegistry}
+      viewportProfile={viewportProfile}
+      effectiveViewMode={effectiveViewMode}
+      availableViewModes={availableViewModes}
+    >
       <main className="body" ref={bodyRef}>
-        <Sidebar textareaRef={editorRef} />
-        <PaneResizer hidden={sidebarMode === 'collapsed'} label="사이드바 크기 조절" onPointerDown={startSidebarResize} />
-        <EditorPane textareaRef={editorRef} commandRegistry={commandRegistry} />
-        <PaneResizer hidden={viewMode !== 'split'} label="편집 구역 크기 조절" onPointerDown={startSplitResize} />
+        <Sidebar
+          textareaRef={editorRef}
+          menuHandlers={shortcuts}
+          commandRegistry={commandRegistry}
+          effectiveViewMode={effectiveViewMode}
+          availableViewModes={availableViewModes}
+        />
+        <PaneResizer
+          hidden={viewportProfile.profile === 'compact'}
+          kind="sidebar"
+          label={sidebarMode === 'collapsed' ? '사이드바 열기' : '사이드바 크기 조절'}
+          onPointerDown={startSidebarResize}
+        />
+        <EditorPane editorScrollRef={editorScrollRef} textareaRef={editorRef} commandRegistry={commandRegistry} />
+        <PaneResizer hidden={false} kind="pane" label={paneResizerLabel(effectiveViewMode)} onPointerDown={startPaneResize} />
         <PreviewPane previewRef={previewRef} />
       </main>
     </AppShell>
@@ -121,10 +118,12 @@ export function App() {
 
 function PaneResizer({
   hidden,
+  kind,
   label,
   onPointerDown,
 }: {
   hidden: boolean;
+  kind: 'pane' | 'sidebar';
   label: string;
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
@@ -132,52 +131,20 @@ function PaneResizer({
     <div
       aria-hidden={hidden}
       aria-label={label}
-      className={`pane-resizer ${hidden ? 'hidden' : ''}`}
+      className={`pane-resizer pane-resizer-${kind} ${hidden ? 'hidden' : ''}`}
       role="separator"
       onPointerDown={onPointerDown}
     />
   );
 }
 
-function beginHorizontalDrag({
-  onMove,
-  onEnd,
-}: {
-  onMove: (clientX: number) => void;
-  onEnd: () => void;
-}): void {
-  let animationFrame = 0;
-  let latestClientX: number | null = null;
-  const previousCursor = document.body.style.cursor;
-  const previousUserSelect = document.body.style.userSelect;
-  document.body.style.cursor = 'col-resize';
-  document.body.style.userSelect = 'none';
-
-  const flush = () => {
-    animationFrame = 0;
-    if (latestClientX === null) return;
-    onMove(latestClientX);
-  };
-  const onPointerMove = (event: PointerEvent) => {
-    latestClientX = event.clientX;
-    if (animationFrame) return;
-    animationFrame = window.requestAnimationFrame(flush);
-  };
-  const stop = () => {
-    if (animationFrame) {
-      window.cancelAnimationFrame(animationFrame);
-      flush();
-    }
-    window.removeEventListener('pointermove', onPointerMove);
-    document.body.style.cursor = previousCursor;
-    document.body.style.userSelect = previousUserSelect;
-    onEnd();
-  };
-
-  window.addEventListener('pointermove', onPointerMove);
-  window.addEventListener('pointerup', stop, { once: true });
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+function paneResizerLabel(viewMode: ViewMode): string {
+  switch (viewMode) {
+    case 'edit':
+      return '미리보기 열기';
+    case 'preview':
+      return '편집기 열기';
+    case 'split':
+      return '편집 구역 크기 조절';
+  }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { dispatchCommand, type CommandRegistry } from '../../app/commands';
 import type { EditorEventHandlers, EditorHandlerContext, EditorHelperContribution } from '../../app/feature';
 import { enabledFeatures } from '../../app/featureRegistry';
@@ -8,6 +8,7 @@ import { selectEditorContributions } from '../../core/editor/registry';
 import { getLineIndentChange, indentSelectedLines, insertHardLineBreak, insertTextAtSelection, setTextareaValue } from '../../core/editor/textEditing';
 import { getFileTypeLabel } from '../../core/document/fileType';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
+import { useLineNumberSync } from '../../hooks/useLineNumberSync';
 import { useSettingsStore } from '../../store/settings';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
@@ -16,7 +17,15 @@ import { Toolbar as UiToolbar, ToolbarButton, ToolbarGroup } from '../ui/toolbar
 
 type IconName = Parameters<typeof Icon>[0]['name'];
 
-export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefObject<HTMLTextAreaElement>; commandRegistry: CommandRegistry }) {
+export function EditorPane({
+  editorScrollRef,
+  textareaRef,
+  commandRegistry,
+}: {
+  editorScrollRef: RefObject<HTMLDivElement>;
+  textareaRef: RefObject<HTMLTextAreaElement>;
+  commandRegistry: CommandRegistry;
+}) {
   const activeFile = useWorkspaceStore(selectActiveFile);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
@@ -62,6 +71,7 @@ export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefO
         <>
           <EditorContent
             activeLine={cursor.row}
+            editorScrollRef={editorScrollRef}
             value={activeFile.content}
             onChange={(value) => updateContent(activeFile.id, value)}
             editorHandlers={editorContributions.handlers}
@@ -72,8 +82,8 @@ export function EditorPane({ textareaRef, commandRegistry }: { textareaRef: RefO
       ) : (
         <EmptyState
           className="empty-document-state"
-          title="열린 문서가 없습니다"
-          description="워크스페이스에서 파일을 선택하거나 파일을 열어주세요."
+          title="아무것도 열려 있지 않습니다"
+          description="파일을 열어 시작하세요."
         />
       )}
     </section>
@@ -179,6 +189,7 @@ function insertHelperItem(textarea: HTMLTextAreaElement | null, helper: EditorHe
 function EditorContent({
   value,
   onChange,
+  editorScrollRef,
   textareaRef,
   activeLine,
   editorHandlers,
@@ -186,6 +197,7 @@ function EditorContent({
 }: {
   value: string;
   onChange: (value: string) => void;
+  editorScrollRef: RefObject<HTMLDivElement>;
   textareaRef: RefObject<HTMLTextAreaElement>;
   activeLine: number;
   editorHandlers: EditorEventHandlers[];
@@ -193,12 +205,14 @@ function EditorContent({
 }) {
   const fontSize = useSettingsStore((state) => state.fontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
-  const editorContentRef = useRef<HTMLDivElement | null>(null);
-  const lineNumberListRef = useRef<HTMLDivElement | null>(null);
-  const scrollFrameRef = useRef(0);
-  const latestScrollTopRef = useRef(0);
   const [selectionLines, setSelectionLines] = useState<{ start: number; end: number } | null>(null);
-  const [lineNumberHeights, setLineNumberHeights] = useState<number[]>([]);
+  const lineNumberHeights = useLineNumberSync({
+    editorFontFamily,
+    fontSize,
+    rootRef: editorScrollRef,
+    textareaRef,
+    value,
+  });
   const lineCount = Math.max(1, value.split('\n').length);
   const updateSelectionLines = (textarea: HTMLTextAreaElement) => {
     setSelectionLines(getSelectionLines(textarea));
@@ -217,54 +231,6 @@ function EditorContent({
       updateSelectionLines(current);
     });
   };
-  const syncLineNumbers = (scrollTop: number) => {
-    latestScrollTopRef.current = scrollTop;
-    if (scrollFrameRef.current) return;
-    scrollFrameRef.current = window.requestAnimationFrame(() => {
-      scrollFrameRef.current = 0;
-      if (lineNumberListRef.current) {
-        lineNumberListRef.current.style.transform = `translateY(${-latestScrollTopRef.current}px)`;
-      }
-    });
-  };
-
-  useEffect(
-    () => () => {
-      if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
-    },
-    [],
-  );
-
-  useLayoutEffect(() => {
-    const root = editorContentRef.current;
-    const textarea = textareaRef.current;
-    if (!root || !textarea) return;
-
-    let disposed = false;
-
-    const syncEditorMetrics = () => {
-      if (disposed) return;
-      const computedStyle = window.getComputedStyle(textarea);
-      const rowHeight = getEditorRowHeight(computedStyle);
-      if (!rowHeight) return;
-
-      root.style.setProperty('--editor-row-height', `${rowHeight}px`);
-      const nextLineHeights = measureWrappedLineHeights(textarea, value, rowHeight);
-      setLineNumberHeights((current) => (lineHeightsEqual(current, nextLineHeights) ? current : nextLineHeights));
-      syncLineNumbers(textarea.scrollTop);
-    };
-
-    syncEditorMetrics();
-    const resizeObserver = new ResizeObserver(syncEditorMetrics);
-    resizeObserver.observe(textarea);
-    void document.fonts?.ready.then(syncEditorMetrics);
-
-    return () => {
-      disposed = true;
-      resizeObserver.disconnect();
-    };
-  }, [editorFontFamily, fontSize, textareaRef, value]);
-
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -286,9 +252,9 @@ function EditorContent({
   }, [textareaRef]);
 
   return (
-    <div className="editor-content" ref={editorContentRef}>
+    <div className="editor-content" ref={editorScrollRef}>
       <div className="line-numbers">
-        <div className="line-number-list" ref={lineNumberListRef}>
+        <div className="line-number-list">
           {Array.from({ length: lineCount }, (_, index) => {
             const line = index + 1;
             const selected = Boolean(selectionLines && line >= selectionLines.start && line <= selectionLines.end);
@@ -311,7 +277,6 @@ function EditorContent({
         value={value}
         spellCheck={false}
         wrap="soft"
-        onScroll={(event) => syncLineNumbers(event.currentTarget.scrollTop)}
         onSelect={(event) => updateSelectionLines(event.currentTarget)}
         onKeyDown={(event) => {
           const meta = event.metaKey || event.ctrlKey;
@@ -390,60 +355,4 @@ function getLineNumberAtIndex(text: string, index: number): number {
   }
 
   return line;
-}
-
-function getEditorRowHeight(computedStyle: CSSStyleDeclaration): number | null {
-  const fontSizePx = Number.parseFloat(computedStyle.fontSize);
-  const lineHeightRatio = Number.parseFloat(computedStyle.getPropertyValue('--editor-line-height')) || 1.75;
-  const rawLineHeight = fontSizePx * lineHeightRatio;
-  if (!Number.isFinite(rawLineHeight) || rawLineHeight <= 0) return null;
-
-  return Math.ceil(rawLineHeight);
-}
-
-function measureWrappedLineHeights(textarea: HTMLTextAreaElement, text: string, rowHeight: number): number[] {
-  const computedStyle = window.getComputedStyle(textarea);
-  const paddingLeft = Number.parseFloat(computedStyle.paddingLeft) || 0;
-  const paddingRight = Number.parseFloat(computedStyle.paddingRight) || 0;
-  const contentWidth = Math.max(1, textarea.clientWidth - paddingLeft - paddingRight);
-  const mirror = document.createElement('div');
-
-  Object.assign(mirror.style, {
-    position: 'absolute',
-    top: '0',
-    left: '-10000px',
-    width: `${contentWidth}px`,
-    boxSizing: 'content-box',
-    visibility: 'hidden',
-    pointerEvents: 'none',
-    whiteSpace: 'pre-wrap',
-    overflowWrap: 'anywhere',
-    wordBreak: 'break-word',
-    fontFamily: computedStyle.fontFamily,
-    fontSize: computedStyle.fontSize,
-    fontWeight: computedStyle.fontWeight,
-    fontStyle: computedStyle.fontStyle,
-    letterSpacing: computedStyle.letterSpacing,
-    lineHeight: `${rowHeight}px`,
-    tabSize: computedStyle.tabSize,
-  });
-
-  const lines = text.split('\n');
-  lines.forEach((line) => {
-    const row = document.createElement('div');
-    row.textContent = line.length > 0 ? line : '\u200B';
-    row.style.minHeight = `${rowHeight}px`;
-    mirror.append(row);
-  });
-
-  document.body.append(mirror);
-  const heights = Array.from(mirror.children, (row) => Math.max(rowHeight, Math.ceil(row.getBoundingClientRect().height)));
-  mirror.remove();
-
-  return heights.length > 0 ? heights : [rowHeight];
-}
-
-function lineHeightsEqual(current: number[], next: number[]): boolean {
-  if (current.length !== next.length) return false;
-  return current.every((height, index) => Math.abs(height - next[index]) < 0.5);
 }

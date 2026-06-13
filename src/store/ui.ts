@@ -5,8 +5,8 @@ import type { SidebarMode, ViewMode } from '../types/workspace';
 const DEFAULT_SIDEBAR_WIDTH = 248;
 const DEFAULT_EDITOR_WIDTH = 560;
 const SPLIT_HANDLE_WIDTH = 12;
-const MIN_EDITOR_WIDTH = 280;
-const MAX_EDITOR_WIDTH = 920;
+const MIN_EDITOR_WIDTH = 240;
+const MAX_EDITOR_WIDTH = 1600;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -34,6 +34,7 @@ interface UIState {
   syncScroll: boolean;
   settingsOpen: boolean;
   toggleSidebar: () => void;
+  setSidebarMode: (mode: SidebarMode) => void;
   setViewMode: (mode: ViewMode) => void;
   setSidebarWidth: (width: number) => void;
   setSplitRatio: (ratio: number) => void;
@@ -56,6 +57,7 @@ export const useUIStore = create<UIState>()((set) => ({
     set((state) => ({
       sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
     })),
+  setSidebarMode: (mode) => set({ sidebarMode: mode }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
   setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),

@@ -1,30 +1,45 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import type { CommandRegistry } from '../../app/commands';
-import { useViewportProfile } from '../../hooks/useViewportProfile';
+import type { ViewportProfileSnapshot } from '../../hooks/useViewportProfile';
 import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
+import { isAndroidRuntime } from '../../platform/common/runtime';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
+import type { ViewMode } from '../../types/workspace';
 import { Header, type AppMenuHandlers } from './Header';
 import { SettingsPanel } from './SettingsPanel';
 import { StatusBar } from './StatusBar';
+
+const COLLAPSED_SIDEBAR_WIDTH = 56;
 
 interface AppShellProps {
   children: ReactNode;
   menuHandlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
+  viewportProfile: ViewportProfileSnapshot;
+  effectiveViewMode: ViewMode;
+  availableViewModes: readonly ViewMode[];
 }
 
-export function AppShell({ children, menuHandlers, commandRegistry }: AppShellProps) {
+export function AppShell({
+  children,
+  menuHandlers,
+  commandRegistry,
+  viewportProfile,
+  effectiveViewMode,
+  availableViewModes,
+}: AppShellProps) {
   useNativeWindowChrome();
-  const viewportProfile = useViewportProfile();
+  const runtime = isAndroidRuntime() ? 'android' : 'desktop';
   const sidebarMode = useUIStore((state) => state.sidebarMode);
-  const viewMode = useUIStore((state) => state.viewMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
   const editorWidth = useUIStore((state) => state.editorWidth);
+  const visibleSidebarWidth = sidebarMode === 'collapsed' ? COLLAPSED_SIDEBAR_WIDTH : sidebarWidth;
   const layoutStyle = {
     '--sidebar-w': `${sidebarWidth}px`,
+    '--sidebar-current-w': `${visibleSidebarWidth}px`,
     '--editor-fr': `${splitRatio}fr`,
     '--preview-fr': `${1 - splitRatio}fr`,
     '--editor-w': `${editorWidth}px`,
@@ -33,13 +48,19 @@ export function AppShell({ children, menuHandlers, commandRegistry }: AppShellPr
   return (
     <div
       className="app"
+      data-runtime={runtime}
       data-sidebar={sidebarMode}
-      data-view={viewMode}
+      data-view={effectiveViewMode}
       data-viewport-profile={viewportProfile.profile}
       style={layoutStyle}
     >
-      <Header menuHandlers={menuHandlers} commandRegistry={commandRegistry} />
-      <SettingsPanel />
+      <Header
+        menuHandlers={menuHandlers}
+        commandRegistry={commandRegistry}
+        effectiveViewMode={effectiveViewMode}
+        availableViewModes={availableViewModes}
+      />
+      <SettingsPanel effectiveViewMode={effectiveViewMode} availableViewModes={availableViewModes} />
       {children}
       <StatusBar />
     </div>

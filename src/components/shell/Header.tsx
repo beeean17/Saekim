@@ -1,65 +1,53 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { commandMenuItems, dispatchCommand, formatShortcut, type CommandRegistry } from '../../app/commands';
-import { Backend } from '../../platform/common/backend';
-import { currentPlatformCapabilities } from '../../platform/common/capabilities';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CommandRegistry } from '../../app/commands';
 import { useUIStore } from '../../store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import type { ViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { MenuSurface } from '../ui/surface/MenuSurface';
+import { buildAppMenus, type AppMenuGroup, type AppMenuHandlers, type AppMenuId } from './appMenus';
+import { handleTitlebarMouseDown } from './titlebarWindowControls';
 
-export interface AppMenuHandlers {
-  onNewFile: () => void;
-  onNewWindow: () => void;
-  onOpen: () => void;
-  onOpenFolder: () => void;
-  onSave: () => void;
-  onSaveAs: () => void;
+export type { AppMenuHandlers } from './appMenus';
+
+interface HeaderProps {
+  menuHandlers: AppMenuHandlers;
+  commandRegistry: CommandRegistry;
+  effectiveViewMode: ViewMode;
+  availableViewModes: readonly ViewMode[];
 }
 
-type AppMenuId = 'file' | 'edit' | 'view' | 'window' | 'help';
-
-interface AppMenuItem {
-  label?: string;
-  shortcut?: string;
-  checked?: boolean;
-  separator?: boolean;
-  action?: () => void;
-}
-
-interface AppMenuGroup {
-  id: AppMenuId;
-  label: string;
-  items: AppMenuItem[];
-}
-
-export function Header({ menuHandlers, commandRegistry }: { menuHandlers: AppMenuHandlers; commandRegistry: CommandRegistry }) {
+export function Header({ menuHandlers, commandRegistry, effectiveViewMode, availableViewModes }: HeaderProps) {
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const settingsOpen = useUIStore((state) => state.settingsOpen);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
-  const parts = activeFile?.path.split(/[\\/]/) ?? [];
   const isWindows = useIsWindowsRuntime();
+  const showHeaderMenu = isWindows;
 
   return (
-    <header className={`titlebar ${isWindows ? 'windows-titlebar' : ''}`} onMouseDown={startTitlebarDrag}>
+    <header
+      className={`titlebar ${isWindows ? 'windows-titlebar' : ''} ${showHeaderMenu ? 'menu-titlebar' : ''}`}
+      onMouseDown={handleTitlebarMouseDown}
+    >
       <div className="titlebar-drag" data-tauri-drag-region />
-      {isWindows ? <AppMenu handlers={menuHandlers} commandRegistry={commandRegistry} /> : null}
-      <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.path}>
-        {activeFile
-          ? parts.map((part, index) => (
-              <span className="crumb-wrap" key={`${part}-${index}`}>
-                <span className={`crumb ${index === parts.length - 1 ? 'current' : ''}`}>{part}</span>
-                {index < parts.length - 1 ? <span className="sep">/</span> : null}
-              </span>
-            ))
-          : null}
+      {showHeaderMenu ? (
+        <AppMenu
+          handlers={menuHandlers}
+          commandRegistry={commandRegistry}
+          effectiveViewMode={effectiveViewMode}
+          availableViewModes={availableViewModes}
+        />
+      ) : null}
+      <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.name}>
+        {activeFile ? <span className="crumb current">{activeFile.name}</span> : null}
         {dirty ? <span className="dot" title="수정 중" /> : null}
       </div>
 
       <div className="titlebar-right">
-        <ViewToggle />
+        <ViewToggle availableViewModes={availableViewModes} effectiveViewMode={effectiveViewMode} />
         <IconButton
           aria-expanded={settingsOpen}
           aria-pressed={settingsOpen}
@@ -75,39 +63,43 @@ export function Header({ menuHandlers, commandRegistry }: { menuHandlers: AppMen
   );
 }
 
-function startTitlebarDrag(event: MouseEvent<HTMLElement>): void {
-  if (event.button !== 0 || !currentPlatformCapabilities().has('window.chrome')) return;
-
-  const target = event.target as HTMLElement | null;
-  if (target?.closest('button, input, textarea, select, a, [role="button"]')) return;
-
-  event.preventDefault();
-  void Backend.runtime.startWindowDrag().catch((error) => {
-    console.warn('Failed to start titlebar drag:', error);
-  });
-}
-
-function ViewToggle() {
-  const viewMode = useUIStore((state) => state.viewMode);
+function ViewToggle({
+  availableViewModes,
+  effectiveViewMode,
+}: {
+  availableViewModes: readonly ViewMode[];
+  effectiveViewMode: ViewMode;
+}) {
   const setViewMode = useUIStore((state) => state.setViewMode);
+  const options = [
+    { value: 'edit' as const, label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
+    { value: 'split' as const, label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
+    { value: 'preview' as const, label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
+  ].filter((option) => availableViewModes.includes(option.value));
 
   return (
     <SegmentedControl
       ariaLabel="보기 모드"
       className="view-toggle header-view-toggle"
       size="sm"
-      value={viewMode}
-      options={[
-        { value: 'edit', label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
-        { value: 'split', label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
-        { value: 'preview', label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
-      ]}
+      value={effectiveViewMode}
+      options={options}
       onChange={setViewMode}
     />
   );
 }
 
-function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; commandRegistry: CommandRegistry }) {
+function AppMenu({
+  handlers,
+  commandRegistry,
+  effectiveViewMode,
+  availableViewModes,
+}: {
+  handlers: AppMenuHandlers;
+  commandRegistry: CommandRegistry;
+  effectiveViewMode: ViewMode;
+  availableViewModes: readonly ViewMode[];
+}) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -116,77 +108,32 @@ function AppMenu({ handlers, commandRegistry }: { handlers: AppMenuHandlers; com
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
-  const fileCommands = commandMenuItems(commandRegistry, 'file');
-  const editCommands = commandMenuItems(commandRegistry, 'edit');
 
   const menus = useMemo<AppMenuGroup[]>(
-    () => [
-      {
-        id: 'file',
-        label: 'File',
-        items: [
-          { label: 'New File', shortcut: 'Ctrl+N', action: handlers.onNewFile },
-          { label: 'New Window', shortcut: 'Ctrl+Shift+N', action: handlers.onNewWindow },
-          { label: 'Open File...', shortcut: 'Ctrl+O', action: handlers.onOpen },
-          { label: 'Open Folder...', shortcut: 'Ctrl+Shift+O', action: handlers.onOpenFolder },
-          { separator: true },
-          { label: 'Save', shortcut: 'Ctrl+S', action: handlers.onSave },
-          { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: handlers.onSaveAs },
-          ...fileCommands.map((command) => ({
-            label: command.menu?.label,
-            shortcut: formatShortcut(command.defaultShortcut),
-            action: () => dispatchCommand(commandRegistry, command.id),
-          })),
-        ],
-      },
-      {
-        id: 'edit',
-        label: 'Edit',
-        items: [
-          { label: 'Undo', shortcut: 'Ctrl+Z', action: () => runDocumentCommand('undo', lastFocusedRef.current) },
-          { label: 'Redo', shortcut: 'Ctrl+Y', action: () => runDocumentCommand('redo', lastFocusedRef.current) },
-          { separator: true },
-          { label: 'Cut', shortcut: 'Ctrl+X', action: () => runDocumentCommand('cut', lastFocusedRef.current) },
-          { label: 'Copy', shortcut: 'Ctrl+C', action: () => runDocumentCommand('copy', lastFocusedRef.current) },
-          { label: 'Paste', shortcut: 'Ctrl+V', action: () => void runPasteCommand(lastFocusedRef.current) },
-          { separator: true },
-          ...editCommands.map((command) => ({
-            label: command.menu?.label,
-            shortcut: formatShortcut(command.defaultShortcut),
-            action: () => dispatchCommand(commandRegistry, command.id),
-          })),
-          { label: 'Select All', shortcut: 'Ctrl+A', action: () => runDocumentCommand('selectAll', lastFocusedRef.current) },
-        ],
-      },
-      {
-        id: 'view',
-        label: 'View',
-        items: [
-          { label: 'Editor Only', checked: viewMode === 'edit', action: () => setViewMode('edit') },
-          { label: 'Split View', checked: viewMode === 'split', action: () => setViewMode('split') },
-          { label: 'Preview Only', checked: viewMode === 'preview', action: () => setViewMode('preview') },
-          { separator: true },
-          { label: 'Toggle Sidebar', action: toggleSidebar },
-          { label: 'Sync Scroll', checked: syncScroll, action: toggleSyncScroll },
-        ],
-      },
-      {
-        id: 'window',
-        label: 'Window',
-        items: [
-          { label: 'Minimize', action: () => void runWindowAction('minimize') },
-          { label: 'Maximize / Restore', action: () => void runWindowAction('toggleMaximize') },
-          { separator: true },
-          { label: 'Close Window', action: () => void runWindowAction('close') },
-        ],
-      },
-      {
-        id: 'help',
-        label: 'Help',
-        items: [{ label: 'About Saekim', action: () => window.alert('Saekim 3.0.1') }],
-      },
+    () =>
+      buildAppMenus({
+        handlers,
+        commandRegistry,
+        viewMode,
+        effectiveViewMode,
+        availableViewModes,
+        setViewMode,
+        toggleSidebar,
+        syncScroll,
+        toggleSyncScroll,
+        getDocumentCommandTarget: () => lastFocusedRef.current,
+      }),
+    [
+      availableViewModes,
+      commandRegistry,
+      effectiveViewMode,
+      handlers,
+      setViewMode,
+      syncScroll,
+      toggleSidebar,
+      toggleSyncScroll,
+      viewMode,
     ],
-    [editCommands, fileCommands, handlers, setViewMode, syncScroll, toggleSidebar, toggleSyncScroll, viewMode],
   );
 
   useEffect(() => {
@@ -268,27 +215,4 @@ function useIsWindowsRuntime(): boolean {
   }, []);
 
   return isWindows;
-}
-
-function runDocumentCommand(command: string, target: HTMLElement | null): void {
-  target?.focus();
-  document.execCommand(command);
-}
-
-async function runPasteCommand(target: HTMLElement | null): Promise<void> {
-  target?.focus();
-  if (document.execCommand('paste')) return;
-
-  if ((target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) && navigator.clipboard?.readText) {
-    const text = await navigator.clipboard.readText();
-    const start = target.selectionStart ?? target.value.length;
-    const end = target.selectionEnd ?? target.value.length;
-    target.setRangeText(text, start, end, 'end');
-    target.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-}
-
-async function runWindowAction(action: 'minimize' | 'toggleMaximize' | 'close'): Promise<void> {
-  if (!currentPlatformCapabilities().has('window.chrome')) return;
-  await Backend.runtime.runWindowAction(action);
 }
