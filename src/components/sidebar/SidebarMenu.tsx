@@ -6,21 +6,23 @@ import { Icon } from '../primitives/Icon';
 import { MenuSurface } from '../ui/surface/MenuSurface';
 import { buildAppMenus, type AppMenuGroup, type AppMenuHandlers, type AppMenuId } from '../shell/appMenus';
 
-interface AndroidSidebarMenuProps {
-  textareaRef: RefObject<HTMLTextAreaElement>;
-  handlers: AppMenuHandlers;
-  commandRegistry: CommandRegistry;
-  effectiveViewMode: ViewMode;
-  availableViewModes: readonly ViewMode[];
+interface SidebarMenuProps {
+  readonly className?: string;
+  readonly textareaRef: RefObject<HTMLTextAreaElement>;
+  readonly handlers: AppMenuHandlers;
+  readonly commandRegistry: CommandRegistry;
+  readonly effectiveViewMode: ViewMode;
+  readonly availableViewModes: readonly ViewMode[];
 }
 
-export function AndroidSidebarMenu({
+export function SidebarMenu({
+  className,
   textareaRef,
   handlers,
   commandRegistry,
   effectiveViewMode,
   availableViewModes,
-}: AndroidSidebarMenuProps) {
+}: SidebarMenuProps) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -44,7 +46,7 @@ export function AndroidSidebarMenu({
         toggleSyncScroll,
         getDocumentCommandTarget: () => lastFocusedRef.current ?? textareaRef.current,
         includeWindowMenu: false,
-      }).filter((menu) => menu.id !== 'window'),
+      }).filter((menu) => menu.id !== 'window' && menu.id !== 'help'),
     [
       availableViewModes,
       commandRegistry,
@@ -85,11 +87,12 @@ export function AndroidSidebarMenu({
       lastFocusedRef.current = activeElement;
     }
   };
+  const rootClassName = className ? `sidebar-menu ${className}` : 'sidebar-menu';
 
   return (
-    <nav className="android-sidebar-menu" ref={rootRef} aria-label="Application menu">
+    <nav className={rootClassName} ref={rootRef} aria-label="Application menu">
       {menus.map((menu) => (
-        <AndroidSidebarMenuGroup
+        <SidebarMenuGroup
           key={menu.id}
           menu={menu}
           open={openMenu === menu.id}
@@ -102,27 +105,27 @@ export function AndroidSidebarMenu({
   );
 }
 
-function AndroidSidebarMenuGroup({
+function SidebarMenuGroup({
   menu,
   open,
   onRememberFocus,
   onToggle,
   onClose,
 }: {
-  menu: AppMenuGroup;
-  open: boolean;
-  onRememberFocus: () => void;
-  onToggle: () => void;
-  onClose: () => void;
+  readonly menu: AppMenuGroup;
+  readonly open: boolean;
+  readonly onRememberFocus: () => void;
+  readonly onToggle: () => void;
+  readonly onClose: () => void;
 }) {
-  const iconName = androidSidebarMenuIconName(menu.id);
+  const iconName = sidebarMenuIconName(menu.id);
 
   if (!iconName) return null;
 
   return (
-    <div className="android-sidebar-menu-group">
+    <div className="sidebar-menu-group">
       <button
-        className={`android-sidebar-menu-button ${open ? 'active' : ''}`}
+        className={`sidebar-menu-button ${open ? 'active' : ''}`}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -131,10 +134,10 @@ function AndroidSidebarMenuGroup({
         onClick={onToggle}
       >
         <Icon name={iconName} />
-        <span className="android-sidebar-menu-label">{menu.label}</span>
+        <span className="sidebar-menu-label">{menu.label}</span>
       </button>
       {open ? (
-        <MenuSurface className="android-sidebar-menu-panel" role="menu">
+        <MenuSurface className="sidebar-menu-panel" role="menu">
           {menu.items.map((item, index) =>
             item.separator ? (
               <div className="app-menu-separator" key={`${menu.id}-separator-${index}`} role="separator" />
@@ -161,7 +164,7 @@ function AndroidSidebarMenuGroup({
   );
 }
 
-function androidSidebarMenuIconName(menuId: AppMenuId) {
+function sidebarMenuIconName(menuId: AppMenuId) {
   switch (menuId) {
     case 'file':
       return 'file';

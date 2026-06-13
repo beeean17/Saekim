@@ -664,7 +664,7 @@
   left: 1px;
   width: 3px;
   background: var(--pane-drop-preview-handle, var(--accent));
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .app[data-sidebar-resize-preview] .pane-resizer-sidebar::before {
@@ -709,6 +709,19 @@
   width: 3px;
   background: var(--accent);
   border-radius: 999px;
+}
+
+.pane-resizer-pane:hover::before {
+  border-radius: 0;
+}
+
+.pane-resizer-sidebar::before {
+  opacity: 0;
+}
+
+.pane-resizer-sidebar:hover::before,
+.app[data-sidebar-resize-preview] .pane-resizer-sidebar::before {
+  opacity: 1;
 }
 
 .pane-resizer.hidden {
@@ -767,35 +780,31 @@
   gap: 2px;
 }
 
-.android-sidebar-menu {
-  display: none;
-}
-
-.app[data-runtime="android"] .android-sidebar-menu {
-  display: grid;
-  width: 100%;
+.sidebar-menu {
+  position: relative;
+  display: flex;
+  width: auto;
   flex: 0 0 auto;
   gap: 4px;
-  margin-top: auto;
-  padding: 8px 8px 10px;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
-.android-sidebar-menu-group {
-  position: relative;
+.sidebar-menu-group {
+  position: static;
   min-width: 0;
 }
 
-.android-sidebar-menu-button {
+.sidebar-menu-button {
   display: flex;
-  width: 100%;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   min-width: 0;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 0 10px 0 11.5px;
+  justify-content: center;
+  padding: 0;
   color: var(--text-muted);
   border-radius: var(--radius);
   font-size: 12px;
@@ -804,36 +813,39 @@
   transition: background 0.12s, color 0.12s;
 }
 
-.android-sidebar-menu-button:hover,
-.android-sidebar-menu-button.active {
+.sidebar-menu-button:hover,
+.sidebar-menu-button.active {
   color: var(--text-primary);
   background: var(--bg-elevated);
 }
 
-.android-sidebar-menu-button.active .ic {
+.sidebar-menu-button.active .ic {
   color: var(--accent);
 }
 
-.android-sidebar-menu-button .ic {
-  width: 16px;
-  height: 16px;
+.sidebar-menu-button .ic {
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
 }
 
-.android-sidebar-menu-label {
+.sidebar-menu-label {
+  display: none;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.android-sidebar-menu-panel {
+.sidebar-menu-panel {
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
+  top: calc(100% + 6px);
+  right: 0;
+  bottom: auto;
+  left: auto;
   z-index: 150;
   display: grid;
-  width: min(230px, calc(var(--sidebar-current-w) - 16px));
+  width: min(214px, calc(var(--sidebar-current-w) - var(--sidebar-w-collapsed) - 16px));
   min-width: 164px;
   gap: 2px;
   padding: 5px;
@@ -845,8 +857,11 @@
 
 .sidebar-folder-path {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 12px 9px;
-  padding: 7px 9px 7px 11px;
+  padding: 5px 5px 5px 11px;
   overflow: hidden;
   color: var(--text-secondary);
   font-family: var(--font-mono);
@@ -862,11 +877,35 @@
   white-space: nowrap;
 }
 
-.sidebar-folder-path span {
+.sidebar-folder-path-text {
   display: block;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  direction: rtl;
   text-overflow: ellipsis;
+  text-align: left;
+}
+
+.sidebar-folder-path-value {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.sidebar-folder-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.sidebar-folder-actions .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.sidebar-folder-actions .icon-btn .ic {
+  width: 14px;
+  height: 14px;
 }
 
 .icon-btn {
@@ -1151,7 +1190,10 @@
   display: none;
 }
 
-.app[data-sidebar-resize-preview="expanded"] .sidebar-folder-path,
+.app[data-sidebar-resize-preview="expanded"] .sidebar-folder-path {
+  display: flex;
+}
+
 .app[data-sidebar-resize-preview="expanded"] .file-tree {
   display: block;
 }
@@ -1302,49 +1344,77 @@
   gap: 4px;
 }
 
-.app[data-runtime="android"][data-sidebar="collapsed"] .android-sidebar-menu,
-.app[data-runtime="android"][data-sidebar-resize-preview="collapsed"] .android-sidebar-menu,
-.app[data-runtime="android"][data-viewport-profile="compact"] .android-sidebar-menu {
-  align-items: center;
-  justify-items: center;
-  padding: 8px 0 10px;
+.app[data-runtime="android"] .sidebar-menu-button {
+  width: 36px;
+  height: 36px;
 }
 
-.app[data-runtime="android"][data-sidebar="collapsed"] .android-sidebar-menu-button,
-.app[data-runtime="android"][data-sidebar-resize-preview="collapsed"] .android-sidebar-menu-button,
-.app[data-runtime="android"][data-viewport-profile="compact"] .android-sidebar-menu-button {
+.app[data-runtime="android"] .sidebar-menu-button .ic {
+  width: 18px;
+  height: 18px;
+}
+
+.app[data-sidebar="collapsed"] .sidebar-menu,
+.app[data-sidebar-resize-preview="collapsed"] .sidebar-menu,
+.app[data-viewport-profile="compact"] .sidebar-menu {
+  align-items: center;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+}
+
+.app[data-sidebar="collapsed"] .sidebar-menu-button,
+.app[data-sidebar-resize-preview="collapsed"] .sidebar-menu-button,
+.app[data-viewport-profile="compact"] .sidebar-menu-button {
   width: 36px;
+  height: 36px;
   justify-content: center;
   padding: 0;
 }
 
-.app[data-runtime="android"][data-sidebar="collapsed"] .android-sidebar-menu-label,
-.app[data-runtime="android"][data-sidebar-resize-preview="collapsed"] .android-sidebar-menu-label,
-.app[data-runtime="android"][data-viewport-profile="compact"] .android-sidebar-menu-label {
-  display: none;
+.app[data-sidebar="collapsed"] .sidebar-menu-button .ic,
+.app[data-sidebar-resize-preview="collapsed"] .sidebar-menu-button .ic,
+.app[data-viewport-profile="compact"] .sidebar-menu-button .ic {
+  width: 18px;
+  height: 18px;
 }
 
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .android-sidebar-menu {
-  align-items: stretch;
-  justify-items: stretch;
-  padding: 8px 8px 10px;
+.app[data-sidebar-resize-preview="expanded"] .sidebar-menu {
+  align-items: center;
+  flex-direction: row;
+  width: auto;
+  padding: 0;
 }
 
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .android-sidebar-menu-button {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0 10px 0 11.5px;
+.app[data-sidebar-resize-preview="expanded"] .sidebar-menu-button {
+  width: 36px;
+  height: 36px;
+  justify-content: center;
+  padding: 0;
 }
 
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .android-sidebar-menu-label {
-  display: inline;
+.app[data-sidebar-resize-preview="expanded"] .sidebar-menu-button .ic {
+  width: 18px;
+  height: 18px;
 }
 
-.app[data-runtime="android"][data-sidebar="collapsed"] .android-sidebar-menu-panel,
-.app[data-runtime="android"][data-sidebar-resize-preview="collapsed"] .android-sidebar-menu-panel,
-.app[data-runtime="android"][data-viewport-profile="compact"] .android-sidebar-menu-panel {
-  bottom: 0;
+.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .sidebar-menu-button {
+  width: 36px;
+  height: 36px;
+}
+
+.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .sidebar-menu-button .ic {
+  width: 18px;
+  height: 18px;
+}
+
+.app[data-sidebar="collapsed"] .sidebar-menu-panel,
+.app[data-sidebar-resize-preview="collapsed"] .sidebar-menu-panel,
+.app[data-viewport-profile="compact"] .sidebar-menu-panel {
+  top: 0;
   left: calc(100% + 10px);
+  right: auto;
+  bottom: auto;
   width: 214px;
   min-width: 214px;
 }
@@ -1355,7 +1425,6 @@
   min-height: 0;
   flex-direction: column;
   background: var(--bg-surface);
-  border-right: 1px solid var(--border);
 }
 
 .app[data-view="preview"] .editor-pane,
@@ -1393,13 +1462,13 @@
   display: inline-flex;
   width: 48px;
   flex: 0 0 48px;
-  height: 30px;
+  align-self: stretch;
   align-items: center;
   justify-content: center;
   margin-right: 5px;
   color: var(--text-faint);
   border-right: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;

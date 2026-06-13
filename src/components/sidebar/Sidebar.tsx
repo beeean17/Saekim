@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import { relativeTime } from '../../core/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
-import { currentPlatformCapabilities } from '../../platform/common/capabilities';
-import { isAndroidRuntime } from '../../platform/common/runtime';
 import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile, ViewMode } from '../../types/workspace';
@@ -13,7 +11,7 @@ import type { AppMenuHandlers } from '../shell/appMenus';
 import { Dialog } from '../ui/overlay/Dialog';
 import { CloseButton } from '../ui/primitives/CloseButton';
 import { SearchField } from '../ui/primitives/SearchField';
-import { AndroidSidebarMenu } from './AndroidSidebarMenu';
+import { SidebarMenu } from './SidebarMenu';
 
 interface SidebarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -34,15 +32,11 @@ export function Sidebar({
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const activeFile = useWorkspaceStore(selectActiveFile);
-  const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openFile = useWorkspaceStore((state) => state.openFile);
-  const createFile = useWorkspaceStore((state) => state.createFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
-  const canOpenFolder = currentPlatformCapabilities().has('folder.open');
-  const isAndroid = isAndroidRuntime();
   const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
@@ -68,15 +62,20 @@ export function Sidebar({
         <button className="brand-mark sidebar-toggle" title="탐색기 접기/펼치기" type="button" onClick={toggleSidebar}>
           <Icon name="sidebar" />
         </button>
-        <SidebarActions
-          canOpenFolder={canOpenFolder}
-          onCreateFile={() => void createFile()}
-          onOpenFolder={() => void openFolder()}
-          onSearch={() => setWorkspaceSearchOpen((open) => !open)}
-          onRefresh={() => void refresh()}
+        <SidebarMenu
+          className="sidebar-actions"
+          textareaRef={textareaRef}
+          handlers={menuHandlers}
+          commandRegistry={commandRegistry}
+          effectiveViewMode={effectiveViewMode}
+          availableViewModes={availableViewModes}
         />
       </div>
-      <FolderPath path={rootPath} />
+      <FolderPath
+        path={rootPath}
+        onSearch={() => setWorkspaceSearchOpen((open) => !open)}
+        onRefresh={() => void refresh()}
+      />
       {workspaceSearchOpen ? (
         <SearchField
           autoFocus
@@ -100,15 +99,6 @@ export function Sidebar({
           />
         ))}
       </div>
-      {isAndroid ? (
-        <AndroidSidebarMenu
-          textareaRef={textareaRef}
-          handlers={menuHandlers}
-          commandRegistry={commandRegistry}
-          effectiveViewMode={effectiveViewMode}
-          availableViewModes={availableViewModes}
-        />
-      ) : null}
       {imagePreview ? (
         <ImagePreviewModal
           canAddToDocument={Boolean(activeFile)}
@@ -121,12 +111,28 @@ export function Sidebar({
   );
 }
 
-function FolderPath({ path }: { path: string | null }) {
+function FolderPath({
+  path,
+  onSearch,
+  onRefresh,
+}: {
+  readonly path: string | null;
+  readonly onSearch: () => void;
+  readonly onRefresh: () => void;
+}) {
   const label = path ? displayWorkspacePath(path) : '열린 폴더 없음';
 
   return (
     <div className="sidebar-folder-path" title={label}>
-      <span>{label}</span>
+      <span className="sidebar-folder-path-text"><span className="sidebar-folder-path-value">{label}</span></span>
+      <div className="sidebar-folder-actions">
+        <IconButton label="파일 검색" onClick={onSearch}>
+          <Icon name="search" />
+        </IconButton>
+        <IconButton label="새로고침" onClick={onRefresh}>
+          <Icon name="refresh" />
+        </IconButton>
+      </div>
     </div>
   );
 }
@@ -164,39 +170,6 @@ function androidDocumentIdDisplayName(documentId: string): string {
   if (normalized === 'Download') return 'Downloads';
   if (normalized.startsWith('Download/')) return normalized.replace('Download', 'Downloads').replace(/\//g, ' / ');
   return normalized.replace(/\//g, ' / ') || 'Android document';
-}
-
-function SidebarActions({
-  canOpenFolder,
-  onCreateFile,
-  onOpenFolder,
-  onSearch,
-  onRefresh,
-}: {
-  canOpenFolder: boolean;
-  onCreateFile: () => void;
-  onOpenFolder: () => void;
-  onSearch: () => void;
-  onRefresh: () => void;
-}) {
-  return (
-    <div className="sidebar-actions">
-      <IconButton label="새 파일" onClick={onCreateFile}>
-        <Icon name="filePlus" />
-      </IconButton>
-      {canOpenFolder ? (
-        <IconButton label="폴더 열기" onClick={onOpenFolder}>
-          <Icon name="folder" />
-        </IconButton>
-      ) : null}
-      <IconButton label="파일 검색" onClick={onSearch}>
-        <Icon name="search" />
-      </IconButton>
-      <IconButton label="새로고침" onClick={onRefresh}>
-        <Icon name="refresh" />
-      </IconButton>
-    </div>
-  );
 }
 
 function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {

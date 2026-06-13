@@ -5,7 +5,6 @@ import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/worksp
 import type { ViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
-import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { MenuSurface } from '../ui/surface/MenuSurface';
 import { buildAppMenus, type AppMenuGroup, type AppMenuHandlers, type AppMenuId } from './appMenus';
 import { handleTitlebarMouseDown } from './titlebarWindowControls';
@@ -47,7 +46,6 @@ export function Header({ menuHandlers, commandRegistry, effectiveViewMode, avail
       </div>
 
       <div className="titlebar-right">
-        <ViewToggle availableViewModes={availableViewModes} effectiveViewMode={effectiveViewMode} />
         <IconButton
           aria-expanded={settingsOpen}
           aria-pressed={settingsOpen}
@@ -60,32 +58,6 @@ export function Header({ menuHandlers, commandRegistry, effectiveViewMode, avail
         </IconButton>
       </div>
     </header>
-  );
-}
-
-function ViewToggle({
-  availableViewModes,
-  effectiveViewMode,
-}: {
-  availableViewModes: readonly ViewMode[];
-  effectiveViewMode: ViewMode;
-}) {
-  const setViewMode = useUIStore((state) => state.setViewMode);
-  const options = [
-    { value: 'edit' as const, label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
-    { value: 'split' as const, label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
-    { value: 'preview' as const, label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
-  ].filter((option) => availableViewModes.includes(option.value));
-
-  return (
-    <SegmentedControl
-      ariaLabel="보기 모드"
-      className="view-toggle header-view-toggle"
-      size="sm"
-      value={effectiveViewMode}
-      options={options}
-      onChange={setViewMode}
-    />
   );
 }
 

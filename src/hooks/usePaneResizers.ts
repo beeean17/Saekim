@@ -157,8 +157,6 @@ function beginHorizontalDrag({
   readonly onMove: (clientX: number) => void;
   readonly onEnd: () => void;
 }): void {
-  let animationFrame = 0;
-  let latestClientX: number | null = null;
   const previousCursor = document.body.style.cursor;
   const previousUserSelect = document.body.style.userSelect;
   document.body.style.cursor = 'col-resize';
@@ -169,23 +167,12 @@ function beginHorizontalDrag({
     if (!(error instanceof Error)) throw error;
   }
 
-  const flush = () => {
-    animationFrame = 0;
-    if (latestClientX === null) return;
-    onMove(latestClientX);
-  };
   const onPointerMove = (event: PointerEvent) => {
     if (event.pointerId !== pointerId) return;
-    latestClientX = event.clientX;
-    if (animationFrame) return;
-    animationFrame = window.requestAnimationFrame(flush);
+    onMove(event.clientX);
   };
   const stop = (event: PointerEvent) => {
     if (event.pointerId !== pointerId) return;
-    if (animationFrame) {
-      window.cancelAnimationFrame(animationFrame);
-      flush();
-    }
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', stop);
     window.removeEventListener('pointercancel', stop);
