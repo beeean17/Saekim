@@ -1,4 +1,8 @@
 .app {
+  --sidebar-control-icon-size: 16px;
+  --sidebar-control-size: 30px;
+  --sidebar-control-top: 10px;
+  --sidebar-rail-gap: 8px;
   display: grid;
   grid-template-rows: 36px 1fr 28px;
   width: 100vw;
@@ -50,17 +54,17 @@
 
 .brand-mark {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: var(--sidebar-control-size);
+  height: var(--sidebar-control-size);
   place-items: center;
-  color: var(--accent-fg);
-  background: var(--accent);
+  color: var(--text-primary);
+  background: transparent;
   border-radius: 8px;
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .brand-mark:hover {
-  background: var(--accent-hover);
+  background: transparent;
 }
 
 .brand-mark:active {
@@ -68,9 +72,9 @@
 }
 
 .brand-mark .ic {
-  width: 16px;
-  height: 16px;
-  stroke: var(--accent-fg);
+  width: var(--sidebar-control-icon-size);
+  height: var(--sidebar-control-icon-size);
+  stroke: var(--text-primary);
   stroke-width: 1.8;
 }
 
@@ -78,7 +82,7 @@
 .app[data-sidebar-resize-preview="collapsed"] .brand-mark,
 .app[data-viewport-profile="compact"] .brand-mark {
   color: var(--text-primary);
-  background: var(--bg-elevated);
+  background: transparent;
 }
 
 .app[data-sidebar="collapsed"] .brand-mark .ic,
@@ -121,24 +125,6 @@
 
 .app[data-viewport-profile="medium"] .header-view-toggle {
   display: none;
-}
-
-.app[data-runtime="android"] .titlebar {
-  justify-content: flex-end;
-  padding: 0 8px 0 12px;
-}
-
-.app[data-runtime="android"] .titlebar-path {
-  left: 12px;
-  right: 52px;
-  width: auto;
-  max-width: none;
-  justify-content: flex-start;
-  transform: translateY(-50%);
-}
-
-.app[data-runtime="android"][data-viewport-profile="expanded"] .titlebar-path {
-  right: 218px;
 }
 
 .breadcrumb {
@@ -769,15 +755,26 @@
 }
 
 .sidebar-head {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px 8px;
+  justify-content: flex-end;
+  min-height: 50px;
+  padding: 10px 14px 10px var(--sidebar-w-collapsed);
 }
 
 .sidebar-actions {
   display: flex;
   gap: 2px;
+  margin-left: auto;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: var(--sidebar-control-top);
+  left: calc((var(--sidebar-w-collapsed) - var(--sidebar-control-size)) / 2);
+  width: var(--sidebar-control-size);
+  height: var(--sidebar-control-size);
 }
 
 .sidebar-menu {
@@ -799,8 +796,8 @@
 
 .sidebar-menu-button {
   display: flex;
-  width: 36px;
-  height: 36px;
+  width: var(--sidebar-control-size);
+  height: var(--sidebar-control-size);
   min-width: 0;
   align-items: center;
   justify-content: center;
@@ -824,8 +821,8 @@
 }
 
 .sidebar-menu-button .ic {
-  width: 18px;
-  height: 18px;
+  width: var(--sidebar-control-icon-size);
+  height: var(--sidebar-control-icon-size);
   flex: 0 0 auto;
 }
 
@@ -1209,20 +1206,21 @@
   align-items: center;
   justify-content: flex-start;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sidebar-rail-gap);
   overflow: visible;
-  padding: 10px 0;
+  padding: calc(var(--sidebar-control-top) + var(--sidebar-control-size) + var(--sidebar-rail-gap)) 0 10px;
   border-bottom: 0;
 }
 
 .app[data-sidebar-resize-preview="expanded"] .sidebar-head {
   height: auto;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  min-height: 50px;
   flex-direction: row;
   gap: 0;
   overflow: visible;
-  padding: 12px 14px 8px;
+  padding: 10px 14px 10px var(--sidebar-w-collapsed);
 }
 
 .app[data-sidebar="collapsed"] .sidebar-actions,
@@ -1233,7 +1231,8 @@
   width: 100%;
   align-items: center;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sidebar-rail-gap);
+  margin-left: 0;
 }
 
 .app[data-sidebar="collapsed"] .sidebar-actions::after,
@@ -1250,30 +1249,31 @@
 .app[data-sidebar="collapsed"] .icon-btn,
 .app[data-sidebar-resize-preview="collapsed"] .icon-btn,
 .app[data-viewport-profile="compact"] .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: var(--sidebar-control-size);
+  height: var(--sidebar-control-size);
 }
 
 .app[data-sidebar="collapsed"] .icon-btn .ic,
 .app[data-sidebar-resize-preview="collapsed"] .icon-btn .ic,
 .app[data-viewport-profile="compact"] .icon-btn .ic {
-  width: 18px;
-  height: 18px;
+  width: var(--sidebar-control-icon-size);
+  height: var(--sidebar-control-icon-size);
 }
 
 .app[data-sidebar-resize-preview="expanded"] .brand-mark {
-  color: var(--accent-fg);
-  background: var(--accent);
+  color: var(--text-primary);
+  background: transparent;
 }
 
 .app[data-sidebar-resize-preview="expanded"] .brand-mark .ic {
-  stroke: var(--accent-fg);
+  stroke: var(--text-primary);
 }
 
 .app[data-sidebar-resize-preview="expanded"] .sidebar-actions {
   width: auto;
   flex-direction: row;
   gap: 2px;
+  margin-left: auto;
 }
 
 .app[data-sidebar-resize-preview="expanded"] .icon-btn {
@@ -1286,88 +1286,21 @@
   height: 14px;
 }
 
-.app[data-runtime="android"] .sidebar-actions .icon-btn {
-  width: 36px;
-  height: 36px;
-}
-
-.app[data-runtime="android"] .sidebar-actions .icon-btn .ic {
-  width: 18px;
-  height: 18px;
-}
-
-.app[data-runtime="android"] .sidebar-head {
-  position: relative;
-}
-
-.app[data-runtime="android"] .sidebar-toggle {
-  position: absolute;
-  top: 10px;
-  left: calc((var(--sidebar-w-collapsed) - 30px) / 2);
-  width: 30px;
-  height: 30px;
-}
-
-.app[data-runtime="android"] .sidebar-toggle .ic {
-  width: 16px;
-  height: 16px;
-}
-
-.app[data-runtime="android"][data-sidebar="collapsed"] .sidebar-toggle,
-.app[data-runtime="android"][data-sidebar-resize-preview="collapsed"] .sidebar-toggle,
-.app[data-runtime="android"][data-viewport-profile="compact"] .sidebar-toggle {
-  background: transparent;
-}
-
-.app[data-runtime="android"][data-sidebar="collapsed"] .sidebar-head,
-.app[data-runtime="android"][data-sidebar-resize-preview="collapsed"] .sidebar-head,
-.app[data-runtime="android"][data-viewport-profile="compact"] .sidebar-head {
-  height: auto;
-  flex: 0 0 auto;
-  padding-top: 44px;
-}
-
-.app[data-runtime="android"][data-sidebar="expanded"] .sidebar-head,
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .sidebar-head {
-  min-height: 56px;
-  padding: 10px 8px 8px var(--sidebar-w-collapsed);
-}
-
-.app[data-runtime="android"][data-sidebar="expanded"] .sidebar-actions,
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .sidebar-actions {
-  position: absolute;
-  top: 7px;
-  left: var(--sidebar-w-collapsed);
-  width: auto;
-  align-items: center;
-  flex-direction: row;
-  gap: 4px;
-}
-
-.app[data-runtime="android"] .sidebar-menu-button {
-  width: 36px;
-  height: 36px;
-}
-
-.app[data-runtime="android"] .sidebar-menu-button .ic {
-  width: 18px;
-  height: 18px;
-}
-
 .app[data-sidebar="collapsed"] .sidebar-menu,
 .app[data-sidebar-resize-preview="collapsed"] .sidebar-menu,
 .app[data-viewport-profile="compact"] .sidebar-menu {
   align-items: center;
   flex-direction: column;
   width: 100%;
+  gap: var(--sidebar-rail-gap);
   padding: 0;
 }
 
 .app[data-sidebar="collapsed"] .sidebar-menu-button,
 .app[data-sidebar-resize-preview="collapsed"] .sidebar-menu-button,
 .app[data-viewport-profile="compact"] .sidebar-menu-button {
-  width: 36px;
-  height: 36px;
+  width: var(--sidebar-control-size);
+  height: var(--sidebar-control-size);
   justify-content: center;
   padding: 0;
 }
@@ -1375,8 +1308,8 @@
 .app[data-sidebar="collapsed"] .sidebar-menu-button .ic,
 .app[data-sidebar-resize-preview="collapsed"] .sidebar-menu-button .ic,
 .app[data-viewport-profile="compact"] .sidebar-menu-button .ic {
-  width: 18px;
-  height: 18px;
+  width: var(--sidebar-control-icon-size);
+  height: var(--sidebar-control-icon-size);
 }
 
 .app[data-sidebar-resize-preview="expanded"] .sidebar-menu {
@@ -1387,25 +1320,15 @@
 }
 
 .app[data-sidebar-resize-preview="expanded"] .sidebar-menu-button {
-  width: 36px;
-  height: 36px;
+  width: var(--sidebar-control-size);
+  height: var(--sidebar-control-size);
   justify-content: center;
   padding: 0;
 }
 
 .app[data-sidebar-resize-preview="expanded"] .sidebar-menu-button .ic {
-  width: 18px;
-  height: 18px;
-}
-
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .sidebar-menu-button {
-  width: 36px;
-  height: 36px;
-}
-
-.app[data-runtime="android"][data-sidebar-resize-preview="expanded"] .sidebar-menu-button .ic {
-  width: 18px;
-  height: 18px;
+  width: var(--sidebar-control-icon-size);
+  height: var(--sidebar-control-icon-size);
 }
 
 .app[data-sidebar="collapsed"] .sidebar-menu-panel,
