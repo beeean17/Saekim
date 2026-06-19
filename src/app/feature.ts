@@ -2,6 +2,7 @@ import type { ClipboardEvent as ReactClipboardEvent, ComponentType, DragEvent as
 import type { EditorHelperItemBase } from '../core/editor/helperTypes';
 import type { FileTypeContribution, FileTypeInfo } from '../core/document/fileType';
 import type { PlatformCapability } from '../platform/common/capabilities';
+import type { PreviewRenderScene } from '../core/preview/renderScene';
 import type { BlockLayout } from '../types/metadata';
 import type { HtmlPreviewMode } from '../types/session';
 import type { ThemeName, OpenFile } from '../types/workspace';
@@ -140,9 +141,11 @@ export type PreviewResult =
       kind: 'html';
       html: string;
       renderMode?: 'default' | 'browser-frame';
+      scene?: PreviewRenderScene;
     }
   | {
       kind: 'react';
       node: ReactNode;
       renderKey?: string;
+      scene?: PreviewRenderScene;
     };

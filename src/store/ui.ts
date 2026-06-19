@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { PreviewInteractionMode } from '../core/preview/surfacePolicy';
 import type { UISession } from '../types/session';
 import type { SidebarMode, ViewMode } from '../types/workspace';
 
@@ -7,6 +8,7 @@ const DEFAULT_EDITOR_WIDTH = 560;
 const SPLIT_HANDLE_WIDTH = 12;
 const MIN_EDITOR_WIDTH = 240;
 const MAX_EDITOR_WIDTH = 1600;
+const DEFAULT_PREVIEW_INTERACTION_MODE: PreviewInteractionMode = 'view';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -32,6 +34,7 @@ interface UIState {
   splitRatio: number;
   editorWidth: number;
   syncScroll: boolean;
+  previewInteractionMode: PreviewInteractionMode;
   settingsOpen: boolean;
   toggleSidebar: () => void;
   setSidebarMode: (mode: SidebarMode) => void;
@@ -40,6 +43,7 @@ interface UIState {
   setSplitRatio: (ratio: number) => void;
   setEditorWidth: (width: number) => void;
   setSyncScroll: (enabled: boolean) => void;
+  setPreviewInteractionMode: (mode: PreviewInteractionMode) => void;
   toggleSyncScroll: () => void;
   toggleSettings: () => void;
   closeSettings: () => void;
@@ -53,6 +57,7 @@ export const useUIStore = create<UIState>()((set) => ({
   splitRatio: 0.5,
   editorWidth: getInitialEditorWidth(),
   syncScroll: true,
+  previewInteractionMode: DEFAULT_PREVIEW_INTERACTION_MODE,
   settingsOpen: false,
   toggleSidebar: () =>
     set((state) => ({
@@ -64,6 +69,7 @@ export const useUIStore = create<UIState>()((set) => ({
   setSplitRatio: (ratio) => set({ splitRatio: clamp(ratio, 0.25, 0.75) }),
   setEditorWidth: (width) => set({ editorWidth: clamp(width, MIN_EDITOR_WIDTH, MAX_EDITOR_WIDTH) }),
   setSyncScroll: (enabled) => set({ syncScroll: enabled }),
+  setPreviewInteractionMode: (mode) => set({ previewInteractionMode: mode }),
   toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
@@ -75,6 +81,7 @@ export const useUIStore = create<UIState>()((set) => ({
       splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,
       editorWidth: restoreEditorWidth(ui),
       syncScroll: ui.syncScroll ?? true,
+      previewInteractionMode: DEFAULT_PREVIEW_INTERACTION_MODE,
       settingsOpen: false,
     }),
 }));

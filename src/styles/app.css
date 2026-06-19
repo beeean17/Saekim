@@ -92,6 +92,9 @@
 }
 
 .app[data-viewport-profile="compact"] .titlebar {
+  width: 100vw;
+  max-width: 100vw;
+  min-width: 0;
   justify-content: flex-end;
   padding-right: 8px;
 }
@@ -443,10 +446,16 @@
 .app[data-viewport-profile="compact"] .body,
 .app[data-viewport-profile="compact"][data-view="edit"] .body,
 .app[data-viewport-profile="compact"][data-view="split"] .body {
+  width: 100vw;
+  max-width: 100vw;
+  min-width: 0;
   grid-template-columns: var(--sidebar-w-collapsed) 0 minmax(0, 1fr) var(--pane-resizer-w) 0;
 }
 
 .app[data-viewport-profile="compact"][data-view="preview"] .body {
+  width: 100vw;
+  max-width: 100vw;
+  min-width: 0;
   grid-template-columns: var(--sidebar-w-collapsed) 0 0 var(--pane-resizer-w) minmax(0, 1fr);
 }
 
@@ -1634,6 +1643,25 @@
   border-radius: var(--radius);
 }
 
+.preview-head-actions,
+.preview-mode-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.preview-head-actions {
+  margin-left: auto;
+}
+
+.preview-head .html-preview-mode + .preview-head-actions {
+  margin-left: 0;
+}
+
+.preview-head-actions .preview-action {
+  margin-left: 0;
+}
+
 .preview-action:disabled {
   cursor: not-allowed;
   opacity: 0.42;
@@ -1697,8 +1725,11 @@
 
 .statusbar .item {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1722,6 +1753,7 @@
 
 .statusbar .right {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 14px;
   margin-left: auto;
@@ -1750,4 +1782,11 @@
   .statusbar .right {
     gap: 8px;
   }
+}
+
+.app[data-viewport-profile="compact"] .statusbar {
+  width: 100vw;
+  max-width: 100vw;
+  min-width: 0;
+  overflow: hidden;
 }
