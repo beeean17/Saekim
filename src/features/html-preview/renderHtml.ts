@@ -220,7 +220,7 @@ function ensureBrowserPreviewBaseStyles(doc: Document): void {
       color: #111827;
     }
     body {
-      min-height: 100vh;
+      min-height: 0;
       margin: 0;
       box-sizing: border-box;
     }
