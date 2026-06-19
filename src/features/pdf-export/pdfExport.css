@@ -188,6 +188,8 @@
 }
 
 .pdf-export-root code {
+  display: inline-block;
+  max-width: 100%;
   padding: 2px 5px;
   color: #111827;
   background: #f3f4f6;
@@ -195,6 +197,9 @@
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .pdf-export-root pre,
