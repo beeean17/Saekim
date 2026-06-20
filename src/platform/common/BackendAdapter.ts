@@ -45,6 +45,7 @@ export interface MetadataBackend {
   loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null>;
   loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;
   saveBlockLayout(layout: BlockLayout): Promise<void>;
+  saveBlockLayouts(layouts: readonly BlockLayout[]): Promise<void>;
 }
 
 export interface ExportBackend {

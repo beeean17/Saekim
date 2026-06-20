@@ -17,7 +17,7 @@ import {
   takePendingOpenFiles,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
-import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveSession } from '../common/tauri/session';
+import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveBlockLayouts, saveSession } from '../common/tauri/session';
 import type { BackendAdapter, ImageDownloadProgressPayload } from '../common/BackendAdapter';
 
 const externalOpenEvent = 'saekim-open-external-files';
@@ -49,6 +49,7 @@ export const androidBackend: BackendAdapter = {
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
+    saveBlockLayouts,
   },
   export: {
     pickPdfExportPath: unsupported('PDF target picker'),

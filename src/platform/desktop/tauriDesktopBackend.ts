@@ -22,7 +22,7 @@ import {
   writePdfExport,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
-import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveSession } from '../common/tauri/session';
+import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveBlockLayouts, saveSession } from '../common/tauri/session';
 import type { BackendAdapter, ImageDownloadProgressPayload, NativeMenuCommandHandlers, WindowAction } from '../common/BackendAdapter';
 
 const externalOpenEvent = 'saekim-open-external-files';
@@ -64,6 +64,7 @@ export const tauriDesktopBackend: BackendAdapter = {
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
+    saveBlockLayouts,
   },
   export: {
     pickPdfExportPath,

@@ -31,6 +31,7 @@ export const browserBackend: BackendAdapter = {
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
+    saveBlockLayouts,
   },
   export: {
     pickPdfExportPath,
@@ -161,16 +162,28 @@ async function loadBlockLayouts(filePath: string): Promise<BlockLayout[]> {
 }
 
 async function saveBlockLayout(layout: BlockLayout): Promise<void> {
-  const key = `${blockLayoutPrefix}${layout.filePath}`;
-  const existing = await loadBlockLayouts(layout.filePath);
-  const next = existing.filter(
-    (item) =>
-      item.blockKind !== layout.blockKind ||
-      item.blockKey !== layout.blockKey ||
-      item.occurrenceIndex !== layout.occurrenceIndex,
-  );
-  next.push(layout);
-  localStorage.setItem(key, JSON.stringify(next));
+  await saveBlockLayouts([layout]);
+}
+
+async function saveBlockLayouts(layouts: readonly BlockLayout[]): Promise<void> {
+  const layoutsByFile = new Map<string, BlockLayout[]>();
+  for (const layout of layouts) {
+    const existing = layoutsByFile.get(layout.filePath);
+    if (existing) existing.push(layout);
+    else layoutsByFile.set(layout.filePath, [layout]);
+  }
+
+  for (const [filePath, fileLayouts] of layoutsByFile) {
+    const key = `${blockLayoutPrefix}${filePath}`;
+    const incomingKeys = new Set(fileLayouts.map(blockLayoutStorageKey));
+    const next = (await loadBlockLayouts(filePath)).filter((item) => !incomingKeys.has(blockLayoutStorageKey(item)));
+    next.push(...fileLayouts);
+    localStorage.setItem(key, JSON.stringify(next));
+  }
+}
+
+function blockLayoutStorageKey(layout: BlockLayout): string {
+  return `${layout.blockKind}:${layout.blockKey}:${layout.occurrenceIndex}`;
 }
 
 async function openExternalUrl(url: string): Promise<void> {

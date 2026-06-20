@@ -26,3 +26,8 @@ export async function saveBlockLayout(layout: BlockLayout): Promise<void> {
   if (!isTauriRuntime()) return;
   await invokeCommand<null>('save_block_layout', { layout });
 }
+
+export async function saveBlockLayouts(layouts: readonly BlockLayout[]): Promise<void> {
+  if (!isTauriRuntime() || layouts.length === 0) return;
+  await invokeCommand<null>('save_block_layouts', { layouts });
+}

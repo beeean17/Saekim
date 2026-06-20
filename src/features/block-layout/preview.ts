@@ -82,7 +82,7 @@ export async function readBlockLayouts(filePath: string): Promise<BlockLayout[]>
 }
 
 export async function writeBlockLayouts(layouts: BlockLayout[]): Promise<void> {
-  await Promise.all(layouts.map((layout) => Backend.metadata.saveBlockLayout(layout)));
+  await Backend.metadata.saveBlockLayouts(layouts);
 }
 
 export function enhancePreviewLayoutBlocks(
