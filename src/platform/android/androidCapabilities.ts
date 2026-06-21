@@ -1,4 +1,4 @@
-import type { PlatformCapability } from '../common/capabilities';
+import type { PlatformCapability } from '../common/capabilityTypes';
 
 export const androidCapabilities: ReadonlySet<PlatformCapability> = new Set([
   'file.open',

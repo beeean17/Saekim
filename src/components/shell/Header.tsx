@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CommandRegistry } from '../../app/commands';
+import { Platform } from '../../platform/common/platform';
 import { useUIStore } from '../../store/ui';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { ViewMode } from '../../types/workspace';
@@ -23,14 +24,14 @@ export function Header({ menuHandlers, commandRegistry, effectiveViewMode, avail
   const settingsOpen = useUIStore((state) => state.settingsOpen);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
-  const isWindows = useIsWindowsRuntime();
-  const showHeaderMenu = isWindows;
+  const windowChrome = Platform.windowChrome;
+  const titlebarClassName = windowChrome.titlebarClassName
+    ? `titlebar ${windowChrome.titlebarClassName}`
+    : 'titlebar';
+  const showHeaderMenu = windowChrome.showsApplicationMenu;
 
   return (
-    <header
-      className={`titlebar ${isWindows ? 'windows-titlebar' : ''} ${showHeaderMenu ? 'menu-titlebar' : ''}`}
-      onMouseDown={handleTitlebarMouseDown}
-    >
+    <header className={titlebarClassName} onMouseDown={handleTitlebarMouseDown}>
       <div className="titlebar-drag" data-tauri-drag-region />
       {showHeaderMenu ? (
         <AppMenu
@@ -175,16 +176,4 @@ function AppMenu({
       ))}
     </nav>
   );
-}
-
-function useIsWindowsRuntime(): boolean {
-  const [isWindows, setIsWindows] = useState(false);
-
-  useEffect(() => {
-    const platform = navigator.platform.toLowerCase();
-    const userAgent = navigator.userAgent.toLowerCase();
-    setIsWindows(platform.startsWith('win') || userAgent.includes('windows'));
-  }, []);
-
-  return isWindows;
 }

@@ -1,25 +1,8 @@
-import { isTauriRuntime } from './tauri/invoke';
-import { androidCapabilities } from '../android/androidCapabilities';
-import { browserCapabilities } from '../browser/browserCapabilities';
-import { desktopCapabilities } from '../desktop/desktopCapabilities';
-import { isAndroidRuntime } from './runtime';
+import { Platform } from './platform';
+import type { PlatformCapability } from './capabilityTypes';
 
-export type PlatformCapability =
-  | 'file.open'
-  | 'file.save'
-  | 'folder.open'
-  | 'folder.tree'
-  | 'image.pick'
-  | 'image.copyToAssets'
-  | 'image.importBytesToAssets'
-  | 'image.downloadToAssets'
-  | 'pdf.save'
-  | 'metadata.sqlite'
-  | 'externalFile.open'
-  | 'window.chrome'
-  | 'native.menu';
+export type { PlatformCapability } from './capabilityTypes';
 
 export function currentPlatformCapabilities(): ReadonlySet<PlatformCapability> {
-  if (isAndroidRuntime()) return androidCapabilities;
-  return isTauriRuntime() ? desktopCapabilities : browserCapabilities;
+  return Platform.capabilities;
 }

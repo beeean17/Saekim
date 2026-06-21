@@ -1,14 +1,6 @@
-import { isTauriRuntime } from './tauri/invoke';
-import { androidBackend } from '../android/androidBackend';
-import { browserBackend } from '../browser/browserBackend';
-import { isAndroidRuntime } from './runtime';
-import { tauriDesktopBackend } from '../desktop/tauriDesktopBackend';
 import type { BackendAdapter } from './BackendAdapter';
+import { Platform } from './platform';
 
-export const Backend: BackendAdapter = isAndroidRuntime()
-  ? androidBackend
-  : isTauriRuntime()
-    ? tauriDesktopBackend
-    : browserBackend;
+export const Backend: BackendAdapter = Platform.backend;
 
 export type { BackendAdapter } from './BackendAdapter';

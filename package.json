@@ -14,7 +14,10 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:app": "tauri build --bundles app",
-    "tauri:build:dmg": "tauri build --bundles dmg"
+    "tauri:build:dmg": "tauri build --bundles dmg",
+    "tauri:build:macos": "tauri build --bundles app,dmg",
+    "tauri:build:windows": "tauri build --config src-tauri/tauri.windows.conf.json",
+    "tauri:build:android": "tauri android build"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans-kr": "^5.2.8",

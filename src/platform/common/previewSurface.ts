@@ -1,14 +1,6 @@
-import { androidPreviewSurface } from '../android/previewSurface';
-import { browserPreviewSurface } from '../browser/previewSurface';
-import { desktopPreviewSurface } from '../desktop/previewSurface';
-import { isAndroidRuntime } from './runtime';
-import { isTauriRuntime } from './tauri/invoke';
+import { Platform } from './platform';
 
-export const PreviewSurface = isAndroidRuntime()
-  ? androidPreviewSurface
-  : isTauriRuntime()
-    ? desktopPreviewSurface
-    : browserPreviewSurface;
+export const PreviewSurface = Platform.previewSurface;
 
 export type {
   PreviewInteractionMode,
