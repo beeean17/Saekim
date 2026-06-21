@@ -6,6 +6,7 @@ type IconName =
   | 'settings'
   | 'filePlus'
   | 'folder'
+  | 'folderOpen'
   | 'refresh'
   | 'file'
   | 'chevronRight'
@@ -71,6 +72,11 @@ const paths: Record<IconName, JSX.Element> = {
     </>
   ),
   folder: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
+  folderOpen: (
+    <>
+      <path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6A2 2 0 0 1 18.46 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2" />
+    </>
+  ),
   refresh: (
     <>
       <polyline points="23 4 23 10 17 10" />

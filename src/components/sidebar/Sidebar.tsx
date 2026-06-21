@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import { relativeTime } from '../../core/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
-import { useUIStore } from '../../store/ui';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile, ViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
@@ -12,6 +11,7 @@ import { Dialog } from '../ui/overlay/Dialog';
 import { CloseButton } from '../ui/primitives/CloseButton';
 import { SearchField } from '../ui/primitives/SearchField';
 import { SidebarMenu } from './SidebarMenu';
+import { SidebarToggle } from './SidebarToggle';
 
 interface SidebarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -36,7 +36,6 @@ export function Sidebar({
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
-  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
@@ -59,9 +58,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
-        <button className="brand-mark sidebar-toggle" title="탐색기 접기/펼치기" type="button" onClick={toggleSidebar}>
-          <Icon name="sidebar" />
-        </button>
+        <SidebarToggle />
         <SidebarMenu
           className="sidebar-actions"
           textareaRef={textareaRef}
