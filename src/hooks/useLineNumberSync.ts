@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
-import { getEditorRowHeight, lineHeightsEqual, measureWrappedLineHeights } from '../core/editor/lineMetrics';
+import { lineHeightsEqual, measureEditorRowHeight, measureWrappedLineHeights } from '../core/editor/lineMetrics';
 
 interface UseLineNumberSyncOptions {
   readonly editorFontFamily: string;
@@ -29,11 +29,11 @@ export function useLineNumberSync({
       if (disposed) return;
 
       const computedStyle = window.getComputedStyle(textarea);
-      const rowHeight = getEditorRowHeight(computedStyle);
+      const rowHeight = measureEditorRowHeight(textarea, computedStyle);
       if (!rowHeight) return;
 
       root.style.setProperty('--editor-row-height', `${rowHeight}px`);
-      const nextLineHeights = measureWrappedLineHeights(textarea, value, rowHeight);
+      const nextLineHeights = measureWrappedLineHeights(textarea, value, rowHeight, computedStyle);
       const paddingTop = Number.parseFloat(computedStyle.paddingTop) || 0;
       const paddingBottom = Number.parseFloat(computedStyle.paddingBottom) || 0;
       const documentHeight = nextLineHeights.reduce((total, height) => total + height, paddingTop + paddingBottom);
