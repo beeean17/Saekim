@@ -1,14 +1,17 @@
-import { countKoreanAwareWords, readingTime } from '../../core/format/readingTime';
+import type { RefObject } from 'react';
+import { countKoreanAwareWords } from '../../core/format/readingTime';
 import { pdfExportStatusText, usePdfExportStore } from '../../features/pdf-export';
+import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 
-export function StatusBar() {
+export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTMLTextAreaElement> }) {
   const activeFile = useWorkspaceStore(selectActiveFile);
   const pdfExportStatus = usePdfExportStore((state) => state.status);
   const dirty = isDirty(activeFile);
   const content = activeFile?.content ?? '';
   const language = activeFile?.name.endsWith('.txt') ? 'Text' : 'Markdown';
   const pdfStatusText = pdfExportStatusText(pdfExportStatus);
+  const cursor = useCursorPosition(content, textareaRef);
 
   return (
     <footer className="statusbar">
@@ -27,11 +30,11 @@ export function StatusBar() {
         </>
       ) : null}
       <div className="right">
-        <span className="item" id="cursor-position">Ln 1, Col 1</span>
+        <span className="item" id="cursor-position">
+          Ln {cursor.row}, Col {cursor.column}
+        </span>
         <span className="sep" />
         <span className="item">{countKoreanAwareWords(content)} 단어</span>
-        <span className="sep" />
-        <span className="item">{readingTime(content)}</span>
       </div>
     </footer>
   );

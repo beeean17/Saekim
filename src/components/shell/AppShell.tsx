@@ -1,9 +1,8 @@
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import type { ViewportProfileSnapshot } from '../../hooks/useViewportProfile';
 import { Backend } from '../../platform/common/backend';
-import { currentPlatformCapabilities } from '../../platform/common/capabilities';
-import { isAndroidRuntime } from '../../platform/common/runtime';
+import { Platform } from '../../platform/common/platform';
 import { useSettingsStore } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import type { ViewMode } from '../../types/workspace';
@@ -20,6 +19,7 @@ interface AppShellProps {
   viewportProfile: ViewportProfileSnapshot;
   effectiveViewMode: ViewMode;
   availableViewModes: readonly ViewMode[];
+  textareaRef: RefObject<HTMLTextAreaElement>;
 }
 
 export function AppShell({
@@ -29,9 +29,10 @@ export function AppShell({
   viewportProfile,
   effectiveViewMode,
   availableViewModes,
+  textareaRef,
 }: AppShellProps) {
   useNativeWindowChrome();
-  const runtime = isAndroidRuntime() ? 'android' : 'desktop';
+  const runtime = Platform.shellRuntime;
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
@@ -62,7 +63,7 @@ export function AppShell({
       />
       <SettingsPanel effectiveViewMode={effectiveViewMode} availableViewModes={availableViewModes} />
       {children}
-      <StatusBar />
+      <StatusBar textareaRef={textareaRef} />
     </div>
   );
 }
@@ -71,9 +72,9 @@ function useNativeWindowChrome(): void {
   const theme = useSettingsStore((state) => state.theme);
 
   useEffect(() => {
-    const hasWindowChrome = currentPlatformCapabilities().has('window.chrome');
+    const hasWindowChrome = Platform.capabilities.has('window.chrome');
     document.documentElement.classList.toggle('tauri-window-chrome', hasWindowChrome);
-    if (!hasWindowChrome) return;
+    if (!hasWindowChrome || !Platform.windowChrome.syncsNativeTitlebarColor) return;
 
     const titlebarColor = getComputedStyle(document.documentElement)
       .getPropertyValue('--bg-surface')

@@ -97,6 +97,7 @@ export function App() {
       viewportProfile={viewportProfile}
       effectiveViewMode={effectiveViewMode}
       availableViewModes={availableViewModes}
+      textareaRef={editorRef}
     >
       <main className="body" ref={bodyRef}>
         <Sidebar
