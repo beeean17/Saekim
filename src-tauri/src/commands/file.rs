@@ -50,9 +50,9 @@ pub struct OpenFilePayload {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImagePickPayload {
-    path: String,
-    name: String,
-    display_path: Option<String>,
+    pub(crate) path: String,
+    pub(crate) name: String,
+    pub(crate) display_path: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -150,35 +150,46 @@ pub async fn open_folder_dialog(_app: AppHandle) -> CommandResult<Option<String>
 
 #[tauri::command]
 pub async fn pick_image_path(app: AppHandle) -> CommandResult<Option<ImagePickPayload>> {
-    let app_handle = app.clone();
-    let selected = tauri::async_runtime::spawn_blocking(move || {
-        let selected = app
-            .dialog()
-            .file()
-            .add_filter(
-                "Images",
-                &[
-                    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif",
-                ],
-            )
-            .blocking_pick_file();
-
-        let Some(path) = selected else {
-            return Ok(None);
-        };
-
-        selected_image_path(path)
-    })
-    .await;
-
-    match selected {
-        Ok(Ok(Some(path))) => match image_pick_payload(&app_handle, path) {
-            Ok(payload) => ok(Some(payload)),
+    #[cfg(target_os = "android")]
+    {
+        return match crate::platform::android::image_picker::pick_image_path(&app).await {
+            Ok(payload) => ok(payload),
             Err(error) => fail(error),
-        },
-        Ok(Ok(None)) => ok(None),
-        Ok(Err(error)) => fail(error),
-        Err(error) => fail(format!("failed to pick image path: {error}")),
+        };
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let app_handle = app.clone();
+        let selected = tauri::async_runtime::spawn_blocking(move || {
+            let selected = app
+                .dialog()
+                .file()
+                .add_filter(
+                    "Images",
+                    &[
+                        "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif",
+                    ],
+                )
+                .blocking_pick_file();
+
+            let Some(path) = selected else {
+                return Ok(None);
+            };
+
+            selected_image_path(path)
+        })
+        .await;
+
+        match selected {
+            Ok(Ok(Some(path))) => match image_pick_payload(&app_handle, path) {
+                Ok(payload) => ok(Some(payload)),
+                Err(error) => fail(error),
+            },
+            Ok(Ok(None)) => ok(None),
+            Ok(Err(error)) => fail(error),
+            Err(error) => fail(format!("failed to pick image path: {error}")),
+        }
     }
 }
 
@@ -501,32 +512,14 @@ fn selected_document_path(path: tauri_plugin_dialog::FilePath) -> Result<Option<
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn selected_image_path(path: tauri_plugin_dialog::FilePath) -> Result<Option<String>, String> {
-    #[cfg(target_os = "android")]
-    {
-        return Ok(Some(path.to_string()));
+    let path = path.into_path().unwrap_or_default();
+    if !is_supported_image_asset_path(&path) {
+        return Err("unsupported image type".to_string());
     }
 
-    #[cfg(not(target_os = "android"))]
-    {
-        let path = path.into_path().unwrap_or_default();
-        if !is_supported_image_asset_path(&path) {
-            return Err("unsupported image type".to_string());
-        }
-
-        Ok(Some(path.to_string_lossy().to_string()))
-    }
-}
-
-#[cfg(target_os = "android")]
-fn image_pick_payload(app: &AppHandle, path: String) -> Result<ImagePickPayload, String> {
-    let selected_path = selected_file_path_from_string(path.clone());
-    let name = selected_file_name(app, &selected_path);
-    Ok(ImagePickPayload {
-        path,
-        display_path: selected_display_path(&selected_path, &name),
-        name,
-    })
+    Ok(Some(path.to_string_lossy().to_string()))
 }
 
 #[cfg(not(target_os = "android"))]

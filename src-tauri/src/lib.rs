@@ -18,6 +18,7 @@ pub fn run() {
     #[cfg(target_os = "android")]
     let builder = builder
         .plugin(platform::android::document_metadata::init())
+        .plugin(platform::android::image_picker::init())
         .plugin(tauri_plugin_fs::init());
 
     let builder = builder

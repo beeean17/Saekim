@@ -1,5 +1,5 @@
-import type { BlockLayout } from '../../types/metadata';
 import { isPreviewArrangeMode } from './interactionMode';
+import { clearLayoutGroupForWrapper, createManualTwoColumnGroup } from './layoutGroupChanges';
 import { layoutIdentity } from './layoutIdentity';
 import {
   clearLayoutDropTargets,
@@ -9,20 +9,15 @@ import {
   updateLayoutDropPreview,
 } from './layoutDropPreview';
 import {
-  clearLayoutGroup,
   findLayoutWrapperByIdentity,
-  getLayoutGroupColumns,
-  getLayoutGroupId,
-  groupLayoutsForWrapper,
   layoutForWrapper,
-  uniqueLayouts,
-  withColumnGroup,
 } from './layoutModel';
 import type { LayoutInteractionPolicy } from './layoutInteractionPolicy';
 import { clearSelectedKatexEquations, clearSelectedLayoutBlocks } from './layoutSelection';
 import type { LayoutByKey, LayoutChangeHandler } from './layoutTypes';
 
 const layoutUngroupThresholdPx = 18;
+const touchLongPressCancelSlopPx = 24;
 
 type ActiveLayoutDrag = {
   readonly filePath: string;
@@ -46,7 +41,7 @@ export function startLayoutPointerDrag(
   onChange: LayoutChangeHandler,
   interactionPolicy: LayoutInteractionPolicy,
 ): void {
-  if (event.button !== 0 || !isPreviewArrangeMode(root)) return;
+  if (!isPrimaryLayoutDragPointer(event) || !isPreviewArrangeMode(root)) return;
 
   event.preventDefault();
   event.stopPropagation();
@@ -86,11 +81,13 @@ export function startLayoutPointerDrag(
   handle.setPointerCapture(event.pointerId);
 
   const handlePointerMove = (moveEvent: PointerEvent) => {
+    if (moveEvent.pointerId !== event.pointerId) return;
+
     moveEvent.preventDefault();
 
     const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
     if (!dragArmed) {
-      if (distance >= interactionPolicy.dragActivationPx) cancelPointerDrag(moveEvent);
+      if (distance >= pendingDragCancelDistance(interactionPolicy)) cancelPointerDrag(moveEvent);
       return;
     }
 
@@ -102,10 +99,12 @@ export function startLayoutPointerDrag(
   };
 
   const finishPointerDrag = (finishEvent: PointerEvent) => {
+    if (finishEvent.pointerId !== event.pointerId) return;
+
     if (handle.hasPointerCapture(finishEvent.pointerId)) handle.releasePointerCapture(finishEvent.pointerId);
-    handle.removeEventListener('pointermove', handlePointerMove);
-    handle.removeEventListener('pointerup', finishPointerDrag);
-    handle.removeEventListener('pointercancel', cancelPointerDrag);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', finishPointerDrag);
+    window.removeEventListener('pointercancel', cancelPointerDrag);
     clearLongPressTimer();
 
     const distance = Math.hypot(finishEvent.clientX - startX, finishEvent.clientY - startY);
@@ -120,17 +119,29 @@ export function startLayoutPointerDrag(
   };
 
   const cancelPointerDrag = (cancelEvent: PointerEvent) => {
+    if (cancelEvent.pointerId !== event.pointerId) return;
+
     if (handle.hasPointerCapture(cancelEvent.pointerId)) handle.releasePointerCapture(cancelEvent.pointerId);
-    handle.removeEventListener('pointermove', handlePointerMove);
-    handle.removeEventListener('pointerup', finishPointerDrag);
-    handle.removeEventListener('pointercancel', cancelPointerDrag);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', finishPointerDrag);
+    window.removeEventListener('pointercancel', cancelPointerDrag);
     clearLongPressTimer();
     finishLayoutDrag(root, wrapper);
   };
 
-  handle.addEventListener('pointermove', handlePointerMove);
-  handle.addEventListener('pointerup', finishPointerDrag);
-  handle.addEventListener('pointercancel', cancelPointerDrag);
+  window.addEventListener('pointermove', handlePointerMove, { passive: false });
+  window.addEventListener('pointerup', finishPointerDrag);
+  window.addEventListener('pointercancel', cancelPointerDrag);
+}
+
+function isPrimaryLayoutDragPointer(event: PointerEvent): boolean {
+  if (event.pointerType === 'mouse') return event.button === 0;
+  return event.isPrimary;
+}
+
+function pendingDragCancelDistance(interactionPolicy: LayoutInteractionPolicy): number {
+  if (interactionPolicy.longPressArrangeMs === null) return interactionPolicy.dragActivationPx;
+  return Math.max(touchLongPressCancelSlopPx, interactionPolicy.dragActivationPx * 3);
 }
 
 export function bindLayoutDropTarget(
@@ -197,55 +208,4 @@ function canDropLayoutBlock(root: HTMLElement, target: HTMLElement, filePath: st
     ? activeLayoutDrag.source
     : findLayoutWrapperByIdentity(root, activeLayoutDrag.identity);
   return Boolean(source && source !== target);
-}
-
-function createManualTwoColumnGroup(
-  root: HTMLElement,
-  source: HTMLElement,
-  target: HTMLElement,
-  filePath: string,
-  layoutByKey: LayoutByKey,
-  onChange: LayoutChangeHandler,
-): void {
-  const sourceLayout = layoutForWrapper(source, filePath, layoutByKey);
-  const targetLayout = layoutForWrapper(target, filePath, layoutByKey);
-  const sourceIdentity = layoutIdentity(sourceLayout);
-  const targetIdentity = layoutIdentity(targetLayout);
-  if (sourceIdentity === targetIdentity) return;
-
-  const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const previousLayouts = uniqueLayouts([
-    ...groupLayoutsForWrapper(root, source, filePath, layoutByKey),
-    ...groupLayoutsForWrapper(root, target, filePath, layoutByKey),
-  ]);
-
-  const clearedPreviousLayouts = previousLayouts
-    .filter((item) => {
-      const identity = layoutIdentity(item);
-      return identity !== sourceIdentity && identity !== targetIdentity;
-    })
-    .map((item) => clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }));
-
-  onChange([
-    ...clearedPreviousLayouts,
-    withColumnGroup(clearLayoutGroup(targetLayout), groupId, 2, 0, 'manual'),
-    withColumnGroup(clearLayoutGroup(sourceLayout), groupId, 2, 1, 'manual'),
-  ]);
-}
-
-function clearLayoutGroupForWrapper(
-  root: HTMLElement,
-  wrapper: HTMLElement,
-  filePath: string,
-  layoutByKey: LayoutByKey,
-  onChange: LayoutChangeHandler,
-): void {
-  const layout = layoutForWrapper(wrapper, filePath, layoutByKey);
-  if (!getLayoutGroupId(layout) || getLayoutGroupColumns(layout) <= 1) return;
-
-  onChange(
-    groupLayoutsForWrapper(root, wrapper, filePath, layoutByKey).map((item) =>
-      clearLayoutGroup({ ...item, widthValue: 100, widthUnit: '%' }),
-    ),
-  );
 }

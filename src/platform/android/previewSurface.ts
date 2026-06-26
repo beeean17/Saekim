@@ -16,7 +16,7 @@ export const androidPreviewSurface = createPreviewSurfaceAdapter({
     pointer: {
       resizeHandlePx: 18,
       dragActivationPx: 8,
-      longPressArrangeMs: 450,
+      longPressArrangeMs: null,
       commitBoundsOnPointerUp: true,
     },
   },

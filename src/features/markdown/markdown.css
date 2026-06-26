@@ -1,4 +1,7 @@
 .preview-content h1 {
+  display: table;
+  width: fit-content;
+  max-width: 100%;
   margin-bottom: 14px;
   font-size: 26px;
   font-weight: 700;
@@ -6,6 +9,9 @@
 }
 
 .preview-content h2 {
+  display: table;
+  width: fit-content;
+  max-width: 100%;
   margin-top: 24px;
   margin-bottom: 10px;
   font-size: 19px;
@@ -13,6 +19,9 @@
 }
 
 .preview-content h3 {
+  display: table;
+  width: fit-content;
+  max-width: 100%;
   margin-top: 18px;
   margin-bottom: 8px;
   color: var(--text-secondary);
@@ -21,6 +30,9 @@
 }
 
 .preview-content p {
+  display: table;
+  width: fit-content;
+  max-width: 100%;
   margin-bottom: 12px;
   color: var(--text-secondary);
   font-size: 1em;
@@ -47,14 +59,29 @@
 
 .preview-content ul,
 .preview-content ol {
+  width: fit-content;
+  max-width: 100%;
   margin-bottom: 14px;
   padding-left: 24px;
 }
 
 .preview-content li {
+  width: fit-content;
+  max-width: 100%;
   margin-bottom: 5px;
   color: var(--text-secondary);
   font-size: 1em;
+}
+
+.preview-content::selection,
+.preview-content *::selection {
+  background: transparent;
+  background-color: transparent;
+}
+
+.preview-content :where(p, li, h1, h2, h3, blockquote, th, td, strong, em, mark, a, code, span)::selection {
+  background: var(--accent-soft);
+  background-color: var(--accent-soft);
 }
 
 .preview-content li::marker {
@@ -114,11 +141,11 @@
 .preview-content .shiki {
   --preview-code-font-size: 12.5px;
   --preview-code-row-height: 19px;
-  --preview-code-selection-bg: color-mix(in srgb, var(--accent) 42%, transparent);
+  --preview-code-selection-bg: var(--accent-soft);
 
   position: relative;
   margin: 14px 0;
-  padding: 22px 0 10px;
+  padding: 34px 0 10px;
   overflow-x: auto;
   color: var(--text-primary);
   background: var(--bg-code) !important;
@@ -145,24 +172,62 @@
   --preview-code-row-height: 23px;
 }
 
-.preview-content .shiki::before {
+.preview-content .code-type-button {
   position: absolute;
   top: 5px;
   right: 8px;
+  z-index: 2;
   display: inline-flex;
-  min-height: 12px;
+  max-width: calc(100% - 16px);
+  min-width: 28px;
+  height: 22px;
   align-items: center;
-  padding: 1px 4px 0;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 6px;
   color: var(--text-muted);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 4px;
-  content: attr(data-label);
+  cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
-  line-height: 12px;
   letter-spacing: 0;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-user-select: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.preview-content .code-type-button:hover,
+.preview-content .code-type-button:focus-visible {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+.preview-content .code-type-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.preview-content .code-type-button[data-state="copied"] {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 9%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+}
+
+.preview-content .code-type-button[data-state="failed"] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+}
+
+.preview-content .code-type-button::selection {
+  background: transparent;
+  background-color: transparent;
 }
 
 .preview-content pre code,
@@ -177,6 +242,8 @@
 
 .preview-content .shiki code {
   position: relative;
+  width: max-content;
+  min-width: 100%;
   padding-left: 52px;
   white-space: normal;
 }
@@ -193,8 +260,7 @@
 .preview-content .shiki .line {
   position: relative;
   display: block;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
   height: var(--preview-code-row-height);
   box-sizing: border-box;
   padding: 0 16px 0 0;
@@ -203,23 +269,45 @@
 }
 
 .preview-content .shiki .line > span {
+  position: relative;
+  z-index: 1;
   line-height: inherit;
 }
 
+.preview-content .shiki.has-code-selection .line.code-selection-line::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--preview-code-selection-bg);
+  content: "";
+  pointer-events: none;
+}
+
+.preview-content .shiki::selection,
+.preview-content .shiki code::selection,
 .preview-content .shiki .line::selection {
   background: transparent;
+  background-color: transparent;
+}
+
+.preview-content .shiki.has-code-selection .line *::selection {
+  background: transparent;
+  background-color: transparent;
 }
 
 .preview-content .shiki .line *::selection {
   background: var(--preview-code-selection-bg);
+  background-color: var(--preview-code-selection-bg);
 }
 
 .preview-content .shiki .line:empty {
+  -webkit-user-select: none;
   user-select: none;
 }
 
 .preview-content .shiki .line:empty::selection {
   background: transparent;
+  background-color: transparent;
 }
 
 .preview-content .shiki .line::before {
@@ -229,10 +317,11 @@
   display: block;
   width: 28px;
   margin: 0;
+  z-index: 1;
   color: var(--text-faint);
   content: attr(data-line);
   font-variant-numeric: tabular-nums;
-  line-height: var(--preview-code-row-height);
+  line-height: inherit;
   pointer-events: none;
   text-align: right;
   vertical-align: top;

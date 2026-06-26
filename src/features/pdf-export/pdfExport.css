@@ -420,7 +420,8 @@
 .pdf-export-root .preview-layout-drop-zone,
 .pdf-export-root .preview-image-resize-handle,
 .pdf-export-root .math-equation-tools,
-.pdf-export-root .preview-mode-tabs {
+.pdf-export-root .preview-mode-tabs,
+.pdf-export-root .code-type-button {
   display: none !important;
 }
 

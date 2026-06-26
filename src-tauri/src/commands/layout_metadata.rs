@@ -654,3 +654,7 @@ fn json_i64(value: &Value) -> Option<i64> {
         .or_else(|| value.as_u64().and_then(|number| i64::try_from(number).ok()))
         .or_else(|| value.as_f64().map(|number| number.round() as i64))
 }
+
+#[cfg(test)]
+#[path = "layout_metadata_tests.rs"]
+mod layout_metadata_tests;

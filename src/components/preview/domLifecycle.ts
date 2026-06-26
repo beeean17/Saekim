@@ -1,5 +1,7 @@
 import type { PreviewContribution } from '../../app/feature';
 import { Backend } from '../../platform/common/backend';
+import { codeBlockCopyPreviewEnhancement } from './codeBlockCopyEnhancement';
+import { codeBlockSelectionPreviewEnhancement } from './codeBlockSelectionEnhancement';
 
 type CleanupRef = {
   current: (() => void) | null;
@@ -79,6 +81,8 @@ const imageLoadPreviewEnhancement: PreviewContribution = {
 };
 
 export const previewDomEnhancements: PreviewContribution[] = [
+  codeBlockCopyPreviewEnhancement,
+  codeBlockSelectionPreviewEnhancement,
   externalLinkPreviewEnhancement,
   imageLoadPreviewEnhancement,
 ];
