@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.1.0] - Unreleased
+## [3.2.0] - Unreleased
+
+### Added
+
+- 기능 레지스트리와 플랫폼별 capability/profile 구조를 추가해 데스크톱, 브라우저, Android 기능을 명시적으로 조합할 수 있는 기반을 마련했습니다.
+- Android 문서 URI 입출력과 문서 메타데이터 연동, 플랫폼 전용 이미지 선택 및 런처 리소스를 추가했습니다.
+- macOS 네이티브 메뉴 이벤트와 사이드바 앱 메뉴를 프론트엔드 명령 체계에 연결했습니다.
+- 창별 워크스페이스 메타데이터와 문서 레이아웃 박스 저장을 추가했습니다.
+- 미리보기 블럭을 드래그해 그룹화하고 크기와 배치를 조정하는 상호작용을 추가했습니다.
+
+### Changed
+
+- 공통 코드를 core/platform/features 계층과 backend adapter로 재구성하고 런타임 기능을 capability 기반으로 분리했습니다.
+- 미리보기 렌더링을 scene/render object와 플랫폼별 surface로 분리해 확장 가능한 렌더링 흐름으로 정리했습니다.
+- 최근 파일 중심의 사이드바를 워크스페이스 메뉴 중심으로 단순화하고 화면 크기에 따라 셸 제어가 반응하도록 조정했습니다.
+- 편집기 텍스트가 패널 너비에 맞춰 줄바꿈되고 코드블럭 복사와 레이아웃 그룹 처리가 일관되게 동작하도록 개선했습니다.
+
+### Fixed
+
+- PDF 내보내기에서 코드블럭, 목록, KaTeX와 페이지 나눔이 잘리거나 흐름을 잃던 문제를 수정했습니다.
+- 미리보기 블럭의 드롭 위치, 그룹 해제, 다단 이미지 크기 조절과 렌더링 안정성 문제를 수정했습니다.
+- 파일을 연 직후의 스크롤 동기화와 상태바 커서 위치, 에디터 줄 높이 계산이 어긋나던 문제를 수정했습니다.
+- 설정 팝오버가 즉시 닫히거나 앱 크롬 아래에 가려지던 문제를 수정했습니다.
+
+---
+
+## [3.1.0] - 2026-06-08
 
 ### Added
 
@@ -259,7 +285,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
-| 3.1.0 | Unreleased | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, source-line preview sync, code block selection stability, recent-file close cleanup, Windows text icon handling |
+| 3.2.0 | Unreleased | Capability-based platform architecture, Android document integration, native app menus, responsive shell, persistent preview layouts, PDF export stability |
+| 3.1.0 | 2026-06-08 | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, source-line preview sync, code block selection stability, recent-file close cleanup, Windows text icon handling |
 | 3.0.1 | Unreleased | Flexible text-file detection, HTML/data previews, image assets workflow, preview block layouts, Windows desktop support |
 | 3.0.0 | Unreleased | Tauri migration, native file/session commands, resizable editor/preview, synced scrolling, CSS-template PDF export, Shiki highlighting, bundled fonts |
 | 1.3.0 | 2026-01-21 | macOS app bundle, PDF export browser handling, PKG installer, macOS UX cleanup |

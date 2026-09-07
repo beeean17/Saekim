@@ -143,7 +143,7 @@ export function buildAppMenus({
   menus.push({
     id: 'help',
     label: 'Help',
-    items: [{ label: 'About Saekim', action: () => window.alert('Saekim 3.2.0') }],
+    items: [{ label: 'About Saekim', action: () => window.alert(`Saekim ${__APP_VERSION__}`) }],
   });
 
   return menus;
