@@ -200,7 +200,7 @@ export function useScrollSync(
       invalidateEditorMetrics();
       activeScroller = 'editor';
       renderAnchor = {
-        line: getEditorVisibleLine(editorScroller.scrollTop, getEditorMetrics()),
+        line: getCaretLine(editor),
         keepBottom: isNearBottom(editorScroller, BOTTOM_THRESHOLD_PX),
         scrollTop: editorScroller.scrollTop,
         time: performance.now(),

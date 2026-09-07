@@ -1,0 +1,6 @@
+{
+  "build": {
+    "beforeDevCommand": "corepack pnpm dev --port 1421",
+    "devUrl": "http://127.0.0.1:1421"
+  }
+}

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { lineHeightsEqual, measureEditorRowHeight, measureWrappedLineHeights } from '../core/editor/lineMetrics';
 
 interface UseLineNumberSyncOptions {
@@ -18,12 +18,13 @@ export function useLineNumberSync({
 }: UseLineNumberSyncOptions): number[] {
   const [lineNumberHeights, setLineNumberHeights] = useState<number[]>([]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const root = rootRef.current;
     const textarea = textareaRef.current;
     if (!root || !textarea) return;
 
     let disposed = false;
+    let animationFrame = 0;
 
     const syncEditorMetrics = () => {
       if (disposed) return;
@@ -42,13 +43,24 @@ export function useLineNumberSync({
       setLineNumberHeights((current) => (lineHeightsEqual(current, nextLineHeights) ? current : nextLineHeights));
     };
 
-    syncEditorMetrics();
-    const resizeObserver = new ResizeObserver(syncEditorMetrics);
+    const scheduleSyncEditorMetrics = () => {
+      if (animationFrame) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = 0;
+        syncEditorMetrics();
+      });
+    };
+
+    scheduleSyncEditorMetrics();
+    const resizeObserver = new ResizeObserver(scheduleSyncEditorMetrics);
     resizeObserver.observe(textarea);
-    void document.fonts?.ready.then(syncEditorMetrics);
+    void document.fonts?.ready.then(scheduleSyncEditorMetrics);
 
     return () => {
       disposed = true;
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
     };
   }, [editorFontFamily, fontSize, rootRef, textareaRef, value]);

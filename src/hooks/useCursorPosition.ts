@@ -29,13 +29,11 @@ export function useCursorPosition(text: string, textareaTarget: TextareaCursorTa
     textarea.addEventListener('keyup', update);
     textarea.addEventListener('mouseup', update);
     textarea.addEventListener('select', update);
-    textarea.addEventListener('input', update);
     return () => {
       textarea.removeEventListener('click', update);
       textarea.removeEventListener('keyup', update);
       textarea.removeEventListener('mouseup', update);
       textarea.removeEventListener('select', update);
-      textarea.removeEventListener('input', update);
     };
   }, [text, textareaTarget]);
 

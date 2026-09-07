@@ -379,7 +379,7 @@ async function workspaceFolderPatchForOpenFile(
   file: OpenFile,
   currentRootPath: string | null,
 ): Promise<Pick<WorkspaceState, 'rootPath' | 'tree'> | null> {
-  if (isAndroidContentTreePath(currentRootPath) && isAndroidContentPath(file.path)) return null;
+  if (shouldRetainWorkspaceRootForFile(currentRootPath, file.path)) return null;
 
   const folderPatch = await workspaceFolderPatchForFile(file.path);
   return folderPatch ?? androidContentWorkspacePatch(file);
@@ -508,6 +508,19 @@ function parentFolderFromFilePath(path: string): string | null {
 
 function isPlaceholderPath(path: string): boolean {
   return path.startsWith('~');
+}
+
+function shouldRetainWorkspaceRootForFile(rootPath: string | null, filePath: string): boolean {
+  if (!rootPath || isPlaceholderPath(rootPath)) return false;
+  if (rootPath.startsWith('~android/')) return isAndroidContentPath(filePath);
+  if (isAndroidContentTreePath(rootPath) && isAndroidContentPath(filePath)) return true;
+  return isPathWithinWorkspaceRoot(rootPath, filePath);
+}
+
+function isPathWithinWorkspaceRoot(rootPath: string, filePath: string): boolean {
+  const normalizedRoot = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  return normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`);
 }
 
 function findTreeNode(nodes: FileTreeNode[], path: string): FileTreeNode | null {

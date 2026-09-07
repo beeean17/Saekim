@@ -30,6 +30,11 @@ class FolderListArgs {
 }
 
 @InvokeArg
+class ReadDocumentArgs {
+  lateinit var uri: String
+}
+
+@InvokeArg
 class CopyImageToAssetsArgs {
   lateinit var sourceUri: String
   lateinit var currentFileUri: String
@@ -148,6 +153,24 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
       invoke.resolve(response)
     } catch (error: Exception) {
       invoke.reject(error.message ?: "Failed to read folder children")
+    }
+  }
+
+  @Command
+  fun readTextDocument(invoke: Invoke) {
+    try {
+      val args = invoke.parseArgs(ReadDocumentArgs::class.java)
+      val bytes =
+        activity.contentResolver.openInputStream(Uri.parse(args.uri))?.use { input ->
+          input.readBytes()
+        }
+          ?: throw IllegalStateException("Failed to read selected file")
+      val response = JSObject()
+      response.put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+      response.put("displayName", displayName(args.uri))
+      invoke.resolve(response)
+    } catch (error: Exception) {
+      invoke.reject(error.message ?: "Failed to read file")
     }
   }
 

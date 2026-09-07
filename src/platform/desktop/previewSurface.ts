@@ -11,7 +11,7 @@ export const desktopPreviewSurface = createPreviewSurfaceAdapter({
       maxMountedBoxes: 240,
       maxInteractiveBoxes: 160,
       overscanPx: 1200,
-      debounceMs: 160,
+      debounceMs: 60,
     },
     pointer: {
       resizeHandlePx: 10,

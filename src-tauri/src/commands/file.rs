@@ -492,7 +492,38 @@ fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, 
 
 #[cfg(target_os = "android")]
 fn read_file_payload(app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
+    if path.starts_with("content://") {
+        return read_android_content_file_payload(app, path);
+    }
+
     read_selected_file_payload(app, selected_file_path_from_string(path))
+}
+
+#[cfg(target_os = "android")]
+fn read_android_content_file_payload(
+    app: &AppHandle,
+    path: String,
+) -> Result<OpenFilePayload, String> {
+    let document = crate::platform::android::document_metadata::read_text_document(app, &path)?;
+    let selected_path = selected_file_path_from_string(path.clone());
+    let name = document
+        .display_name
+        .unwrap_or_else(|| selected_file_name(app, &selected_path));
+
+    if document.bytes.len() as u64 > MAX_TEXT_FILE_BYTES {
+        return Err(format!(
+            "file is too large to open as text (limit: {} MB)",
+            MAX_TEXT_FILE_BYTES / 1024 / 1024
+        ));
+    }
+
+    let content = decode_text_bytes(document.bytes)?;
+    Ok(OpenFilePayload {
+        path,
+        display_path: selected_display_path(&selected_path, &name),
+        name,
+        content,
+    })
 }
 
 fn selected_document_path(path: tauri_plugin_dialog::FilePath) -> Result<Option<String>, String> {

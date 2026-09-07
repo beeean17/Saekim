@@ -11,6 +11,11 @@ const PLUGIN_IDENTIFIER: &str = "com.beeean17.saekim";
 
 pub struct AndroidDocumentMetadata<R: Runtime>(PluginHandle<R>);
 
+pub struct AndroidDocumentContent {
+    pub bytes: Vec<u8>,
+    pub display_name: Option<String>,
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("saekim-android-document-metadata")
         .setup(|app, api| {
@@ -46,6 +51,13 @@ pub fn read_folder_children(app: &AppHandle, uri: &str) -> Result<Vec<FileTreeNo
         .try_state::<AndroidDocumentMetadata<Wry>>()
         .ok_or_else(|| "Android document metadata plugin is not available".to_string())?;
     metadata.read_folder_children(uri)
+}
+
+pub fn read_text_document(app: &AppHandle, uri: &str) -> Result<AndroidDocumentContent, String> {
+    let metadata = app
+        .try_state::<AndroidDocumentMetadata<Wry>>()
+        .ok_or_else(|| "Android document metadata plugin is not available".to_string())?;
+    metadata.read_text_document(uri)
 }
 
 pub fn copy_image_to_assets(
@@ -120,6 +132,26 @@ impl<R: Runtime> AndroidDocumentMetadata<R> {
             .map_err(|error| error.to_string())
     }
 
+    fn read_text_document(&self, uri: &str) -> Result<AndroidDocumentContent, String> {
+        self.0
+            .run_mobile_plugin::<ReadDocumentResponse>(
+                "readTextDocument",
+                ReadDocumentPayload {
+                    uri: uri.to_string(),
+                },
+            )
+            .map_err(|error| error.to_string())
+            .and_then(|response| {
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(response.data)
+                    .map_err(|error| format!("failed to decode Android document: {error}"))?;
+                Ok(AndroidDocumentContent {
+                    bytes,
+                    display_name: response.display_name,
+                })
+            })
+    }
+
     fn copy_image_to_assets(
         &self,
         source_uri: &str,
@@ -190,6 +222,19 @@ struct FolderListPayload {
 #[serde(rename_all = "camelCase")]
 struct FolderChildrenResponse {
     tree: Vec<FileTreeNode>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadDocumentPayload {
+    uri: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadDocumentResponse {
+    data: String,
+    display_name: Option<String>,
 }
 
 #[derive(Serialize)]
