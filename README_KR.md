@@ -1,12 +1,12 @@
 # 새김 Saekim
 
-![Version](https://img.shields.io/badge/version-3.4.0-555555.svg)
+![Version](https://img.shields.io/badge/version-3.5.0-555555.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6.svg)
 ![Rust](https://img.shields.io/badge/Rust-stable-B7410E.svg)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Android-lightgrey.svg)
 
 새김은 Markdown과 텍스트 기반 문서를 위한 로컬 우선 데스크톱 에디터입니다.
 Tauri 2, React, TypeScript, Rust 기반으로 동작하며, 편집기와 미리보기를
@@ -65,7 +65,9 @@ UTF-8 텍스트로 판정되면 일반 텍스트 모드로 열 수 있습니다.
 - OS별 Tauri 2 개발/빌드 필수 구성 요소
 
 macOS와 Windows 데스크톱 번들을 만들려면 Tauri의 플랫폼별 설정 안내에 따라
-컴파일러, SDK, 네이티브 의존성을 준비해야 합니다.
+컴파일러, SDK, 네이티브 의존성을 준비해야 합니다. Android 7.0(API 24) 이상을
+지원하며, Android 빌드는 API 36을 대상으로 Android SDK, NDK와 Tauri Android
+환경 구성이 필요합니다.
 
 ---
 
@@ -109,20 +111,27 @@ corepack pnpm tauri:build:app
 corepack pnpm tauri:build:dmg
 ```
 
+Android APK 전체 ABI 또는 ARM64 빌드:
+
+```bash
+corepack pnpm tauri:build:android
+corepack pnpm tauri:build:android:arm64
+```
+
 ---
 
 ## 릴리즈 배포
 
-새김은 GitHub Releases를 통해 macOS와 Windows용 배포 파일을 따로 올리는
-방식으로 배포합니다.
+새김은 GitHub Releases를 통해 macOS, Windows, Android용 배포 파일을 따로
+올리는 방식으로 배포합니다.
 
 권장 릴리즈 흐름:
 
 1. `package.json`, `src-tauri/tauri.conf.json`, `CHANGELOG.md`의 버전을
    릴리즈 버전에 맞게 정리합니다.
 2. 대상 OS별로 앱을 빌드하고 실행 검증합니다.
-3. `v3.4.0` 같은 Git tag를 생성합니다.
-4. 생성된 데스크톱 번들을 GitHub Release에 업로드합니다.
+3. `v3.5.0` 같은 Git tag를 생성합니다.
+4. 생성된 데스크톱 및 Android 번들을 GitHub Release에 업로드합니다.
 
 macOS 배포 파일은 macOS에서 빌드합니다:
 
@@ -143,6 +152,7 @@ corepack pnpm tauri:build
 | --- | --- |
 | macOS | `.app` bundle, `.dmg` installer |
 | Windows | Tauri가 생성하는 `.msi` 또는 `.exe` installer |
+| Android | Android 7.0+용 `.apk` (API 24, target API 36) |
 
 macOS 앱을 개발 머신 밖에 공개 배포하려면 Release에 올리기 전에 code signing과
 notarization을 처리해야 합니다.

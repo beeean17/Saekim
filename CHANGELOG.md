@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.5.0] - 2026-09-08
+
+### Added
+
+- 작은 화면에서 기존 경로, 검색, 파일 트리를 재사용하는 오버레이 파일 브라우저와 배경 탭, 스와이프, Escape 닫기 및 포커스 트랩을 추가했습니다.
+- compact 화면에서 편집과 미리보기를 바로 전환하는 하단 탭을 추가했습니다.
+- 줄번호 표시 설정을 추가하고 compact 화면에서는 선택하지 않은 경우 자동으로 숨기도록 했습니다.
+
+### Changed
+
+- 레이아웃 폭은 viewport profile로 유지하면서 포인터 정밀도, 모션 감소, 안전 영역은 CSS 기기 특성 쿼리로 분리했습니다.
+- coarse pointer에서 사이드바, 버튼, 분할 조절선의 실효 터치 영역을 최소 44px로 확대했습니다.
+- 편집기와 헬퍼 모달이 동적 뷰포트 높이와 좁은 화면 여백을 사용하도록 조정했습니다.
+- 셸의 경쟁하던 grid 규칙을 명시적 레이아웃 변수로 통합하고 터치 스크롤바와 overscroll 동작을 정리했습니다.
+- Android 7.0(API 24) 이상을 정식 지원 범위로 문서화하고 target SDK 36 APK를 실제 에뮬레이터에서 검증했습니다.
+
+---
+
 ## [3.4.0] - 2026-09-08
 
 ### Added
@@ -354,6 +372,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.5.0 | 2026-09-08 | Responsive device foundations, 44px touch targets, compact file drawer and view tabs, mobile editor space recovery, Android dark-mode and rotation support |
 | 3.4.0 | 2026-09-08 | Document tabs and restore, replace and workspace content search, workspace file operations, outline navigation, unified command palette, focus accessibility, external-change save protection |
 | 3.3.0 | 2026-09-08 | Secondary-window events, restored window geometry, system theme, in-memory drafts, recursive workspace search, encoding round trips, body-free session metadata |
 | 3.2.1 | 2026-09-08 | Atomic and line-ending-safe saves, serialized metadata access, dirty-close protection, stable workspace roots, responsive window constraints, Android dark system bars |

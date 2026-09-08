@@ -1,6 +1,6 @@
 # Saekim 기능 명세
 
-Saekim 3.4.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 문서입니다.
+Saekim 3.5.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 문서입니다.
 설계 원칙은 [platform-architecture.md](platform-architecture.md)를 참고하세요.
 
 - **런타임**: Tauri 2 / React 18.3.1 / TypeScript 5.8.3 / Rust stable
@@ -19,7 +19,7 @@ Saekim 3.4.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 | macOS | `desktop/macos/macosPlatformProfile.ts` | `desktop` | 주 지원 |
 | Windows | `desktop/windows/windowsPlatformProfile.ts` | `desktop` | 주 지원 |
 | Linux | `desktop/linux/linuxPlatformProfile.ts` | `desktop` | 부분 지원 |
-| Android | `android/androidPlatformProfile.ts` | `android` | 실험적 |
+| Android | `android/androidPlatformProfile.ts` | `android` | 정식 지원 |
 | Browser | `browser/browserPlatformProfile.ts` | `browser` | 개발용 |
 
 ### Capability 집합
@@ -748,7 +748,14 @@ Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용�
 
 ---
 
-## 15. Android 지원 (실험적)
+## 15. Android 지원
+
+- 지원 범위: Android 7.0(API 24) 이상, target/compile SDK 36
+- ARM64 디버그 APK를 Pixel 9 Pro 에뮬레이터에서 세로·가로 회전, 시스템 다크 모드,
+  소프트 키보드와 헬퍼 모달 조합까지 검증
+- compact 화면에서 파일 탐색 오버레이 드로어와 편집/보기 하단 탭을 제공하고,
+  coarse pointer에서는 주요 터치 타깃을 최소 44px로 확장
+- 안전 영역, 동적 뷰포트 높이, 모션 감소, 터치 스크롤 특성을 CSS 기기 쿼리로 처리
 
 - Kotlin 플러그인 2종
   - `AndroidDocumentMetadataPlugin` — SAF 기반 폴더/문서 접근, 표시 이름 조회
