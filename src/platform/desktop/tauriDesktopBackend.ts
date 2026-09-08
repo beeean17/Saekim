@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { EventCallback, EventTarget } from '@tauri-apps/api/event';
+import type { EventTarget } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
@@ -146,20 +146,15 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
   const webviewWindow = getCurrentWebviewWindow();
   const registrations: Array<() => void> = [];
   const registerMenuEvent = async <T>(eventName: string, command: string, handler: (payload: T) => void): Promise<void> => {
-    const dedupedHandler = dedupeNativeMenuHandler(command, handler);
-    const tauriHandler = createTauriEventHandler(dedupedHandler);
-    const eventRegistrations: Array<() => void> = [listenDomMenuEvent(eventName, dedupedHandler)];
-    const channels = ['dom'];
-
-    try {
-      eventRegistrations.push(await listen(eventName, tauriHandler, { target: webviewWindowEventTarget(webviewWindow.label) }));
-      channels.push(`webviewWindow:${webviewWindow.label}`);
-    } catch (error) {
-      logDesktopEvent('native-menu', 'tauri listener unavailable', { command, eventName, error: renderDesktopError(error) });
-    }
-
-    registrations.push(...eventRegistrations);
-    logDesktopEvent('native-menu', 'listener registered', { command, eventName, channels });
+    registrations.push(await listen<T>(eventName, (event) => {
+      logDesktopEvent('native-menu', 'event received', { command });
+      handler(event.payload);
+    }, { target: webviewWindowEventTarget(webviewWindow.label) }));
+    logDesktopEvent('native-menu', 'listener registered', {
+      command,
+      eventName,
+      target: `webviewWindow:${webviewWindow.label}`,
+    });
   };
 
   try {
@@ -185,47 +180,8 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
   return () => registrations.forEach((unlisten) => unlisten());
 }
 
-function createTauriEventHandler<T>(handler: (payload: T) => void): EventCallback<T> {
-  return (event) => handler(event.payload);
-}
-
-function listenDomMenuEvent<T>(eventName: string, handler: (payload: T) => void): () => void {
-  if (typeof globalThis.window === 'undefined') return () => {};
-
-  const listener = (event: Event) => handler((event as CustomEvent<T>).detail);
-  globalThis.window.addEventListener(eventName, listener);
-  return () => globalThis.window.removeEventListener(eventName, listener);
-}
-
 function webviewWindowEventTarget(label: string): EventTarget {
   return { kind: 'WebviewWindow', label };
-}
-
-function renderDesktopError(error: unknown): Record<string, string> {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack ?? '',
-    };
-  }
-
-  return { message: String(error) };
-}
-
-function dedupeNativeMenuHandler<T>(command: string, handler: (payload: T) => void): (payload: T) => void {
-  let lastHandledAt = 0;
-  return (payload) => {
-    const now = Date.now();
-    if (now - lastHandledAt < 100) {
-      logDesktopEvent('native-menu', 'duplicate event ignored', { command });
-      return;
-    }
-
-    lastHandledAt = now;
-    logDesktopEvent('native-menu', 'event received', { command });
-    handler(payload);
-  };
 }
 
 function logDesktopEvent(scope: string, message: string, details?: unknown): void {

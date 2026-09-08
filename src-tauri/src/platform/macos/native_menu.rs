@@ -1,6 +1,6 @@
 use tauri::{
     menu::{AboutMetadata, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
-    AppHandle, Emitter, EventTarget, Manager, WebviewWindow, Wry,
+    AppHandle, Emitter, EventTarget, Manager, Wry,
 };
 
 const MENU_SAVE: &str = "save";
@@ -215,54 +215,24 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
 }
 
 fn emit_menu_event(app: &AppHandle, event_name: &str, payload: MenuPayload) {
-    let Some((target_label, window)) = target_window(app) else {
+    let Some(target_label) = target_window_label(app) else {
         eprintln!("[saekim:native-menu] target window not found for event={event_name}");
         return;
     };
 
-    match emit_to_window_target(app, &target_label, event_name, &payload) {
-        Ok(()) => eprintln!("[saekim:native-menu] emitted target window event={event_name}"),
-        Err(error) => eprintln!(
-            "[saekim:native-menu] failed to emit target window event={event_name}: {error}"
-        ),
-    }
-
     match emit_to_webview_window_target(app, &target_label, event_name, &payload) {
-        Ok(()) => {
-            eprintln!("[saekim:native-menu] emitted target webview window event={event_name}")
-        }
+        Ok(()) => eprintln!(
+            "[saekim:native-menu] emitted webview window event={event_name} target={target_label}"
+        ),
         Err(error) => eprintln!(
             "[saekim:native-menu] failed to emit target webview window event={event_name}: {error}"
         ),
     }
-
-    match emit_to_webview_window(&window, event_name, &payload) {
-        Ok(()) => eprintln!("[saekim:native-menu] emitted window event={event_name}"),
-        Err(error) => {
-            eprintln!("[saekim:native-menu] failed to emit window event={event_name}: {error}")
-        }
-    }
-
-    dispatch_dom_event(&window, event_name, &payload);
 }
 
 enum MenuPayload {
     Unit,
     String(String),
-}
-
-fn emit_to_window_target(
-    app: &AppHandle,
-    target_label: &str,
-    event_name: &str,
-    payload: &MenuPayload,
-) -> tauri::Result<()> {
-    match payload {
-        MenuPayload::Unit => app.emit_to(EventTarget::window(target_label), event_name, ()),
-        MenuPayload::String(value) => {
-            app.emit_to(EventTarget::window(target_label), event_name, value)
-        }
-    }
 }
 
 fn emit_to_webview_window_target(
@@ -275,32 +245,6 @@ fn emit_to_webview_window_target(
         MenuPayload::Unit => app.emit_to(EventTarget::webview_window(target_label), event_name, ()),
         MenuPayload::String(value) => {
             app.emit_to(EventTarget::webview_window(target_label), event_name, value)
-        }
-    }
-}
-
-fn emit_to_webview_window(
-    window: &WebviewWindow<Wry>,
-    event_name: &str,
-    payload: &MenuPayload,
-) -> tauri::Result<()> {
-    match payload {
-        MenuPayload::Unit => window.emit(event_name, ()),
-        MenuPayload::String(value) => window.emit(event_name, value),
-    }
-}
-
-fn dispatch_dom_event(window: &WebviewWindow<Wry>, event_name: &str, payload: &MenuPayload) {
-    let script = match payload {
-        MenuPayload::Unit => format!("window.dispatchEvent(new CustomEvent({event_name:?}));"),
-        MenuPayload::String(value) => format!(
-            "window.dispatchEvent(new CustomEvent({event_name:?}, {{ detail: {value:?} }}));"
-        ),
-    };
-    match window.eval(script) {
-        Ok(()) => eprintln!("[saekim:native-menu] dispatched dom event={event_name}"),
-        Err(error) => {
-            eprintln!("[saekim:native-menu] failed to dispatch dom event={event_name}: {error}")
         }
     }
 }
@@ -344,14 +288,11 @@ fn recent_workspace_label(name: &str, path: &str) -> String {
     }
 }
 
-fn target_window(app: &AppHandle) -> Option<(String, WebviewWindow<Wry>)> {
+fn target_window_label(app: &AppHandle) -> Option<String> {
     crate::active_window_label(app)
-        .and_then(|label| app.get_webview_window(&label).map(|window| (label, window)))
-        .or_else(|| {
-            app.get_webview_window("main")
-                .map(|window| ("main".to_string(), window))
-        })
-        .or_else(|| app.webview_windows().into_iter().next())
+        .filter(|label| app.get_webview_window(label).is_some())
+        .or_else(|| app.get_webview_window("main").map(|_| "main".to_string()))
+        .or_else(|| app.webview_windows().into_keys().next())
 }
 
 fn menu_event_name(menu_id: &str) -> Option<&'static str> {

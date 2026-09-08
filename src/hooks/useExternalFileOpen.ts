@@ -82,18 +82,12 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
 
     window.addEventListener('focus', flushOnFocus);
     document.addEventListener('visibilitychange', flushOnVisible);
-    const pendingPoll = window.setInterval(() => {
-      if (enabledRef.current) {
-        void flushQueuedPaths();
-      }
-    }, 1500);
 
     return () => {
       disposedRef.current = true;
       unlisten?.();
       window.removeEventListener('focus', flushOnFocus);
       document.removeEventListener('visibilitychange', flushOnVisible);
-      window.clearInterval(pendingPoll);
     };
   }, [flushQueuedPaths]);
 }
