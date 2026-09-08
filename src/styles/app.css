@@ -1,10 +1,6 @@
 .app {
-  --sidebar-control-icon-size: 16px;
-  --sidebar-control-size: 30px;
-  --sidebar-control-top: 10px;
-  --sidebar-rail-gap: 8px;
   display: grid;
-  grid-template-rows: calc(36px + var(--safe-area-top)) 1fr calc(28px + var(--safe-area-bottom));
+  grid-template-rows: calc(var(--titlebar-height) + var(--safe-area-top)) 1fr calc(var(--statusbar-height) + var(--safe-area-bottom));
   width: 100vw;
   height: 100vh;
   height: 100dvh;
@@ -16,7 +12,7 @@
 }
 
 .tauri-window-chrome .app {
-  grid-template-rows: calc(36px + var(--safe-area-top)) 1fr calc(28px + var(--safe-area-bottom));
+  grid-template-rows: calc(var(--titlebar-height) + var(--safe-area-top)) 1fr calc(var(--statusbar-height) + var(--safe-area-bottom));
 }
 
 .titlebar {
@@ -214,7 +210,7 @@
 
 .app-menu-button {
   display: inline-flex;
-  height: 28px;
+  height: var(--control-size);
   align-items: center;
   padding: 0 10px;
   color: var(--text-secondary);
@@ -247,7 +243,7 @@
 .app-menu-item {
   display: grid;
   min-width: 0;
-  min-height: 28px;
+  min-height: var(--control-size);
   align-items: center;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   gap: 8px;
@@ -291,8 +287,8 @@
 
 .header-btn {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: var(--toolbar-control-size);
+  height: var(--toolbar-control-size);
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
@@ -340,7 +336,8 @@
 }
 
 .settings-head button {
-  height: 28px;
+  min-width: var(--control-size);
+  height: var(--control-size);
   padding: 0 10px;
   color: var(--text-secondary);
   border-radius: var(--radius);
@@ -395,7 +392,7 @@
 
 .settings-section select {
   width: 100%;
-  height: 32px;
+  height: var(--form-control-size);
   padding: 0 9px;
   color: var(--text-primary);
   background: var(--bg-elevated);
@@ -696,8 +693,8 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -6px;
-  right: -6px;
+  left: calc(-1 * var(--pane-resizer-hit-slop));
+  right: calc(-1 * var(--pane-resizer-hit-slop));
   content: "";
 }
 
@@ -885,7 +882,7 @@
 .sidebar-panel-tabs button {
   flex: 1;
   min-width: 0;
-  min-height: 28px;
+  min-height: var(--control-size);
   padding: 4px 8px;
   overflow: hidden;
   color: var(--text-muted);
@@ -950,8 +947,8 @@
 }
 
 .sidebar-folder-actions .icon-btn {
-  width: 24px;
-  height: 24px;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
 }
 
 .sidebar-folder-actions .icon-btn .ic {
@@ -961,8 +958,8 @@
 
 .icon-btn {
   display: inline-flex;
-  width: 26px;
-  height: 26px;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
@@ -1095,7 +1092,7 @@
 
 .tree-context-menu button {
   width: 100%;
-  min-height: 30px;
+  min-height: var(--toolbar-control-size);
   padding: 5px 9px;
   color: var(--text-primary);
   border-radius: var(--radius-sm);
@@ -1243,7 +1240,8 @@
 
 .image-preview-head button {
   display: inline-flex;
-  height: 28px;
+  min-width: var(--control-size);
+  height: var(--control-size);
   align-items: center;
   justify-content: center;
   padding: 0 9px;
@@ -1274,7 +1272,7 @@
 
 .image-preview-head .image-preview-close {
   order: 2;
-  width: 28px;
+  width: var(--control-size);
   padding: 0;
 }
 
@@ -1411,8 +1409,8 @@
 }
 
 .app[data-sidebar-resize-preview="expanded"] .icon-btn {
-  width: 26px;
-  height: 26px;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
 }
 
 .app[data-sidebar-resize-preview="expanded"] .icon-btn .ic {
@@ -1499,7 +1497,7 @@
 }
 
 .toolbar {
-  height: 36px;
+  height: max(36px, calc(var(--toolbar-control-size) + 6px));
   padding: 0 10px 0 0;
   border-bottom: 1px solid var(--border);
 }
@@ -1541,7 +1539,7 @@
 
 .tool-btn {
   display: inline-flex;
-  height: 30px;
+  height: var(--toolbar-control-size);
   align-items: center;
   justify-content: center;
   gap: 3px;
@@ -1554,7 +1552,7 @@
 }
 
 .tool-btn {
-  min-width: 30px;
+  min-width: var(--toolbar-control-size);
   padding: 0;
 }
 
@@ -1924,6 +1922,26 @@
 
   .statusbar .right {
     gap: 8px;
+  }
+}
+
+@media (pointer: coarse) {
+  .folder,
+  .file,
+  .tree-context-menu button,
+  .sidebar-panel-tabs button,
+  .app-menu-item,
+  .settings-check {
+    min-height: 44px;
+  }
+
+  .preview-pane {
+    grid-template-rows: 48px 1fr;
+  }
+
+  .preview-action {
+    width: 44px;
+    height: 44px;
   }
 }
 

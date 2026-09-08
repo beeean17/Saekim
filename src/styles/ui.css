@@ -18,7 +18,7 @@
 
 .ui-segmented button {
   display: inline-flex;
-  height: 28px;
+  height: var(--control-size);
   min-width: 0;
   align-items: center;
   justify-content: center;
@@ -31,7 +31,7 @@
 }
 
 .ui-segmented[data-size="sm"] button {
-  height: 24px;
+  height: var(--control-size-sm);
   padding: 0 9px;
   font-size: 11.5px;
 }
@@ -62,7 +62,7 @@
 
 .ui-search-field input {
   min-width: 0;
-  height: 28px;
+  height: var(--control-size);
   padding: 0 8px;
   color: var(--text-primary);
   background: var(--bg-elevated);
@@ -78,4 +78,14 @@
 
 .find-search-field {
   display: contents;
+}
+
+@media (pointer: coarse) {
+  .ui-button,
+  .ui-icon-button,
+  .ui-close-button,
+  .ui-toolbar-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
