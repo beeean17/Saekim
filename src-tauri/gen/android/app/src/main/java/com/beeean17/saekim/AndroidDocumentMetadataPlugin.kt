@@ -30,6 +30,15 @@ class FolderListArgs {
 }
 
 @InvokeArg
+class WorkspaceSearchArgs {
+  lateinit var rootPath: String
+  lateinit var query: String
+  lateinit var scope: String
+  var cursor: String? = null
+  var limit: Int? = null
+}
+
+@InvokeArg
 class ReadDocumentArgs {
   lateinit var uri: String
 }
@@ -60,6 +69,13 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
     val isDirectory: Boolean
       get() = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
   }
+
+  private data class WorkspaceSearchItem(
+    val path: String,
+    val name: String,
+    val relativePath: String,
+    val modifiedAt: Long,
+  )
 
   private val treeGrantFlags =
     Intent.FLAG_GRANT_READ_URI_PERMISSION or
@@ -153,6 +169,45 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
       invoke.resolve(response)
     } catch (error: Exception) {
       invoke.reject(error.message ?: "Failed to read folder children")
+    }
+  }
+
+  @Command
+  fun searchWorkspace(invoke: Invoke) {
+    try {
+      val args = invoke.parseArgs(WorkspaceSearchArgs::class.java)
+      if (args.scope != "file-name") {
+        throw IllegalArgumentException("Unsupported workspace search scope: ${args.scope}")
+      }
+
+      val query = args.query.trim().lowercase(Locale.ROOT)
+      val cursor = args.cursor
+      val pageSize = (args.limit ?: DEFAULT_SEARCH_PAGE_SIZE).coerceIn(1, MAX_SEARCH_PAGE_SIZE)
+      val matches = mutableListOf<WorkspaceSearchItem>()
+      collectWorkspaceSearchItems(Uri.parse(args.rootPath), "", false, matches)
+      val filtered =
+        matches
+          .asSequence()
+          .filter { it.name.lowercase(Locale.ROOT).contains(query) }
+          .filter { cursor == null || compareSearchPaths(it.relativePath, cursor) > 0 }
+          .sortedWith { left, right -> compareSearchPaths(left.relativePath, right.relativePath) }
+          .toList()
+      val page = filtered.take(pageSize)
+      val responseItems = JSArray()
+      page.forEach { item ->
+        val result = JSObject()
+        result.put("path", item.path)
+        result.put("name", item.name)
+        result.put("relativePath", item.relativePath)
+        if (item.modifiedAt > 0) result.put("modifiedAt", item.modifiedAt)
+        responseItems.put(result)
+      }
+      val response = JSObject()
+      response.put("items", responseItems)
+      response.put("nextCursor", if (filtered.size > pageSize) page.lastOrNull()?.relativePath else null)
+      invoke.resolve(response)
+    } catch (error: Exception) {
+      invoke.reject(error.message ?: "Failed to search workspace")
     }
   }
 
@@ -260,6 +315,53 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
       nodes.put(buildTreeNode(row, depth, maxDepth, openRootFolders, insideAssets))
     }
     return nodes
+  }
+
+  private fun collectWorkspaceSearchItems(
+    folderUri: Uri,
+    parentRelativePath: String,
+    insideAssets: Boolean,
+    items: MutableList<WorkspaceSearchItem>,
+  ) {
+    val folderDocumentId = documentIdFor(folderUri)
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, folderDocumentId)
+    val projection =
+      arrayOf(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+      )
+    val rows = mutableListOf<DocumentRow>()
+    activity.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+      val documentIdColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+      val nameColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+      val mimeColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+      val modifiedColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+      while (cursor.moveToNext()) {
+        val documentId = cursor.getStringOrNull(documentIdColumn) ?: continue
+        val name = cursor.getStringOrNull(nameColumn) ?: continue
+        val mimeType = cursor.getStringOrNull(mimeColumn) ?: ""
+        val modifiedAt = cursor.getLongOrNull(modifiedColumn) ?: 0L
+        val documentUri = DocumentsContract.buildDocumentUriUsingTree(folderUri, documentId)
+        val row = DocumentRow(documentId, name, mimeType, modifiedAt, documentUri)
+        if (shouldInclude(row, insideAssets)) rows.add(row)
+      }
+    }
+
+    rows.forEach { row ->
+      val relativePath = if (parentRelativePath.isEmpty()) row.name else "$parentRelativePath/${row.name}"
+      if (row.isDirectory) {
+        collectWorkspaceSearchItems(row.uri, relativePath, insideAssets || row.name == ".assets", items)
+      } else {
+        items.add(WorkspaceSearchItem(row.uri.toString(), row.name, relativePath, row.modifiedAt))
+      }
+    }
+  }
+
+  private fun compareSearchPaths(left: String, right: String): Int {
+    val normalized = left.lowercase(Locale.ROOT).compareTo(right.lowercase(Locale.ROOT))
+    return if (normalized != 0) normalized else left.compareTo(right)
   }
 
   private fun writeImageBytesToAssets(
@@ -553,6 +655,8 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
 
   companion object {
     private const val MAX_ENTRIES_PER_FOLDER = 80
+    private const val DEFAULT_SEARCH_PAGE_SIZE = 100
+    private const val MAX_SEARCH_PAGE_SIZE = 500
 
     private val ignoredNames =
       setOf(

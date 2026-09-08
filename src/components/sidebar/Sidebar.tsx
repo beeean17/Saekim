@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import { relativeTime } from '../../core/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
-import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
-import type { FileTreeNode, OpenFile, ViewMode } from '../../types/workspace';
+import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import type { FileTreeNode, OpenFile, ViewMode, WorkspaceSearchItem } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 import type { AppMenuHandlers } from '../shell/appMenus';
@@ -38,12 +38,68 @@ export function Sidebar({
   const refresh = useWorkspaceStore((state) => state.refresh);
   const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
+  const [workspaceSearchResults, setWorkspaceSearchResults] = useState<WorkspaceSearchItem[] | null>(null);
+  const [workspaceSearchError, setWorkspaceSearchError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
   const closeSearch = () => {
     setWorkspaceSearchQuery('');
     setWorkspaceSearchOpen(false);
   };
-  const visibleTree = useMemo(() => filterTree(tree, workspaceSearchQuery), [workspaceSearchQuery, tree]);
+  const searchNeedle = workspaceSearchQuery.trim();
+
+  useEffect(() => {
+    if (!searchNeedle) {
+      setWorkspaceSearchResults(null);
+      setWorkspaceSearchError(null);
+      return;
+    }
+    if (!rootPath || rootPath.startsWith('~')) {
+      setWorkspaceSearchResults([]);
+      setWorkspaceSearchError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const items: WorkspaceSearchItem[] = [];
+          let cursor: string | null = null;
+          do {
+            const page = await Backend.folders.searchWorkspace({
+              rootPath,
+              query: searchNeedle,
+              scope: 'file-name',
+              cursor,
+              limit: 200,
+            });
+            if (cancelled) return;
+            items.push(...page.items);
+            const nextCursor = page.nextCursor ?? null;
+            if (nextCursor === cursor) break;
+            cursor = nextCursor;
+          } while (cursor);
+
+          if (!cancelled) {
+            setWorkspaceSearchResults(items);
+            setWorkspaceSearchError(null);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            setWorkspaceSearchResults([]);
+            setWorkspaceSearchError(error instanceof Error ? error.message : String(error));
+          }
+        }
+      })();
+    }, 150);
+
+    setWorkspaceSearchResults(null);
+    setWorkspaceSearchError(null);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [rootPath, searchNeedle]);
   const addImageToDocument = (image: { path: string; name: string }) => {
     if (!activeFile) {
       window.alert('이미지를 추가할 문서를 먼저 열어주세요.');
@@ -84,17 +140,28 @@ export function Sidebar({
         />
       ) : null}
       <div className="file-tree">
-        {visibleTree.map((node) => (
-          <FileTreeNodeView
+        {searchNeedle ? (
+          <WorkspaceSearchResults
             activePath={activeFile?.path ?? null}
-            key={node.id}
-            node={node}
+            error={workspaceSearchError}
+            items={workspaceSearchResults}
             openFiles={openFiles}
-            onToggle={toggleFolder}
             onOpen={(path) => void openFile(path)}
-            onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
+            onPreviewImage={(item) => setImagePreview({ path: item.path, name: item.name })}
           />
-        ))}
+        ) : (
+          tree.map((node) => (
+            <FileTreeNodeView
+              activePath={activeFile?.path ?? null}
+              key={node.id}
+              node={node}
+              openFiles={openFiles}
+              onToggle={toggleFolder}
+              onOpen={(path) => void openFile(path)}
+              onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
+            />
+          ))
+        )}
       </div>
       {imagePreview ? (
         <ImagePreviewModal
@@ -169,22 +236,44 @@ function androidDocumentIdDisplayName(documentId: string): string {
   return normalized.replace(/\//g, ' / ') || 'Android document';
 }
 
-function filterTree(nodes: FileTreeNode[], query: string): FileTreeNode[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return nodes;
+function WorkspaceSearchResults({
+  activePath,
+  error,
+  items,
+  openFiles,
+  onOpen,
+  onPreviewImage,
+}: {
+  activePath: string | null;
+  error: string | null;
+  items: WorkspaceSearchItem[] | null;
+  openFiles: OpenFile[];
+  onOpen: (path: string) => void;
+  onPreviewImage: (item: WorkspaceSearchItem) => void;
+}) {
+  if (error) return <div className="workspace-search-message" title={error}>검색할 수 없습니다.</div>;
+  if (!items) return <div className="workspace-search-message">검색 중…</div>;
+  if (items.length === 0) return <div className="workspace-search-message">일치하는 파일이 없습니다.</div>;
 
-  return nodes.flatMap((node) => {
-    const children = node.children ? filterTree(node.children, needle) : [];
-    const matched = node.name.toLowerCase().includes(needle);
-    if (!matched && children.length === 0) return [];
-
-    return [
-      {
-        ...node,
-        isOpen: node.type === 'folder' ? true : node.isOpen,
-        children,
-      },
-    ];
+  return items.map((item) => {
+    const imageAsset = isWorkspaceImageAsset(item.path);
+    const dirty = isDirty(openFiles.find((file) => file.path === item.path) ?? null);
+    return (
+      <button
+        className={`file workspace-search-result ${item.path === activePath ? 'current' : ''} ${imageAsset ? 'asset-file' : ''}`}
+        key={item.path}
+        title={item.relativePath}
+        type="button"
+        onClick={() => (imageAsset ? onPreviewImage(item) : onOpen(item.path))}
+      >
+        <Icon name={imageAsset ? 'image' : 'file'} />
+        <span className="workspace-search-result-text">
+          <span className="name">{item.name}</span>
+          <span className="workspace-search-result-path">{item.relativePath}</span>
+        </span>
+        {dirty ? <span className="dirty" title="저장 안 됨" /> : null}
+      </button>
+    );
   });
 }
 
@@ -235,7 +324,7 @@ function FileTreeNodeView({
 
   const active = node.path === activePath;
   const openFile = openFiles.find((file) => file.path === node.path);
-  const dirty = Boolean(openFile && openFile.content !== openFile.savedContent);
+  const dirty = isDirty(openFile ?? null);
   const imageAsset = isWorkspaceImageAsset(node.path);
   return (
     <button

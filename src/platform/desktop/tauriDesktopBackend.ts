@@ -15,6 +15,7 @@ import {
   readFile,
   readFolder,
   readFolderChildren,
+  searchWorkspace,
   resolveImageSrc,
   saveFile,
   saveFileAs,
@@ -62,6 +63,7 @@ export const tauriDesktopBackend: BackendAdapter = {
     openFolderDialog,
     readFolder,
     readFolderChildren,
+    searchWorkspace,
   },
   images: {
     pickImagePath,

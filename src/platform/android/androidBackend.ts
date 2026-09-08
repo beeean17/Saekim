@@ -11,6 +11,7 @@ import {
   readFile,
   readFolder,
   readFolderChildren,
+  searchWorkspace,
   resolveImageSrc,
   saveFile,
   saveFileAs,
@@ -42,6 +43,7 @@ export const androidBackend: BackendAdapter = {
     openFolderDialog,
     readFolder,
     readFolderChildren,
+    searchWorkspace,
   },
   images: {
     pickImagePath,

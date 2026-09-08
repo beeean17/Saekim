@@ -1,6 +1,13 @@
 import type { BackendAdapter, CloseDecision, ImagePickPayload } from '../common/BackendAdapter';
 import type { BlockLayout } from '../../types/metadata';
-import type { FileTreeNode, FolderPayload, OpenFilePayload, TextEncoding } from '../../types/workspace';
+import type {
+  FileTreeNode,
+  FolderPayload,
+  OpenFilePayload,
+  TextEncoding,
+  WorkspaceSearchPage,
+  WorkspaceSearchRequest,
+} from '../../types/workspace';
 
 const sessionKey = 'saekim-browser-session';
 const blockLayoutPrefix = 'saekim-block-layouts:';
@@ -17,6 +24,7 @@ export const browserBackend: BackendAdapter = {
     openFolderDialog,
     readFolder,
     readFolderChildren,
+    searchWorkspace,
   },
   images: {
     pickImagePath,
@@ -129,6 +137,31 @@ async function readFolder(path: string): Promise<FolderPayload> {
 
 async function readFolderChildren(_path: string): Promise<FileTreeNode[]> {
   return [];
+}
+
+async function searchWorkspace(request: WorkspaceSearchRequest): Promise<WorkspaceSearchPage> {
+  const prefix = 'saekim-file:';
+  const rootPrefix = request.rootPath.endsWith('/') ? request.rootPath : `${request.rootPath}/`;
+  const query = request.query.trim().toLocaleLowerCase();
+  const cursor = request.cursor ?? '';
+  const limit = Math.min(500, Math.max(1, request.limit ?? 100));
+  const matches = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+    .filter((key): key is string => Boolean(key?.startsWith(prefix)))
+    .map((key) => key.slice(prefix.length))
+    .filter((path) => path.startsWith(rootPrefix))
+    .map((path) => ({
+      path,
+      name: path.split('/').pop() || path,
+      relativePath: path.slice(rootPrefix.length),
+    }))
+    .filter((item) => item.relativePath > cursor && item.name.toLocaleLowerCase().includes(query))
+    .sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  const items = matches.slice(0, limit);
+
+  return {
+    items,
+    nextCursor: matches.length > limit ? items[items.length - 1]?.relativePath ?? null : null,
+  };
 }
 
 async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {

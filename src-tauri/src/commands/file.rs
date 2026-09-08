@@ -66,6 +66,38 @@ pub struct FolderPayload {
     tree: Vec<FileTreeNode>,
 }
 
+#[derive(Clone, Copy, Deserialize, Serialize)]
+pub enum WorkspaceSearchScope {
+    #[serde(rename = "file-name")]
+    FileName,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSearchRequest {
+    pub(crate) root_path: String,
+    pub(crate) query: String,
+    pub(crate) scope: WorkspaceSearchScope,
+    pub(crate) cursor: Option<String>,
+    pub(crate) limit: Option<usize>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSearchItem {
+    pub(crate) path: String,
+    pub(crate) name: String,
+    pub(crate) relative_path: String,
+    pub(crate) modified_at: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSearchPage {
+    pub(crate) items: Vec<WorkspaceSearchItem>,
+    pub(crate) next_cursor: Option<String>,
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileTreeNode {
@@ -311,6 +343,32 @@ pub fn read_folder_children(app: AppHandle, path: String) -> CommandResult<Vec<F
             Ok(payload) => ok(payload),
             Err(error) => fail(error),
         }
+    }
+}
+
+#[tauri::command]
+pub async fn search_workspace(
+    app: AppHandle,
+    request: WorkspaceSearchRequest,
+) -> CommandResult<WorkspaceSearchPage> {
+    let searched = tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "android")]
+        {
+            crate::platform::android::document_metadata::search_workspace(&app, &request)
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            let _ = app;
+            search_workspace_files(request)
+        }
+    })
+    .await;
+
+    match searched {
+        Ok(Ok(page)) => ok(page),
+        Ok(Err(error)) => fail(error),
+        Err(error) => fail(format!("failed to run workspace search: {error}")),
     }
 }
 
@@ -1683,6 +1741,195 @@ fn emit_image_progress(
             message,
         },
     );
+}
+
+#[cfg(not(target_os = "android"))]
+fn search_workspace_files(request: WorkspaceSearchRequest) -> Result<WorkspaceSearchPage, String> {
+    const DEFAULT_PAGE_SIZE: usize = 100;
+    const MAX_PAGE_SIZE: usize = 500;
+
+    let root = PathBuf::from(&request.root_path);
+    if !root.is_dir() {
+        return Err("workspace root is not a directory".to_string());
+    }
+
+    let mut items = Vec::new();
+    collect_workspace_files(&root, &root, &mut items)?;
+    let query = request.query.trim().to_lowercase();
+    items.retain(|item| match request.scope {
+        WorkspaceSearchScope::FileName => item.name.to_lowercase().contains(&query),
+    });
+    items.sort_by(|left, right| workspace_search_item_cmp(left, right));
+
+    if let Some(cursor) = request.cursor.as_deref() {
+        items.retain(|item| workspace_search_path_cmp(&item.relative_path, cursor).is_gt());
+    }
+
+    let limit = request
+        .limit
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE);
+    let has_more = items.len() > limit;
+    items.truncate(limit);
+    let next_cursor = has_more
+        .then(|| items.last().map(|item| item.relative_path.clone()))
+        .flatten();
+
+    Ok(WorkspaceSearchPage { items, next_cursor })
+}
+
+#[cfg(not(target_os = "android"))]
+fn collect_workspace_files(
+    root: &Path,
+    folder: &Path,
+    items: &mut Vec<WorkspaceSearchItem>,
+) -> Result<(), String> {
+    let entries = match fs::read_dir(folder) {
+        Ok(entries) => entries,
+        Err(error) if folder != root => {
+            eprintln!(
+                "[saekim:workspace-search] skipped unreadable folder path={} error={error}",
+                folder.display()
+            );
+            return Ok(());
+        }
+        Err(error) => return Err(format!("failed to read workspace root: {error}")),
+    };
+
+    for entry in entries.filter_map(Result::ok) {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        let path = entry.path();
+        let is_dir = file_type.is_dir();
+        let is_file = file_type.is_file();
+        if !should_include_path(&path, is_dir, is_file) {
+            continue;
+        }
+        if is_dir {
+            collect_workspace_files(root, &path, items)?;
+            continue;
+        }
+
+        let Some(name) = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let relative_path = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let modified_at = entry
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_millis() as u64);
+        items.push(WorkspaceSearchItem {
+            path: path.to_string_lossy().to_string(),
+            name,
+            relative_path,
+            modified_at,
+        });
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+fn workspace_search_item_cmp(
+    left: &WorkspaceSearchItem,
+    right: &WorkspaceSearchItem,
+) -> std::cmp::Ordering {
+    workspace_search_path_cmp(&left.relative_path, &right.relative_path)
+}
+
+#[cfg(not(target_os = "android"))]
+fn workspace_search_path_cmp(left: &str, right: &str) -> std::cmp::Ordering {
+    left.to_lowercase()
+        .cmp(&right.to_lowercase())
+        .then_with(|| left.cmp(right))
+}
+
+#[cfg(all(test, not(target_os = "android")))]
+mod workspace_search_tests {
+    use super::*;
+
+    #[test]
+    fn finds_nested_files_without_loading_tree_nodes() {
+        let root = workspace_search_temp_dir("nested");
+        let nested = root.join("closed").join("deeper");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("hidden-in-tree.md"), "result").unwrap();
+        fs::create_dir_all(root.join("node_modules")).unwrap();
+        fs::write(
+            root.join("node_modules").join("hidden-in-tree.md"),
+            "ignored",
+        )
+        .unwrap();
+
+        let page = search_workspace_files(search_request(&root, "hidden", None, 100)).unwrap();
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(
+            page.items[0].relative_path,
+            "closed/deeper/hidden-in-tree.md"
+        );
+        assert!(page.next_cursor.is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn pages_workspace_results_with_a_stable_path_cursor() {
+        let root = workspace_search_temp_dir("paging");
+        fs::create_dir_all(&root).unwrap();
+        for name in ["alpha.md", "beta.md", "gamma.md"] {
+            fs::write(root.join(name), name).unwrap();
+        }
+
+        let first = search_workspace_files(search_request(&root, ".md", None, 2)).unwrap();
+        assert_eq!(first.items.len(), 2);
+        assert_eq!(first.items[0].relative_path, "alpha.md");
+        assert_eq!(first.items[1].relative_path, "beta.md");
+
+        let second =
+            search_workspace_files(search_request(&root, ".md", first.next_cursor, 2)).unwrap();
+        assert_eq!(second.items.len(), 1);
+        assert_eq!(second.items[0].relative_path, "gamma.md");
+        assert!(second.next_cursor.is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn search_request(
+        root: &Path,
+        query: &str,
+        cursor: Option<String>,
+        limit: usize,
+    ) -> WorkspaceSearchRequest {
+        WorkspaceSearchRequest {
+            root_path: root.to_string_lossy().to_string(),
+            query: query.to_string(),
+            scope: WorkspaceSearchScope::FileName,
+            cursor,
+            limit: Some(limit),
+        }
+    }
+
+    fn workspace_search_temp_dir(suffix: &str) -> PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("saekim-workspace-search-{timestamp}-{suffix}"))
+    }
 }
 
 #[cfg(not(target_os = "android"))]

@@ -152,12 +152,10 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
   지연 로딩
 - 노드에 `modifiedAt`, `isOpen`, `isLoaded` 상태 보관
 - `.assets` 폴더를 트리에 노출
+- 파일명 검색은 `search_workspace`가 트리 로딩 상태와 무관하게 전체 루트를 순회하며,
+  경로 커서 기반 페이지 응답을 사용
 - 최근 워크스페이스 목록 유지 (macOS 네이티브 메뉴의 Open Recent Workspace와 연동)
 - 앞/뒤 이동 히스토리 (`history.back` / `history.forward`)
-
-> 열린 파일을 **닫는 경로가 없습니다.** `useWorkspaceStore.closeFile`은
-> `workspace.ts:147`에 구현되어 있지만 호출하는 코드가 없고, 단축키도
-> 닫기 버튼도 연결되어 있지 않습니다. `openFiles`는 계속 누적됩니다.
 
 ### 3.5 파일 열기 경로
 
@@ -171,9 +169,8 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | Android | `content://` URI + SAF |
 
 열린 파일은 `pending_open_files` 큐에 쌓이고, 프론트엔드가
-`take_pending_open_files`로 가져갑니다. 이벤트 전달은 3중화되어 있습니다 —
-전역 emit, 창 타깃 emit, `window.eval` 기반 DOM CustomEvent. 여기에 1.5초 폴링과
-포커스·visibility 이벤트 플러시가 더해집니다.
+`take_pending_open_files`로 가져갑니다. 실행 중 전달은 대상 창의 Tauri 이벤트 하나를
+사용하며, 포커스·visibility 전환 때 큐를 한 번 더 확인합니다.
 
 ### 3.6 Rust 커맨드 목록
 
@@ -181,6 +178,7 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | --- | --- |
 | `open_file_dialog` / `open_folder_dialog` | 네이티브 선택 다이얼로그 |
 | `read_file` / `read_folder` / `read_folder_children` | 읽기 |
+| `search_workspace` | 전체 워크스페이스 파일명 검색 (커서 페이지 지원) |
 | `save_file` / `save_file_as` | 저장 |
 | `take_pending_open_files` | 외부 열기 큐 소비 |
 | `pick_image_path` | 이미지 선택 |
@@ -492,8 +490,9 @@ $HOME/** $PICTURE/** $DESKTOP/** $DOCUMENT/** $DOWNLOAD/**
 - 전체 일치 개수 표시, 이전/다음 순환 이동
 - 일치 항목을 편집기에서 선택 상태로 표시
 - 명령 ID `search.openFind`, Edit 메뉴에 `Find`로 등록
+- 사이드바 파일명 검색은 접힌 폴더를 포함한 워크스페이스 전체에서 실행
 
-> 바꾸기, 정규식, 대소문자 구분, 워크스페이스 전체 검색은 아직 없습니다.
+> 바꾸기, 정규식, 대소문자 구분, 워크스페이스 전체 **내용** 검색은 아직 없습니다.
 
 ---
 

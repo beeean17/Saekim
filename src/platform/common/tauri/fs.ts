@@ -1,6 +1,13 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
 import type { ImagePickPayload } from '../BackendAdapter';
-import type { FileTreeNode, FolderPayload, OpenFilePayload, TextEncoding } from '../../../types/workspace';
+import type {
+  FileTreeNode,
+  FolderPayload,
+  OpenFilePayload,
+  TextEncoding,
+  WorkspaceSearchPage,
+  WorkspaceSearchRequest,
+} from '../../../types/workspace';
 
 export async function openFileDialog(): Promise<OpenFilePayload | null> {
   if (!isTauriRuntime()) return null;
@@ -53,6 +60,10 @@ export async function readFolder(path: string): Promise<FolderPayload> {
 
 export async function readFolderChildren(path: string): Promise<FileTreeNode[]> {
   return invokeCommand<FileTreeNode[]>('read_folder_children', { path });
+}
+
+export async function searchWorkspace(request: WorkspaceSearchRequest): Promise<WorkspaceSearchPage> {
+  return invokeCommand<WorkspaceSearchPage>('search_workspace', { request });
 }
 
 export async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {

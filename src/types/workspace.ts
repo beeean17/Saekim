@@ -55,3 +55,25 @@ export interface FolderPayload {
   rootPath: string;
   tree: FileTreeNode[];
 }
+
+export type WorkspaceSearchScope = 'file-name';
+
+export interface WorkspaceSearchRequest {
+  rootPath: string;
+  query: string;
+  scope: WorkspaceSearchScope;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface WorkspaceSearchItem {
+  path: string;
+  name: string;
+  relativePath: string;
+  modifiedAt?: number;
+}
+
+export interface WorkspaceSearchPage {
+  items: WorkspaceSearchItem[];
+  nextCursor?: string | null;
+}

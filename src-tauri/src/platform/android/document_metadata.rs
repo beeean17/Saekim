@@ -5,7 +5,9 @@ use tauri::{
     AppHandle, Manager, Runtime, Wry,
 };
 
-use crate::commands::file::{FileTreeNode, FolderPayload};
+use crate::commands::file::{
+    FileTreeNode, FolderPayload, WorkspaceSearchPage, WorkspaceSearchRequest,
+};
 
 const PLUGIN_IDENTIFIER: &str = "com.beeean17.saekim";
 
@@ -51,6 +53,16 @@ pub fn read_folder_children(app: &AppHandle, uri: &str) -> Result<Vec<FileTreeNo
         .try_state::<AndroidDocumentMetadata<Wry>>()
         .ok_or_else(|| "Android document metadata plugin is not available".to_string())?;
     metadata.read_folder_children(uri)
+}
+
+pub fn search_workspace(
+    app: &AppHandle,
+    request: &WorkspaceSearchRequest,
+) -> Result<WorkspaceSearchPage, String> {
+    let metadata = app
+        .try_state::<AndroidDocumentMetadata<Wry>>()
+        .ok_or_else(|| "Android document metadata plugin is not available".to_string())?;
+    metadata.search_workspace(request)
 }
 
 pub fn read_text_document(app: &AppHandle, uri: &str) -> Result<AndroidDocumentContent, String> {
@@ -129,6 +141,24 @@ impl<R: Runtime> AndroidDocumentMetadata<R> {
                 },
             )
             .map(|response| response.tree)
+            .map_err(|error| error.to_string())
+    }
+
+    fn search_workspace(
+        &self,
+        request: &WorkspaceSearchRequest,
+    ) -> Result<WorkspaceSearchPage, String> {
+        self.0
+            .run_mobile_plugin::<WorkspaceSearchPage>(
+                "searchWorkspace",
+                WorkspaceSearchPayload {
+                    root_path: request.root_path.clone(),
+                    query: request.query.clone(),
+                    scope: request.scope,
+                    cursor: request.cursor.clone(),
+                    limit: request.limit,
+                },
+            )
             .map_err(|error| error.to_string())
     }
 
@@ -216,6 +246,16 @@ struct OpenFolderResponse {
 struct FolderListPayload {
     uri: String,
     depth: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceSearchPayload {
+    root_path: String,
+    query: String,
+    scope: crate::commands::file::WorkspaceSearchScope,
+    cursor: Option<String>,
+    limit: Option<usize>,
 }
 
 #[derive(Deserialize)]

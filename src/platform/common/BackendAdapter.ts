@@ -1,6 +1,13 @@
 import type { BlockLayout } from '../../types/metadata';
 import type { WorkspaceSession } from '../../types/session';
-import type { FileTreeNode, FolderPayload, OpenFilePayload, TextEncoding } from '../../types/workspace';
+import type {
+  FileTreeNode,
+  FolderPayload,
+  OpenFilePayload,
+  TextEncoding,
+  WorkspaceSearchPage,
+  WorkspaceSearchRequest,
+} from '../../types/workspace';
 
 export interface BackendAdapter {
   files: FileBackend;
@@ -23,6 +30,7 @@ export interface FolderBackend {
   openFolderDialog(): Promise<string | null>;
   readFolder(path: string): Promise<FolderPayload>;
   readFolderChildren(path: string): Promise<FileTreeNode[]>;
+  searchWorkspace(request: WorkspaceSearchRequest): Promise<WorkspaceSearchPage>;
 }
 
 export interface ImageAssetBackend {

@@ -75,6 +75,7 @@ pub fn run() {
             commands::file::read_file,
             commands::file::read_folder,
             commands::file::read_folder_children,
+            commands::file::search_workspace,
             commands::file::save_file,
             commands::file::save_file_as,
             commands::file::take_pending_open_files,
