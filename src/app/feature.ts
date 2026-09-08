@@ -182,6 +182,9 @@ export interface CommandRuntimeContext {
     setMode(mode: 'edit' | 'split' | 'preview'): void;
     canSetMode(mode: 'edit' | 'split' | 'preview'): boolean;
     toggleSidebar(): void;
+    zoomIn(): void;
+    zoomOut(): void;
+    resetZoom(): void;
   };
   search: {
     openFind(): void;

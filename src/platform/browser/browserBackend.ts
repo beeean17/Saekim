@@ -68,6 +68,7 @@ export const browserBackend: BackendAdapter = {
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
+    setWindowDocumentState: noop,
     openNewWindow,
     runWindowAction: noop,
   },

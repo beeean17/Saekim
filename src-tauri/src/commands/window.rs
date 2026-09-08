@@ -7,6 +7,14 @@ use tauri_plugin_dialog::{
 
 use crate::app_state::AppState;
 
+#[cfg(target_os = "macos")]
+use objc2::{
+    msg_send,
+    runtime::{AnyClass, AnyObject},
+};
+#[cfg(target_os = "macos")]
+use std::ffi::CString;
+
 #[tauri::command]
 pub fn log_frontend_event(scope: String, message: String, details: Option<String>) {
     match details {
@@ -24,6 +32,61 @@ pub fn set_window_min_size(window: tauri::Window, width: f64, height: f64) -> Re
     window
         .set_min_size(Some(tauri::LogicalSize::new(width, height)))
         .map_err(|error| error.to_string())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_window_document_state(
+    window: tauri::WebviewWindow,
+    title: String,
+    edited: bool,
+    document_path: Option<String>,
+) -> Result<(), String> {
+    window
+        .set_title(&title)
+        .map_err(|error| error.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let represented_path = document_path.and_then(|path| CString::new(path).ok());
+        window
+            .with_webview(move |webview| unsafe {
+                let ns_window = webview.ns_window().cast::<AnyObject>();
+                let _: () = msg_send![ns_window, setDocumentEdited: edited];
+
+                let represented_url: *mut AnyObject = represented_path
+                    .as_ref()
+                    .and_then(|path| {
+                        let string_class = AnyClass::get(c"NSString")?;
+                        let url_class = AnyClass::get(c"NSURL")?;
+                        let ns_path: *mut AnyObject =
+                            msg_send![string_class, stringWithUTF8String: path.as_ptr()];
+                        if ns_path.is_null() {
+                            return None;
+                        }
+                        Some(msg_send![url_class, fileURLWithPath: ns_path])
+                    })
+                    .unwrap_or(std::ptr::null_mut());
+                let _: () = msg_send![ns_window, setRepresentedURL: represented_url];
+            })
+            .map_err(|error| error.to_string())?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = (edited, document_path);
+
+    Ok(())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn set_window_document_state(
+    _window: tauri::WebviewWindow,
+    _title: String,
+    _edited: bool,
+    _document_path: Option<String>,
+) -> Result<(), String> {
+    Ok(())
 }
 
 #[tauri::command]

@@ -687,8 +687,12 @@ pub(super) fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFi
         .unwrap_or("untitled.md")
         .to_string();
 
+    let path = path.to_string_lossy().to_string();
+    #[cfg(target_os = "macos")]
+    crate::platform::macos::recent_documents::note_new(_app, &path);
+
     Ok(OpenFilePayload {
-        path: path.to_string_lossy().to_string(),
+        path,
         name,
         content: decoded.content,
         encoding: decoded.encoding,
@@ -1039,7 +1043,10 @@ fn write_selected_file(
     #[cfg(not(target_os = "android"))]
     {
         let path = path.clone().into_path().unwrap_or_default();
-        write_file_atomically(&path, &bytes)
+        write_file_atomically(&path, &bytes)?;
+        #[cfg(target_os = "macos")]
+        crate::platform::macos::recent_documents::note_new(_app, &path.to_string_lossy());
+        Ok(())
     }
 }
 

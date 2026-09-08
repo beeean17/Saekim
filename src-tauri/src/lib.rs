@@ -100,6 +100,7 @@ pub fn run() {
             commands::window::open_external_url,
             commands::window::open_new_window,
             commands::window::set_window_min_size,
+            commands::window::set_window_document_state,
             commands::window::start_window_drag,
             commands::window::confirm_unsaved_changes,
             commands::window::respond_to_close_request

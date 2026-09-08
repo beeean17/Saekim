@@ -55,12 +55,20 @@ const menuEvents = {
   openFile: 'saekim-menu-open-file',
   openFolder: 'saekim-menu-open-folder',
   openRecentWorkspace: 'saekim-menu-open-recent-workspace',
+  openRecentFile: 'saekim-menu-open-recent-file',
   save: 'saekim-menu-save',
   saveAs: 'saekim-menu-save-as',
   print: 'saekim-menu-print',
   closeFile: 'saekim-menu-close-file',
   closeWindow: 'saekim-menu-close-window',
   exportPdf: 'saekim-menu-export-pdf',
+  find: 'saekim-menu-find',
+  replace: 'saekim-menu-replace',
+  zoomIn: 'saekim-menu-zoom-in',
+  zoomOut: 'saekim-menu-zoom-out',
+  zoomReset: 'saekim-menu-zoom-reset',
+  openGitHub: 'saekim-menu-help-github',
+  showShortcuts: 'saekim-menu-help-shortcuts',
 } as const;
 
 export const tauriDesktopBackend: BackendAdapter = {
@@ -117,6 +125,7 @@ export const tauriDesktopBackend: BackendAdapter = {
     setWindowMinSize,
     startWindowDrag,
     setWindowBackgroundColor,
+    setWindowDocumentState,
     openNewWindow,
     runWindowAction,
   },
@@ -182,6 +191,7 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
     await registerMenuEvent<void>(menuEvents.newWindow, 'newWindow', () => handlers.onNewWindow());
     await registerMenuEvent<void>(menuEvents.openFile, 'openFile', () => handlers.onOpen());
     await registerMenuEvent<void>(menuEvents.openFolder, 'openFolder', () => handlers.onOpenFolder());
+    await registerMenuEvent<string>(menuEvents.openRecentFile, 'openRecentFile', handlers.onOpenRecentFile);
     await registerMenuEvent<string>(
       menuEvents.openRecentWorkspace,
       'openRecentWorkspace',
@@ -193,6 +203,13 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
     await registerMenuEvent<void>(menuEvents.closeFile, 'closeFile', () => handlers.onCloseFile());
     await registerMenuEvent<void>(menuEvents.closeWindow, 'closeWindow', () => handlers.onCloseWindow());
     await registerMenuEvent<void>(menuEvents.exportPdf, 'exportPdf', () => handlers.onExportPdf());
+    await registerMenuEvent<void>(menuEvents.find, 'find', () => handlers.onFind());
+    await registerMenuEvent<void>(menuEvents.replace, 'replace', () => handlers.onReplace());
+    await registerMenuEvent<void>(menuEvents.zoomIn, 'zoomIn', () => handlers.onZoomIn());
+    await registerMenuEvent<void>(menuEvents.zoomOut, 'zoomOut', () => handlers.onZoomOut());
+    await registerMenuEvent<void>(menuEvents.zoomReset, 'zoomReset', () => handlers.onZoomReset());
+    await registerMenuEvent<void>(menuEvents.openGitHub, 'openGitHub', () => handlers.onOpenGitHub());
+    await registerMenuEvent<void>(menuEvents.showShortcuts, 'showShortcuts', () => handlers.onShowShortcuts());
   } catch (error) {
     registrations.forEach((unlisten) => unlisten());
     throw error;
@@ -221,6 +238,10 @@ async function startWindowDrag(): Promise<void> {
 
 async function setWindowBackgroundColor(color: string): Promise<void> {
   await getCurrentWebviewWindow().setBackgroundColor(color);
+}
+
+async function setWindowDocumentState(title: string, edited: boolean, documentPath?: string): Promise<void> {
+  await invoke('set_window_document_state', { title, edited, documentPath });
 }
 
 async function openNewWindow(): Promise<void> {

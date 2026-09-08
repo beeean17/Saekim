@@ -89,6 +89,8 @@ function normalizeEventKey(key: string, code: string): string | null {
   if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
   if (/^Digit[0-9]$/.test(code)) return code.slice(5);
   if (code === 'Comma') return ',';
+  if (code === 'Equal') return 'equal';
+  if (code === 'Minus') return 'minus';
   if (code === 'Backslash') return 'backslash';
   if (key === '\\') return 'backslash';
   return key.toLowerCase();

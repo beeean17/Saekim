@@ -338,8 +338,7 @@ fn save_session_to_metadata(
 ) -> Result<(), String> {
     let mut connection = open_metadata_connection(app)?;
     #[cfg(target_os = "macos")]
-    let recent_workspace_snapshot_before =
-        recent_workspace_menu_snapshot(&connection).unwrap_or_default();
+    let recent_menu_snapshot_before = recent_menu_snapshot(&connection).unwrap_or_default();
     let transaction = connection
         .transaction()
         .map_err(|error| format!("failed to start metadata transaction: {error}"))?;
@@ -543,10 +542,9 @@ fn save_session_to_metadata(
 
     #[cfg(target_os = "macos")]
     {
-        let recent_workspace_snapshot_after =
-            recent_workspace_menu_snapshot(&connection).unwrap_or_default();
+        let recent_menu_snapshot_after = recent_menu_snapshot(&connection).unwrap_or_default();
         drop(connection);
-        if recent_workspace_snapshot_before != recent_workspace_snapshot_after {
+        if recent_menu_snapshot_before != recent_menu_snapshot_after {
             crate::platform::macos::native_menu::refresh_menu(app);
         }
     }
@@ -1595,6 +1593,13 @@ pub(crate) struct RecentWorkspaceMenuEntry {
     pub name: String,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct RecentFileMenuEntry {
+    pub id: String,
+    pub path: String,
+    pub name: String,
+}
+
 struct RecentWorkspaceRow {
     id: String,
     path: String,
@@ -1624,13 +1629,77 @@ pub(crate) fn recent_workspace_menu_entries(
     }
 }
 
-fn recent_workspace_menu_snapshot(
-    connection: &Connection,
-) -> Result<Vec<(String, String, String)>, String> {
-    Ok(load_recent_workspace_rows(connection)?
+fn recent_menu_snapshot(connection: &Connection) -> Result<Vec<(String, String, String)>, String> {
+    let mut snapshot = load_recent_workspace_rows(connection)?
         .into_iter()
-        .map(|workspace| (workspace.id, workspace.path, workspace.name))
-        .collect())
+        .map(|workspace| {
+            (
+                format!("workspace:{}", workspace.id),
+                workspace.path,
+                workspace.name,
+            )
+        })
+        .collect::<Vec<_>>();
+    snapshot.extend(
+        load_recent_file_rows(connection)?
+            .into_iter()
+            .map(|file| (format!("file:{}", file.id), file.path, file.name)),
+    );
+    Ok(snapshot)
+}
+
+pub(crate) fn recent_file_menu_entries(app: &tauri::AppHandle) -> Vec<RecentFileMenuEntry> {
+    match open_metadata_connection(app).and_then(|connection| load_recent_file_rows(&connection)) {
+        Ok(files) => files,
+        Err(error) => {
+            eprintln!("[saekim:native-menu] failed to load recent files: {error}");
+            Vec::new()
+        }
+    }
+}
+
+pub(crate) fn recent_file_path(app: &tauri::AppHandle, file_id: &str) -> Option<String> {
+    open_metadata_connection(app)
+        .and_then(|connection| {
+            connection
+                .query_row(
+                    "SELECT absolute_path FROM files
+                     WHERE id = ?1 AND absolute_path != ''
+                     LIMIT 1",
+                    params![file_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|error| format!("failed to load recent file path: {error}"))
+        })
+        .unwrap_or_else(|error| {
+            eprintln!("[saekim:native-menu] failed to resolve recent file: {error}");
+            None
+        })
+}
+
+fn load_recent_file_rows(connection: &Connection) -> Result<Vec<RecentFileMenuEntry>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT id, absolute_path, display_name
+             FROM files
+             WHERE absolute_path != '' AND absolute_path NOT LIKE '~%'
+             ORDER BY last_opened_at DESC
+             LIMIT 10",
+        )
+        .map_err(|error| format!("failed to prepare recent files query: {error}"))?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(RecentFileMenuEntry {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                name: row.get(2)?,
+            })
+        })
+        .map_err(|error| format!("failed to query recent files: {error}"))?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to read recent file row: {error}"))
 }
 
 pub(crate) fn recent_workspace_path(app: &tauri::AppHandle, workspace_id: &str) -> Option<String> {
@@ -1973,7 +2042,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        configure_metadata_connection, ensure_workspace, initialize_schema,
+        configure_metadata_connection, ensure_workspace, initialize_schema, load_recent_file_rows,
         migrate_embedded_file_content, relative_path, save_metadata_value, save_window_open_file,
         stable_hash, upsert_file,
     };
@@ -1996,6 +2065,49 @@ mod tests {
     fn stable_hash_is_repeatable() {
         assert_eq!(stable_hash("docs/guide.md"), stable_hash("docs/guide.md"));
         assert_ne!(stable_hash("docs/guide.md"), stable_hash("README.md"));
+    }
+
+    #[test]
+    fn recent_files_follow_last_opened_order_and_skip_placeholders() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_schema(&mut connection).unwrap();
+        ensure_workspace(&connection, "ws_test", "/project").unwrap();
+
+        upsert_file(
+            &connection,
+            "ws_test",
+            "/project",
+            "/project/older.md",
+            "older.md",
+            None,
+            1,
+        )
+        .unwrap();
+        upsert_file(
+            &connection,
+            "ws_test",
+            "/project",
+            "~untitled-1",
+            "untitled-1.md",
+            None,
+            4,
+        )
+        .unwrap();
+        upsert_file(
+            &connection,
+            "ws_test",
+            "/project",
+            "/project/newer.md",
+            "newer.md",
+            None,
+            3,
+        )
+        .unwrap();
+
+        let recent = load_recent_file_rows(&connection).unwrap();
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].path, "/project/newer.md");
+        assert_eq!(recent[1].path, "/project/older.md");
     }
 
     #[test]

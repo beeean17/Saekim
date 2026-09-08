@@ -3,6 +3,7 @@ import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
 import { createCommandRegistry, dispatchCommand } from './app/commands';
+import { openProjectWebsite, showKeyboardShortcuts } from './app/help';
 import { enabledFeatures } from './app/featureRegistry';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { useExternalFileOpen } from './hooks/useExternalFileOpen';
@@ -16,11 +17,13 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { useAutoUpdater } from './hooks/useAutoUpdater';
+import { useWindowDocumentState } from './hooks/useWindowDocumentState';
 import { useSearchStore } from './features/search';
 import { useCommandPaletteStore } from './features/command-palette';
 import { toggleInlineMarker } from './core/editor/textEditing';
 import { Backend } from './platform/common/backend';
 import { useUIStore } from './store/ui';
+import { defaultEditorFontSize, stepFontSize, useSettingsStore } from './store/settings';
 import { selectActiveFile, useWorkspaceStore } from './store/workspace';
 import type { ViewMode } from './types/workspace';
 
@@ -52,6 +55,15 @@ export function App() {
   const openSettings = useUIStore((state) => state.openSettings);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const openCommandPalette = useCommandPaletteStore((state) => state.open);
+  const zoomIn = useCallback(() => {
+    const settings = useSettingsStore.getState();
+    settings.setFontSize(stepFontSize(settings.fontSize, 1));
+  }, []);
+  const zoomOut = useCallback(() => {
+    const settings = useSettingsStore.getState();
+    settings.setFontSize(stepFontSize(settings.fontSize, -1));
+  }, []);
+  const resetZoom = useCallback(() => useSettingsStore.getState().setFontSize(defaultEditorFontSize), []);
   const { viewportProfile, availableViewModes, effectiveViewMode } = useResponsiveViewMode(viewMode);
 
   const commandRegistry = useMemo(
@@ -80,6 +92,9 @@ export function App() {
           setMode: setViewMode,
           canSetMode: (mode) => availableViewModes.includes(mode),
           toggleSidebar,
+          zoomIn,
+          zoomOut,
+          resetZoom,
         },
         search: { openFind, openReplace },
         palette: { open: openCommandPalette },
@@ -98,6 +113,9 @@ export function App() {
       saveActiveAs,
       setViewMode,
       toggleSidebar,
+      zoomIn,
+      zoomOut,
+      resetZoom,
     ],
   );
 
@@ -107,6 +125,7 @@ export function App() {
       onNewWindow: () => dispatchCommand(commandRegistry, 'window.new'),
       onOpen: () => dispatchCommand(commandRegistry, 'file.open'),
       onOpenFolder: () => dispatchCommand(commandRegistry, 'folder.open'),
+      onOpenRecentFile: (path: string) => void openFile(path),
       onOpenRecentWorkspace: (path: string) => void openWorkspace(path),
       onSave: () => dispatchCommand(commandRegistry, 'file.save'),
       onSaveAs: () => dispatchCommand(commandRegistry, 'file.saveAs'),
@@ -114,8 +133,15 @@ export function App() {
       onCloseFile: () => dispatchCommand(commandRegistry, 'file.close'),
       onCloseWindow: () => dispatchCommand(commandRegistry, 'window.close'),
       onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),
+      onFind: () => dispatchCommand(commandRegistry, 'search.openFind'),
+      onReplace: () => dispatchCommand(commandRegistry, 'search.openReplace'),
+      onZoomIn: () => dispatchCommand(commandRegistry, 'view.zoomIn'),
+      onZoomOut: () => dispatchCommand(commandRegistry, 'view.zoomOut'),
+      onZoomReset: () => dispatchCommand(commandRegistry, 'view.zoomReset'),
+      onOpenGitHub: openProjectWebsite,
+      onShowShortcuts: showKeyboardShortcuts,
     }),
-    [commandRegistry, openWorkspace],
+    [commandRegistry, openFile, openWorkspace],
   );
 
   useShortcuts(commandRegistry);
@@ -128,6 +154,7 @@ export function App() {
   useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null, previewElement);
   useResponsiveSplitWidth(bodyRef, effectiveViewMode, sidebarMode, sidebarWidth, editorWidth, viewportProfile.profile);
   useWindowSizeConstraints();
+  useWindowDocumentState(activeFile);
   useAutoUpdater();
   const { startSidebarResize, startPaneResize } = usePaneResizers({
     bodyRef,

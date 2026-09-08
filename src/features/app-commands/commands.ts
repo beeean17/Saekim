@@ -101,10 +101,31 @@ export const appCommands: CommandContributionFactory = (ctx) => {
     },
     ...viewCommands(ctx),
     {
+      id: 'view.zoomIn',
+      label: 'Zoom In',
+      defaultShortcut: 'mod+equal',
+      menu: { section: 'view', group: 'zoom', order: 40 },
+      run: ctx.view.zoomIn,
+    },
+    {
+      id: 'view.zoomOut',
+      label: 'Zoom Out',
+      defaultShortcut: 'mod+minus',
+      menu: { section: 'view', group: 'zoom', order: 50 },
+      run: ctx.view.zoomOut,
+    },
+    {
+      id: 'view.zoomReset',
+      label: 'Actual Size',
+      defaultShortcut: 'mod+0',
+      menu: { section: 'view', group: 'zoom', order: 60 },
+      run: ctx.view.resetZoom,
+    },
+    {
       id: 'view.toggleSidebar',
       label: 'Toggle Sidebar',
       defaultShortcut: 'mod+backslash',
-      menu: { section: 'view', group: 'sidebar', order: 40 },
+      menu: { section: 'view', group: 'sidebar', order: 70 },
       run: ctx.view.toggleSidebar,
     },
   ];

@@ -11,10 +11,18 @@ const MENU_NEW_FILE: &str = "new-file";
 const MENU_NEW_WINDOW: &str = "new-window";
 const MENU_OPEN_FILE: &str = "open-file";
 const MENU_OPEN_FOLDER: &str = "open-folder";
+const MENU_OPEN_RECENT_FILE_PREFIX: &str = "open-recent-file:";
 const MENU_OPEN_RECENT_WORKSPACE_PREFIX: &str = "open-recent-workspace:";
 const MENU_CLOSE_FILE: &str = "close-file";
 const MENU_CLOSE_WINDOW: &str = "close-window";
 const MENU_QUIT: &str = "quit";
+const MENU_FIND: &str = "find";
+const MENU_REPLACE: &str = "replace";
+const MENU_ZOOM_IN: &str = "zoom-in";
+const MENU_ZOOM_OUT: &str = "zoom-out";
+const MENU_ZOOM_RESET: &str = "zoom-reset";
+const MENU_GITHUB: &str = "help-github";
+const MENU_SHORTCUTS: &str = "help-shortcuts";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_PRINT: &str = "saekim-menu-print";
@@ -23,9 +31,17 @@ const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
 const EVENT_NEW_WINDOW: &str = "saekim-menu-new-window";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
+const EVENT_OPEN_RECENT_FILE: &str = "saekim-menu-open-recent-file";
 const EVENT_OPEN_RECENT_WORKSPACE: &str = "saekim-menu-open-recent-workspace";
 const EVENT_CLOSE_FILE: &str = "saekim-menu-close-file";
 const EVENT_CLOSE_WINDOW: &str = "saekim-menu-close-window";
+const EVENT_FIND: &str = "saekim-menu-find";
+const EVENT_REPLACE: &str = "saekim-menu-replace";
+const EVENT_ZOOM_IN: &str = "saekim-menu-zoom-in";
+const EVENT_ZOOM_OUT: &str = "saekim-menu-zoom-out";
+const EVENT_ZOOM_RESET: &str = "saekim-menu-zoom-reset";
+const EVENT_GITHUB: &str = "saekim-menu-help-github";
+const EVENT_SHORTCUTS: &str = "saekim-menu-help-shortcuts";
 
 pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let package_info = app.package_info();
@@ -65,6 +81,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+Shift+O"),
     )?;
+    let open_recent_file = recent_file_submenu(app)?;
     let open_recent_workspace = recent_workspace_submenu(app)?;
     let save_as = MenuItem::with_id(
         app,
@@ -102,6 +119,25 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+Q"),
     )?;
+    let find = MenuItem::with_id(app, MENU_FIND, "Find...", true, Some("CmdOrCtrl+F"))?;
+    let replace = MenuItem::with_id(app, MENU_REPLACE, "Replace...", true, Some("CmdOrCtrl+H"))?;
+    let zoom_in = MenuItem::with_id(app, MENU_ZOOM_IN, "Zoom In", true, Some("CmdOrCtrl++"))?;
+    let zoom_out = MenuItem::with_id(app, MENU_ZOOM_OUT, "Zoom Out", true, Some("CmdOrCtrl+-"))?;
+    let zoom_reset = MenuItem::with_id(
+        app,
+        MENU_ZOOM_RESET,
+        "Actual Size",
+        true,
+        Some("CmdOrCtrl+0"),
+    )?;
+    let github = MenuItem::with_id(app, MENU_GITHUB, "Saekim on GitHub", true, None::<&str>)?;
+    let shortcuts = MenuItem::with_id(
+        app,
+        MENU_SHORTCUTS,
+        "Keyboard Shortcuts",
+        true,
+        None::<&str>,
+    )?;
 
     let app_menu = Submenu::with_items(
         app,
@@ -127,6 +163,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &new_window,
             &PredefinedMenuItem::separator(app)?,
             &open_file,
+            &open_recent_file,
             &open_folder,
             &open_recent_workspace,
             &PredefinedMenuItem::separator(app)?,
@@ -151,13 +188,22 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::copy(app, None)?,
             &PredefinedMenuItem::paste(app, None)?,
             &PredefinedMenuItem::select_all(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &find,
+            &replace,
         ],
     )?;
     let view_menu = Submenu::with_items(
         app,
         "View",
         true,
-        &[&PredefinedMenuItem::fullscreen(app, None)?],
+        &[
+            &zoom_in,
+            &zoom_out,
+            &zoom_reset,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::fullscreen(app, None)?,
+        ],
     )?;
     let window_menu = Submenu::with_items(
         app,
@@ -168,9 +214,10 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::maximize(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &close_window,
+            &PredefinedMenuItem::bring_all_to_front(app, None)?,
         ],
     )?;
-    let help_menu = Submenu::with_items(app, "Help", true, &[])?;
+    let help_menu = Submenu::with_items(app, "Help", true, &[&github, &shortcuts])?;
 
     Menu::with_items(
         app,
@@ -207,6 +254,15 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
             return;
         };
         emit_menu_event(app, EVENT_OPEN_RECENT_WORKSPACE, MenuPayload::String(path));
+        return;
+    }
+
+    if let Some(file_id) = menu_id.strip_prefix(MENU_OPEN_RECENT_FILE_PREFIX) {
+        let Some(path) = crate::commands::session::recent_file_path(app, file_id) else {
+            eprintln!("[saekim:native-menu] ignored missing recent file id={file_id}");
+            return;
+        };
+        emit_menu_event(app, EVENT_OPEN_RECENT_FILE, MenuPayload::String(path));
         return;
     }
 
@@ -284,7 +340,46 @@ fn recent_workspace_submenu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
     Submenu::with_items(app, "Open Recent Workspace", true, &item_refs)
 }
 
+fn recent_file_submenu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
+    let recent_files = crate::commands::session::recent_file_menu_entries(app);
+    let mut items = Vec::new();
+
+    if recent_files.is_empty() {
+        items.push(MenuItem::with_id(
+            app,
+            "open-recent-file-empty",
+            "No Recent Files",
+            false,
+            None::<&str>,
+        )?);
+    } else {
+        for file in recent_files {
+            items.push(MenuItem::with_id(
+                app,
+                format!("{MENU_OPEN_RECENT_FILE_PREFIX}{}", file.id),
+                recent_file_label(&file.name, &file.path),
+                true,
+                None::<&str>,
+            )?);
+        }
+    }
+
+    let item_refs: Vec<&dyn IsMenuItem<Wry>> = items
+        .iter()
+        .map(|item| item as &dyn IsMenuItem<Wry>)
+        .collect();
+    Submenu::with_items(app, "Open Recent File", true, &item_refs)
+}
+
 fn recent_workspace_label(name: &str, path: &str) -> String {
+    if name.trim().is_empty() {
+        path.to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+fn recent_file_label(name: &str, path: &str) -> String {
     if name.trim().is_empty() {
         path.to_string()
     } else {
@@ -311,6 +406,13 @@ fn menu_event_name(menu_id: &str) -> Option<&'static str> {
         MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
         MENU_CLOSE_FILE => Some(EVENT_CLOSE_FILE),
         MENU_CLOSE_WINDOW => Some(EVENT_CLOSE_WINDOW),
+        MENU_FIND => Some(EVENT_FIND),
+        MENU_REPLACE => Some(EVENT_REPLACE),
+        MENU_ZOOM_IN => Some(EVENT_ZOOM_IN),
+        MENU_ZOOM_OUT => Some(EVENT_ZOOM_OUT),
+        MENU_ZOOM_RESET => Some(EVENT_ZOOM_RESET),
+        MENU_GITHUB => Some(EVENT_GITHUB),
+        MENU_SHORTCUTS => Some(EVENT_SHORTCUTS),
         _ => None,
     }
 }

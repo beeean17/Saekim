@@ -3,6 +3,7 @@ import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import type { CommandContribution } from '../../app/feature';
 import type { ViewMode } from '../../types/workspace';
+import { openProjectWebsite, showKeyboardShortcuts } from '../../app/help';
 
 export type AppMenuId = 'file' | 'edit' | 'view' | 'window' | 'help';
 
@@ -94,7 +95,12 @@ export function buildAppMenus({
   menus.push({
     id: 'help',
     label: 'Help',
-    items: [{ label: 'About Saekim', action: () => window.alert(`Saekim ${__APP_VERSION__}`) }],
+    items: [
+      { label: 'Saekim on GitHub', action: openProjectWebsite },
+      { label: 'Keyboard Shortcuts', action: showKeyboardShortcuts },
+      { separator: true },
+      { label: 'About Saekim', action: () => window.alert(`Saekim ${__APP_VERSION__}`) },
+    ],
   });
 
   return menus;

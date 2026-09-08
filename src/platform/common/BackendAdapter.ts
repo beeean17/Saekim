@@ -91,6 +91,7 @@ export interface RuntimeBackend {
   setWindowMinSize(width: number, height: number): Promise<void>;
   startWindowDrag(): Promise<void>;
   setWindowBackgroundColor(color: string): Promise<void>;
+  setWindowDocumentState(title: string, edited: boolean, documentPath?: string): Promise<void>;
   openNewWindow(): Promise<void>;
   runWindowAction(action: WindowAction): Promise<void>;
 }
@@ -115,6 +116,7 @@ export interface NativeMenuCommandHandlers {
   onNewWindow(): void;
   onOpen(): void;
   onOpenFolder(): void;
+  onOpenRecentFile(path: string): void;
   onOpenRecentWorkspace(path: string): void;
   onSave(): void;
   onSaveAs(): void;
@@ -122,4 +124,11 @@ export interface NativeMenuCommandHandlers {
   onCloseFile(): void;
   onCloseWindow(): void;
   onExportPdf(): void;
+  onFind(): void;
+  onReplace(): void;
+  onZoomIn(): void;
+  onZoomOut(): void;
+  onZoomReset(): void;
+  onOpenGitHub(): void;
+  onShowShortcuts(): void;
 }

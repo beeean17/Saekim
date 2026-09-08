@@ -93,6 +93,7 @@ export const androidBackend: BackendAdapter = {
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
+    setWindowDocumentState: noop,
     openNewWindow: noop,
     runWindowAction: noop,
   },

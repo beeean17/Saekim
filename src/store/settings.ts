@@ -9,7 +9,7 @@ export const fontSizeOptions = [
   { id: 'large', label: '크게', value: 16 },
 ] as const;
 
-const defaultFontSize = fontSizeOptions[1].value;
+export const defaultEditorFontSize = fontSizeOptions[1].value;
 const defaultEditorFontFamily = 'Pretendard Variable';
 
 interface SettingsState {
@@ -63,14 +63,21 @@ export function normalizeFontSize(fontSize: number): number {
   }, fontSizeOptions[0]).value;
 }
 
-applyEditorSettings(defaultFontSize, defaultEditorFontFamily);
+export function stepFontSize(fontSize: number, direction: -1 | 1): number {
+  const normalized = normalizeFontSize(fontSize);
+  const index = fontSizeOptions.findIndex((option) => option.value === normalized);
+  const nextIndex = Math.min(fontSizeOptions.length - 1, Math.max(0, index + direction));
+  return fontSizeOptions[nextIndex].value;
+}
+
+applyEditorSettings(defaultEditorFontSize, defaultEditorFontFamily);
 const defaultTheme: ThemeName = 'system';
 const defaultResolvedTheme = applyTheme(defaultTheme);
 
 export const useSettingsStore = create<SettingsState>()((set) => ({
   theme: defaultTheme,
   resolvedTheme: defaultResolvedTheme,
-  fontSize: defaultFontSize,
+  fontSize: defaultEditorFontSize,
   editorFontFamily: defaultEditorFontFamily,
   htmlPreviewMode: 'browser',
   showLineNumbers: null,
