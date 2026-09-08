@@ -1,6 +1,6 @@
 # Saekim 기능 명세
 
-Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 문서입니다.
+Saekim 3.4.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 문서입니다.
 설계 원칙은 [platform-architecture.md](platform-architecture.md)를 참고하세요.
 
 - **런타임**: Tauri 2 / React 18.3.1 / TypeScript 5.8.3 / Rust stable
@@ -54,7 +54,7 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 
 ## 2. 기능 레지스트리
 
-`src/app/featureRegistry.ts`가 13개 기능을 선언하고, 앱 시작 시 capability와
+`src/app/featureRegistry.ts`가 16개 기능을 선언하고, 앱 시작 시 capability와
 의존성을 검사해 활성 목록을 결정합니다.
 
 | 기능 ID | 의존 | 필요 capability | 기여 항목 |
@@ -72,6 +72,9 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 | `search` | - | - | editor, commands |
 | `tabs` | `file-workspace` | - | editor, commands |
 | `outline` | `markdown` | - | sidebar |
+| `app-commands` | `file-workspace` | - | commands |
+| `command-palette` | `app-commands` | - | app, commands |
+| `external-change-protection` | `file-workspace` | - | app |
 
 ### 선택 알고리즘
 
@@ -89,8 +92,9 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 - **`fileTypes`** — 확장자, 라벨, 언어, `previewKind` 매핑
 - **`editor`** — 상단 바, 툴바 항목, 오버레이 컴포넌트, 헬퍼 모달,
   이벤트 핸들러, 이미지 액션
+- **`app`** — 애플리케이션 셸 위에 표시하는 전역 오버레이 컴포넌트
 - **`sidebar`** — 사이드바 패널 탭과 패널 컴포넌트
-- **`commands`** — id, 기본 단축키, 메뉴 배치, 실행 함수
+- **`commands`** — id, 라벨, 기본 단축키, 메뉴 배치, 실행 함수
 - **`metadata`** — 블록 레이아웃 읽기/쓰기
 - **`pdf`** — 현재 문서 내보내기
 

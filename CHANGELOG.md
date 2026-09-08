@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.4.0] - 2026-09-08
+
+### Added
+
+- 열린 문서를 탭으로 전환하고 닫은 탭을 `Cmd/Ctrl+Shift+T`로 복원하는 문서 탭 스트립을 추가했습니다.
+- 정규식, 대소문자, 단어 단위, 선택 영역 옵션을 지원하는 바꾸기와 전체 바꾸기를 추가했습니다.
+- 워크스페이스 전체의 파일 내용을 검색하고 줄·열·미리보기·파일별 결과 수를 표시하는 검색을 추가했습니다.
+- 워크스페이스 트리에 파일·폴더 이름 변경, 새 폴더 생성, 복제, 운영체제 휴지통 이동 작업을 추가했습니다.
+- Markdown 제목을 원본 줄 위치와 함께 표시하고 선택한 제목으로 이동하는 문서 개요 사이드바를 추가했습니다.
+- 명령 라벨, ID, 단축키를 검색해 실행하는 `Cmd/Ctrl+K` 명령 팔레트를 추가했습니다.
+
+### Changed
+
+- 키보드 단축키, 애플리케이션 메뉴, 명령 팔레트가 같은 명령 메타데이터와 실행 함수를 사용하도록 통합했습니다.
+- 문서 탭의 `Cmd/Ctrl+1~9` 단축키를 유지하기 위해 보기 모드 전환을 `Cmd/Ctrl+Shift+1~3`으로 배치했습니다.
+- 버튼, 링크, 입력 요소에 일관된 키보드 포커스 표시를 적용하고 대화상자에서 초점이 밖으로 빠지지 않도록 조정했습니다.
+- 파일 읽기 결과와 저장 요청에 디스크 수정 시각과 크기로 구성한 revision 메타데이터를 포함하도록 확장했습니다.
+
+### Fixed
+
+- 파일을 연 뒤 외부 프로그램에서 내용이 바뀐 경우 저장이 조용히 덮어쓰지 않고 다시 불러오기, 다른 이름으로 저장, 덮어쓰기를 선택하도록 수정했습니다.
+
+---
+
 ## [3.3.0] - 2026-09-08
 
 ### Added
@@ -330,6 +354,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.4.0 | 2026-09-08 | Document tabs and restore, replace and workspace content search, workspace file operations, outline navigation, unified command palette, focus accessibility, external-change save protection |
 | 3.3.0 | 2026-09-08 | Secondary-window events, restored window geometry, system theme, in-memory drafts, recursive workspace search, encoding round trips, body-free session metadata |
 | 3.2.1 | 2026-09-08 | Atomic and line-ending-safe saves, serialized metadata access, dirty-close protection, stable workspace roots, responsive window constraints, Android dark system bars |
 | 3.2.0 | Unreleased | Capability-based platform architecture, Android document integration, native app menus, responsive shell, persistent preview layouts, PDF export stability |
