@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import packageJson from './package.json';
 
@@ -18,5 +18,9 @@ export default defineConfig({
   build: {
     target: 'es2020',
     minify: 'esbuild',
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
   },
 });
