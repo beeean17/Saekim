@@ -17,7 +17,7 @@ import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { useSearchStore } from './features/search';
 import { Backend } from './platform/common/backend';
 import { useUIStore } from './store/ui';
-import { selectActiveFile, useWorkspaceStore } from './store/workspace';
+import { isDirty, selectActiveFile, useWorkspaceStore } from './store/workspace';
 import type { ViewMode } from './types/workspace';
 
 export function App() {
@@ -32,6 +32,7 @@ export function App() {
   const createFile = useWorkspaceStore((state) => state.createFile);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
+  const closeFile = useWorkspaceStore((state) => state.closeFile);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const openFind = useSearchStore((state) => state.openFind);
   const sidebarMode = useUIStore((state) => state.sidebarMode);
@@ -62,9 +63,18 @@ export function App() {
       onOpenRecentWorkspace: (path: string) => void openWorkspace(path),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
+      onCloseFile: () => {
+        if (!activeFile) {
+          void Backend.runtime.runWindowAction('close');
+          return;
+        }
+        if (isDirty(activeFile) && !window.confirm(`저장하지 않은 ${activeFile.name} 파일을 닫을까요?`)) return;
+        closeFile(activeFile.id);
+      },
+      onCloseWindow: () => void Backend.runtime.runWindowAction('close'),
       onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),
     }),
-    [commandRegistry, createFile, openFile, openFolder, openWorkspace, saveActive, saveActiveAs],
+    [activeFile, closeFile, commandRegistry, createFile, openFile, openFolder, openWorkspace, saveActive, saveActiveAs],
   );
 
   useShortcuts(shortcuts, commandRegistry);

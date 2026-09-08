@@ -87,5 +87,7 @@ export interface NativeMenuCommandHandlers {
   onOpenRecentWorkspace(path: string): void;
   onSave(): void;
   onSaveAs(): void;
+  onCloseFile(): void;
+  onCloseWindow(): void;
   onExportPdf(): void;
 }

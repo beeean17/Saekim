@@ -8,6 +8,8 @@ interface ShortcutHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onCloseFile: () => void;
+  onCloseWindow: () => void;
 }
 
 export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegistry): void {
@@ -36,6 +38,13 @@ export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegist
       } else if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         handlers.onSave();
+      }
+      if (event.key.toLowerCase() === 'w' && event.shiftKey) {
+        event.preventDefault();
+        handlers.onCloseWindow();
+      } else if (event.key.toLowerCase() === 'w') {
+        event.preventDefault();
+        handlers.onCloseFile();
       }
       if (event.key.toLowerCase() === 'f') {
         if (dispatchShortcut(commands, 'mod+f')) event.preventDefault();

@@ -11,6 +11,8 @@ const MENU_NEW_WINDOW: &str = "new-window";
 const MENU_OPEN_FILE: &str = "open-file";
 const MENU_OPEN_FOLDER: &str = "open-folder";
 const MENU_OPEN_RECENT_WORKSPACE_PREFIX: &str = "open-recent-workspace:";
+const MENU_CLOSE_FILE: &str = "close-file";
+const MENU_CLOSE_WINDOW: &str = "close-window";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
@@ -19,6 +21,8 @@ const EVENT_NEW_WINDOW: &str = "saekim-menu-new-window";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
 const EVENT_OPEN_FOLDER: &str = "saekim-menu-open-folder";
 const EVENT_OPEN_RECENT_WORKSPACE: &str = "saekim-menu-open-recent-workspace";
+const EVENT_CLOSE_FILE: &str = "saekim-menu-close-file";
+const EVENT_CLOSE_WINDOW: &str = "saekim-menu-close-window";
 
 pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let package_info = app.package_info();
@@ -73,6 +77,20 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+P"),
     )?;
+    let close_file = MenuItem::with_id(
+        app,
+        MENU_CLOSE_FILE,
+        "Close File",
+        true,
+        Some("CmdOrCtrl+W"),
+    )?;
+    let close_window = MenuItem::with_id(
+        app,
+        MENU_CLOSE_WINDOW,
+        "Close Window",
+        true,
+        Some("CmdOrCtrl+Shift+W"),
+    )?;
 
     let app_menu = Submenu::with_items(
         app,
@@ -106,7 +124,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::separator(app)?,
             &export_pdf,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
+            &close_file,
         ],
     )?;
     let edit_menu = Submenu::with_items(
@@ -137,7 +155,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::minimize(app, None)?,
             &PredefinedMenuItem::maximize(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
+            &close_window,
         ],
     )?;
     let help_menu = Submenu::with_items(app, "Help", true, &[])?;
@@ -332,6 +350,8 @@ fn menu_event_name(menu_id: &str) -> Option<&'static str> {
         MENU_NEW_WINDOW => Some(EVENT_NEW_WINDOW),
         MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),
         MENU_OPEN_FOLDER => Some(EVENT_OPEN_FOLDER),
+        MENU_CLOSE_FILE => Some(EVENT_CLOSE_FILE),
+        MENU_CLOSE_WINDOW => Some(EVENT_CLOSE_WINDOW),
         _ => None,
     }
 }
