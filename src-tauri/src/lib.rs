@@ -36,9 +36,14 @@ pub fn run() {
     );
 
     #[cfg(desktop)]
-    let builder = builder
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+    let builder = builder.plugin(tauri_plugin_process::init());
+
+    #[cfg(desktop)]
+    let builder = if option_env!("VITE_UPDATER_ENABLED") == Some("true") {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
 
     let builder = builder.plugin(tauri_plugin_dialog::init());
 
@@ -89,6 +94,7 @@ pub fn run() {
             commands::file::save_file_as,
             commands::file::take_pending_open_files,
             commands::file::write_pdf_export,
+            commands::pdf::print_webview_pdf,
             commands::session::load_session,
             commands::session::load_workspace_session,
             commands::session::delete_document_draft,

@@ -75,6 +75,7 @@ export const androidBackend: BackendAdapter = {
   },
   export: {
     pickPdfExportPath: unsupported('PDF target picker'),
+    printWebviewPdf: async () => ({ status: 'unsupported' }),
     writePdfExport: unsupported('PDF write'),
   },
   runtime: {

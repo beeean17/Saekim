@@ -50,6 +50,7 @@ export const browserBackend: BackendAdapter = {
   },
   export: {
     pickPdfExportPath,
+    printWebviewPdf,
     writePdfExport,
   },
   runtime: {
@@ -276,6 +277,14 @@ function sameRevision(left: FileRevision, right: FileRevision): boolean {
 
 async function pickPdfExportPath(_suggestedName: string): Promise<string | null> {
   return null;
+}
+
+async function printWebviewPdf(
+  _path: string,
+  _contentWidth: number,
+  _contentHeight: number,
+): Promise<import('../common/BackendAdapter').NativePdfExportResult> {
+  return { status: 'unsupported' };
 }
 
 async function writePdfExport(_path: string, _pdfData: string): Promise<string> {

@@ -11,7 +11,13 @@ const config = {
   },
   plugins: {
     updater: {
+      endpoints: [
+        'https://github.com/beeean17/Saekim/releases/latest/download/latest.json',
+      ],
       pubkey: updaterPublicKey,
+      windows: {
+        installMode: 'passive',
+      },
     },
   },
 };

@@ -36,4 +36,11 @@ tauri-plugin-window-state = "2"
 trash = "5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
 objc2 = "0.6.4"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSError", "NSGeometry", "NSString", "NSObject", "objc2-core-foundation"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "objc2-core-foundation", "WKPDFConfiguration", "WKWebView"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.38.2"
+windows = "0.61.3"

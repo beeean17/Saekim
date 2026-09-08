@@ -75,15 +75,5 @@
       "entitlements": "Entitlements.plist",
       "minimumSystemVersion": "10.15"
     }
-  },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/beeean17/Saekim/releases/latest/download/latest.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    }
   }
 }

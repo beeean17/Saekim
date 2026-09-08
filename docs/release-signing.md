@@ -4,7 +4,7 @@ Saekim release builds are produced by `.github/workflows/release.yml` when a
 `v*` tag is pushed. The workflow verifies the project, builds macOS, Windows,
 and Linux artifacts, signs updater bundles, and creates a draft GitHub Release
 with `latest.json`. Publishing the draft makes the updater manifest available at
-the endpoint configured in `src-tauri/tauri.conf.json`.
+the endpoint injected by `scripts/generate-tauri-release-config.mjs`.
 
 No certificate or private key belongs in the repository. Configure these
 GitHub Actions secrets before pushing a release tag:
@@ -29,13 +29,15 @@ specified by the Windows certificate issuer. The workflow derives the
 certificate thumbprint after importing the `.pfx`; it never stores that
 certificate in the checkout.
 
-The base configuration deliberately omits `pubkey`, `signingIdentity`, and the
-Windows certificate fields so unsigned development builds keep working. The
+The base configuration deliberately omits the entire updater configuration,
+`signingIdentity`, and the Windows certificate fields so unsigned development
+builds keep working without a placeholder key. The
 workflow generates `src-tauri/tauri.release.conf.json` with mode `0600` from
 GitHub Secrets, passes it to Tauri, enables the in-app startup update check with
-`VITE_UPDATER_ENABLED`, and relies on the ephemeral runner cleanup. Development
-and locally packaged builds do not contact the release endpoint unless that
-build-time flag is set explicitly.
+`VITE_UPDATER_ENABLED`, and relies on the ephemeral runner cleanup. The updater
+plugin itself is initialized only when that build-time flag is `true`;
+development and locally packaged builds therefore neither require a public key
+nor contact the release endpoint.
 
 The repository currently contains no Apple Developer certificate, Windows
 code-signing certificate, or updater signing key. Until the secrets above are

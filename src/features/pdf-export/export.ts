@@ -1,6 +1,7 @@
 import { Backend } from '../../platform/common/backend';
 
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
+const EXPORTING_BODY_CLASS = 'pdf-exporting';
 const PAGE_SPACER_CLASS = 'pdf-page-spacer';
 const A4_WIDTH_PX = 794;
 const A4_WIDTH_PT = 595.28;
@@ -137,6 +138,14 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
     await waitForTemplateAssets(exportRoot);
     logPdfExport('wait assets done', readElementMetrics(exportRoot));
 
+    if (targetPath) {
+      const nativeResult = await tryNativeVectorPdf(exportRoot, targetPath);
+      if (nativeResult) {
+        logPdfExport('export done', { targetPath, renderer: 'native-vector' });
+        return true;
+      }
+    }
+
     logPdfExport('apply page breaks start');
     const pageBreakSummary = applyBlockPageBreaks(exportRoot);
     logPdfExport('apply page breaks done', pageBreakSummary);
@@ -144,14 +153,44 @@ export async function exportPreviewToPdf(options: PdfExportOptions = {}): Promis
     const pdfBytes = await renderTemplateToPdf(exportRoot);
     logPdfExport('pdf bytes rendered', { byteLength: pdfBytes.byteLength });
     await savePdfBytes(pdfBytes, suggestedName, targetPath);
-    logPdfExport('export done', { targetPath, byteLength: pdfBytes.byteLength });
+    logPdfExport('export done', { targetPath, byteLength: pdfBytes.byteLength, renderer: 'canvas-fallback' });
     return true;
   } catch (error) {
     logPdfExport('export failed', pdfExportErrorDetails(error));
     throw error;
   } finally {
+    document.body.classList.remove(EXPORTING_BODY_CLASS);
     exportRoot.remove();
     logPdfExport('template removed');
+  }
+}
+
+async function tryNativeVectorPdf(exportRoot: HTMLElement, targetPath: string): Promise<boolean> {
+  resetPageBreakMarkers(exportRoot);
+  const pageBreakPolicy = markPageBreakPolicies(exportRoot);
+  document.body.classList.add(EXPORTING_BODY_CLASS);
+
+  try {
+    await waitForTemplateAssets(exportRoot);
+    logPdfExport('native vector render start', {
+      targetPath,
+      ...pageBreakPolicy,
+    });
+    const contentWidth = A4_WIDTH_PX;
+    const contentHeight = Math.max(A4_HEIGHT_PX, exportRoot.scrollHeight, exportRoot.offsetHeight);
+    const result = await Backend.export.printWebviewPdf(targetPath, contentWidth, contentHeight);
+    if (result.status === 'saved') {
+      logPdfExport('native vector render done', { targetPath: result.path ?? targetPath });
+      return true;
+    }
+
+    logPdfExport('native vector render unsupported; using canvas fallback');
+    return false;
+  } catch (error) {
+    logPdfExport('native vector render failed; using canvas fallback', pdfExportErrorDetails(error));
+    return false;
+  } finally {
+    document.body.classList.remove(EXPORTING_BODY_CLASS);
   }
 }
 

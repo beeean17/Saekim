@@ -107,6 +107,7 @@ export const tauriDesktopBackend: BackendAdapter = {
   },
   export: {
     pickPdfExportPath,
+    printWebviewPdf,
     writePdfExport,
   },
   runtime: {
@@ -130,6 +131,14 @@ export const tauriDesktopBackend: BackendAdapter = {
     runWindowAction,
   },
 };
+
+async function printWebviewPdf(
+  path: string,
+  contentWidth: number,
+  contentHeight: number,
+): Promise<import('../common/BackendAdapter').NativePdfExportResult> {
+  return invoke('print_webview_pdf', { path, contentWidth, contentHeight });
+}
 
 async function openExternalUrl(url: string): Promise<void> {
   if (!isExternalUrl(url)) return;

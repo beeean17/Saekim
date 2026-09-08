@@ -621,9 +621,25 @@
   padding: 0;
 }
 
+body.pdf-exporting {
+  margin: 0 !important;
+  background: #fff !important;
+}
+
+body.pdf-exporting .app {
+  display: none !important;
+}
+
+body.pdf-exporting .pdf-export-root {
+  position: static !important;
+  z-index: auto !important;
+  pointer-events: auto !important;
+}
+
 @media print {
-  body.pdf-exporting .app {
-    display: none !important;
+  @page {
+    size: A4 portrait;
+    margin: 18mm 20mm 21mm;
   }
 
   body.pdf-exporting .pdf-export-root {
@@ -635,11 +651,21 @@
     --accent: #5f6bff;
     --accent-soft: #eef0ff;
 
+    position: static !important;
+    z-index: auto !important;
     display: block !important;
+    width: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
     background: white !important;
     color: #111 !important;
     font-family: var(--editor-font-family, var(--font-ui));
     font-size: 11pt;
     line-height: 1.6;
+  }
+
+  body.pdf-exporting .pdf-export-root .pdf-page-spacer {
+    display: none !important;
   }
 }

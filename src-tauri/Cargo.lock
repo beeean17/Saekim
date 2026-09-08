@@ -3300,9 +3300,12 @@ name = "saekim"
 version = "3.5.0"
 dependencies = [
  "base64 0.22.1",
+ "block2",
  "dirs",
  "futures-util",
  "objc2",
+ "objc2-foundation",
+ "objc2-web-kit",
  "regex",
  "reqwest",
  "rusqlite",
@@ -3319,6 +3322,8 @@ dependencies = [
  "tauri-plugin-window-state",
  "trash",
  "url",
+ "webview2-com",
+ "windows 0.61.3",
 ]
 
 [[package]]

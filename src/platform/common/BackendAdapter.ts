@@ -72,7 +72,13 @@ export type SessionSaveScope = 'ui' | 'documents';
 
 export interface ExportBackend {
   pickPdfExportPath(suggestedName: string): Promise<string | null>;
+  printWebviewPdf(path: string, contentWidth: number, contentHeight: number): Promise<NativePdfExportResult>;
   writePdfExport(path: string, pdfData: string): Promise<string>;
+}
+
+export interface NativePdfExportResult {
+  status: 'saved' | 'unsupported';
+  path?: string | null;
 }
 
 export interface RuntimeBackend {
