@@ -8,6 +8,7 @@ import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/worksp
 
 export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTMLTextAreaElement> }) {
   const activeFile = useWorkspaceStore(selectActiveFile);
+  const setEncoding = useWorkspaceStore((state) => state.setEncoding);
   const pdfExportStatus = usePdfExportStore((state) => state.status);
   const dirty = isDirty(activeFile);
   const content = activeFile?.content ?? '';
@@ -24,8 +25,24 @@ export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTM
       <span className="sep" />
       <span className="item">{language}</span>
       <span className="sep" />
-      <span className="item">
-        {activeFile?.encoding ?? 'UTF-8'} · {activeFile?.hasMixedEol ? 'Mixed' : (activeFile?.eol ?? 'LF')}
+      <span className="item statusbar-document-format">
+        <select
+          aria-label="문서 인코딩"
+          className="statusbar-encoding"
+          disabled={!activeFile}
+          title="저장 인코딩 변경"
+          value={activeFile?.encoding ?? 'utf-8'}
+          onChange={(event) => {
+            if (activeFile) setEncoding(activeFile.id, event.currentTarget.value as typeof activeFile.encoding);
+          }}
+        >
+          <option value="utf-8">UTF-8</option>
+          <option value="utf-8-bom">UTF-8 BOM</option>
+          <option value="utf-16le">UTF-16 LE</option>
+          <option value="utf-16be">UTF-16 BE</option>
+        </select>
+        <span aria-hidden="true">·</span>
+        <span>{activeFile?.hasMixedEol ? 'Mixed' : (activeFile?.eol ?? 'LF')}</span>
       </span>
       {pdfStatusText ? (
         <>

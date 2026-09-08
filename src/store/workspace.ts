@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { detectLineEndings, serializeLineEndings } from '../core/document/lineEndings';
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
-import type { FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace } from '../types/workspace';
+import type { FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace, TextEncoding } from '../types/workspace';
+
+const confirmedEncodingChanges = new Set<string>();
 
 interface WorkspaceState {
   rootPath: string | null;
@@ -19,6 +21,7 @@ interface WorkspaceState {
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
   updateContent: (id: string, text: string) => void;
+  setEncoding: (id: string, encoding: TextEncoding) => void;
   saveFile: (id: string) => Promise<string | null>;
   saveActive: () => Promise<void>;
   saveActiveAs: () => Promise<void>;
@@ -97,14 +100,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
   openFileFromPayload: async (opened) => {
-    const file = toOpenFile(opened.path, opened.name, opened.content, opened.displayPath ?? undefined);
+    const file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined);
     set((state) => upsertOpenFile(state, file));
     const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
     if (folderPatch && get().activeFileId === file.id) set((state) => applyFolderPatch(state, folderPatch));
   },
   createFile: async () => {
     try {
-      const savedPath = await Backend.files.saveFileAs('', 'untitled.md');
+      const savedPath = await Backend.files.saveFileAs('', 'untitled.md', 'utf-8');
       if (!savedPath) return;
 
       const file = toOpenFile(savedPath, fileNameFromPath(savedPath), '');
@@ -146,6 +149,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
   closeFile: (id) => {
+    confirmedEncodingChanges.delete(id);
     let nextActivePath: string | null = null;
     set((state) => {
       const closedIndex = state.openFiles.findIndex((file) => file.id === id);
@@ -189,14 +193,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       openFiles: state.openFiles.map((file) => (file.id === id ? { ...file, content: text } : file)),
     })),
+  setEncoding: (id, encoding) => {
+    confirmedEncodingChanges.delete(id);
+    set((state) => ({
+      openFiles: state.openFiles.map((file) => (file.id === id ? { ...file, encoding } : file)),
+    }));
+  },
   saveFile: async (id) => {
     const file = get().openFiles.find((candidate) => candidate.id === id);
     if (!file) return null;
+    if (!confirmEncodingChange(file)) return null;
     const savedPath = await Backend.files.saveFile(
       file.path.startsWith('~') ? null : file.path,
       serializeLineEndings(file.content, file.eol),
+      file.encoding,
     );
     if (!savedPath) return null;
+    confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
@@ -208,6 +221,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               displayPath: savedPath,
               name: savedFile.name,
               savedContent: candidate.content,
+              savedEncoding: candidate.encoding,
               hasMixedEol: false,
             }
           : candidate,
@@ -233,8 +247,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await Backend.files.saveFileAs(serializeLineEndings(file.content, file.eol), file.name);
+    if (!confirmEncodingChange(file)) return;
+    const savedPath = await Backend.files.saveFileAs(
+      serializeLineEndings(file.content, file.eol),
+      file.name,
+      file.encoding,
+    );
     if (!savedPath) return;
+    confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
@@ -246,6 +266,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               displayPath: savedPath,
               name: savedFile.name,
               savedContent: candidate.content,
+              savedEncoding: candidate.encoding,
               hasMixedEol: false,
             }
           : candidate,
@@ -310,7 +331,7 @@ export function selectActiveFile(state: WorkspaceState): OpenFile | null {
 }
 
 export function isDirty(file: OpenFile | null): boolean {
-  return Boolean(file && file.content !== file.savedContent);
+  return Boolean(file && (file.content !== file.savedContent || file.encoding !== file.savedEncoding));
 }
 
 type HistoryDirection = 'back' | 'forward';
@@ -328,7 +349,7 @@ async function navigateHistory(
   if (!file) {
     try {
       const opened = await Backend.files.readFile(targetPath);
-      file = toOpenFile(opened.path, opened.name, opened.content, opened.displayPath ?? undefined);
+      file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined);
     } catch (error) {
       console.error('히스토리 파일 다시 열기 실패:', error);
       return;
@@ -388,7 +409,13 @@ function navigateToHistoryFile(
   };
 }
 
-function toOpenFile(path: string, name: string, content: string, displayPath?: string): OpenFile {
+function toOpenFile(
+  path: string,
+  name: string,
+  content: string,
+  encoding: TextEncoding = 'utf-8',
+  displayPath?: string,
+): OpenFile {
   const lineEndings = detectLineEndings(content);
   return {
     id: path,
@@ -397,7 +424,8 @@ function toOpenFile(path: string, name: string, content: string, displayPath?: s
     name,
     content,
     savedContent: content,
-    encoding: 'UTF-8',
+    encoding,
+    savedEncoding: encoding,
     eol: lineEndings.eol,
     hasMixedEol: lineEndings.mixed,
   };
@@ -550,9 +578,13 @@ function normalizeRestoredWorkspace(workspace: WorkspaceSession): WorkspaceSessi
 
 function normalizeRestoredOpenFile(file: OpenFile): OpenFile {
   const lineEndings = detectLineEndings(file.savedContent ?? file.content);
+  const encoding = normalizeTextEncoding(file.encoding);
+  const savedEncoding = normalizeTextEncoding(file.savedEncoding ?? file.encoding);
   return {
     ...file,
     displayPath: file.displayPath ?? readablePathFromRawPath(file.path, file.name),
+    encoding,
+    savedEncoding,
     eol: file.eol ?? lineEndings.eol,
     hasMixedEol: file.hasMixedEol ?? lineEndings.mixed,
   };
@@ -567,9 +599,45 @@ function isLegacyStarterWorkspace(workspace: WorkspaceSession): boolean {
 }
 
 function confirmDiscardDirtyWorkspace(openFiles: OpenFile[]): boolean {
-  const dirtyFiles = openFiles.filter((file) => file.content !== file.savedContent);
+  const dirtyFiles = openFiles.filter((file) => isDirty(file));
   if (dirtyFiles.length === 0) return true;
   return window.confirm(`${dirtyFiles.length}개 파일의 저장되지 않은 변경사항을 버리고 워크스페이스를 전환할까요?`);
+}
+
+function confirmEncodingChange(file: OpenFile): boolean {
+  if (file.encoding === file.savedEncoding || confirmedEncodingChanges.has(file.id)) return true;
+
+  const confirmed = window.confirm(
+    `${file.name}의 인코딩을 ${encodingLabel(file.savedEncoding)}에서 ${encodingLabel(file.encoding)}(으)로 변경해 저장할까요?`,
+  );
+  if (confirmed) confirmedEncodingChanges.add(file.id);
+  return confirmed;
+}
+
+function normalizeTextEncoding(value: unknown): TextEncoding {
+  switch (typeof value === 'string' ? value.toLowerCase() : value) {
+    case 'utf-8-bom':
+      return 'utf-8-bom';
+    case 'utf-16le':
+      return 'utf-16le';
+    case 'utf-16be':
+      return 'utf-16be';
+    default:
+      return 'utf-8';
+  }
+}
+
+function encodingLabel(encoding: TextEncoding): string {
+  switch (encoding) {
+    case 'utf-8':
+      return 'UTF-8';
+    case 'utf-8-bom':
+      return 'UTF-8 BOM';
+    case 'utf-16le':
+      return 'UTF-16 LE';
+    case 'utf-16be':
+      return 'UTF-16 BE';
+  }
 }
 
 function parentFolderFromFilePath(path: string): string | null {

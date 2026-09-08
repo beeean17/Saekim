@@ -1733,6 +1733,25 @@
   font-size: 11px;
 }
 
+.statusbar-document-format {
+  gap: 4px;
+}
+
+.statusbar-encoding {
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.statusbar-encoding:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .statusbar .item {
   display: inline-flex;
   min-width: 0;

@@ -1,7 +1,27 @@
 use std::{fs, io::Read, path::Path};
 
+use serde::{Deserialize, Serialize};
+
 pub(crate) const MAX_TEXT_FILE_BYTES: u64 = 20 * 1024 * 1024;
 const SNIFF_BYTES: usize = 8192;
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TextEncoding {
+    #[serde(rename = "utf-8")]
+    Utf8,
+    #[serde(rename = "utf-8-bom")]
+    Utf8Bom,
+    #[serde(rename = "utf-16le")]
+    Utf16Le,
+    #[serde(rename = "utf-16be")]
+    Utf16Be,
+}
+
+#[derive(Debug)]
+pub(crate) struct DecodedText {
+    pub(crate) content: String,
+    pub(crate) encoding: TextEncoding,
+}
 
 pub(crate) const TEXT_DIALOG_EXTENSIONS: &[&str] = &[
     "md", "markdown", "mdown", "mkd", "txt", "log", "html", "htm", "json", "yml", "yaml", "toml",
@@ -64,7 +84,7 @@ pub(crate) fn is_known_text_document_path(path: &Path) -> bool {
 }
 
 #[cfg_attr(target_os = "android", allow(dead_code))]
-pub(crate) fn read_text_file(path: &Path) -> Result<String, String> {
+pub(crate) fn read_text_file(path: &Path) -> Result<DecodedText, String> {
     let metadata =
         fs::metadata(path).map_err(|error| format!("failed to read metadata: {error}"))?;
     if !metadata.is_file() {
@@ -111,29 +131,76 @@ fn is_known_binary_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) fn decode_text_bytes(bytes: Vec<u8>) -> Result<String, String> {
+pub(crate) fn decode_text_bytes(bytes: Vec<u8>) -> Result<DecodedText, String> {
     if bytes.is_empty() {
-        return Ok(String::new());
+        return Ok(DecodedText {
+            content: String::new(),
+            encoding: TextEncoding::Utf8,
+        });
     }
 
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        return String::from_utf8(bytes[3..].to_vec())
-            .map_err(|error| format!("file is not valid UTF-8 text: {error}"));
+        let content = String::from_utf8(bytes[3..].to_vec())
+            .map_err(|error| format!("file is not valid UTF-8 text: {error}"))?;
+        return Ok(DecodedText {
+            content,
+            encoding: TextEncoding::Utf8Bom,
+        });
     }
 
     if bytes.starts_with(&[0xFF, 0xFE]) {
-        return decode_utf16(&bytes[2..], true);
+        return decode_utf16(&bytes[2..], true).map(|content| DecodedText {
+            content,
+            encoding: TextEncoding::Utf16Le,
+        });
     }
 
     if bytes.starts_with(&[0xFE, 0xFF]) {
-        return decode_utf16(&bytes[2..], false);
+        return decode_utf16(&bytes[2..], false).map(|content| DecodedText {
+            content,
+            encoding: TextEncoding::Utf16Be,
+        });
     }
 
     if is_binary_like(&bytes) {
         return Err("file appears to be binary".to_string());
     }
 
-    String::from_utf8(bytes).map_err(|error| format!("file is not valid UTF-8 text: {error}"))
+    let content = String::from_utf8(bytes)
+        .map_err(|error| format!("file is not valid UTF-8 text: {error}"))?;
+    Ok(DecodedText {
+        content,
+        encoding: TextEncoding::Utf8,
+    })
+}
+
+pub(crate) fn encode_text_content(content: &str, encoding: TextEncoding) -> Vec<u8> {
+    match encoding {
+        TextEncoding::Utf8 => content.as_bytes().to_vec(),
+        TextEncoding::Utf8Bom => {
+            let mut bytes = Vec::with_capacity(content.len() + 3);
+            bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+            bytes.extend_from_slice(content.as_bytes());
+            bytes
+        }
+        TextEncoding::Utf16Le | TextEncoding::Utf16Be => {
+            let mut bytes = Vec::with_capacity(content.len() * 2 + 2);
+            bytes.extend_from_slice(if encoding == TextEncoding::Utf16Le {
+                &[0xFF, 0xFE]
+            } else {
+                &[0xFE, 0xFF]
+            });
+            for unit in content.encode_utf16() {
+                let encoded = if encoding == TextEncoding::Utf16Le {
+                    unit.to_le_bytes()
+                } else {
+                    unit.to_be_bytes()
+                };
+                bytes.extend_from_slice(&encoded);
+            }
+            bytes
+        }
+    }
 }
 
 fn decode_utf16(bytes: &[u8], little_endian: bool) -> Result<String, String> {
@@ -187,8 +254,24 @@ mod tests {
 
     #[test]
     fn decodes_utf8_bom() {
-        let content = decode_text_bytes(vec![0xEF, 0xBB, 0xBF, b'h', b'i']).unwrap();
-        assert_eq!(content, "hi");
+        let decoded = decode_text_bytes(vec![0xEF, 0xBB, 0xBF, b'h', b'i']).unwrap();
+        assert_eq!(decoded.content, "hi");
+        assert_eq!(decoded.encoding, TextEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn round_trips_supported_text_encodings() {
+        let content = "hello 한글 👋";
+        for encoding in [
+            TextEncoding::Utf8,
+            TextEncoding::Utf8Bom,
+            TextEncoding::Utf16Le,
+            TextEncoding::Utf16Be,
+        ] {
+            let decoded = decode_text_bytes(encode_text_content(content, encoding)).unwrap();
+            assert_eq!(decoded.content, content);
+            assert_eq!(decoded.encoding, encoding);
+        }
     }
 
     #[test]

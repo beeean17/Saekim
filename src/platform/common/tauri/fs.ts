@@ -1,6 +1,6 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
 import type { ImagePickPayload } from '../BackendAdapter';
-import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload, TextEncoding } from '../../../types/workspace';
 
 export async function openFileDialog(): Promise<OpenFilePayload | null> {
   if (!isTauriRuntime()) return null;
@@ -55,18 +55,18 @@ export async function readFolderChildren(path: string): Promise<FileTreeNode[]> 
   return invokeCommand<FileTreeNode[]>('read_folder_children', { path });
 }
 
-export async function saveFile(path: string | null, content: string): Promise<string | null> {
+export async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {
   if (!isTauriRuntime()) {
     return path;
   }
-  return invokeCommand<string | null>('save_file', { path, content });
+  return invokeCommand<string | null>('save_file', { path, content, encoding });
 }
 
-export async function saveFileAs(content: string, suggestedName: string): Promise<string | null> {
+export async function saveFileAs(content: string, suggestedName: string, encoding: TextEncoding): Promise<string | null> {
   if (!isTauriRuntime()) {
     return null;
   }
-  return invokeCommand<string | null>('save_file_as', { content, suggestedName });
+  return invokeCommand<string | null>('save_file_as', { content, suggestedName, encoding });
 }
 
 export async function pickPdfExportPath(suggestedName: string): Promise<string | null> {

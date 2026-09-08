@@ -3,6 +3,7 @@ export type ResolvedThemeName = Exclude<ThemeName, 'system'>;
 export type SidebarMode = 'expanded' | 'collapsed';
 export type ViewMode = 'edit' | 'split' | 'preview';
 export type FileTreeNodeType = 'folder' | 'file';
+export type TextEncoding = 'utf-8' | 'utf-8-bom' | 'utf-16le' | 'utf-16be';
 
 export interface FileTreeNode {
   id: string;
@@ -22,7 +23,8 @@ export interface OpenFile {
   name: string;
   content: string;
   savedContent: string;
-  encoding: string;
+  encoding: TextEncoding;
+  savedEncoding: TextEncoding;
   eol: 'LF' | 'CRLF';
   hasMixedEol?: boolean;
 }
@@ -45,6 +47,7 @@ export interface OpenFilePayload {
   path: string;
   name: string;
   content: string;
+  encoding: TextEncoding;
   displayPath?: string | null;
 }
 

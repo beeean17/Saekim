@@ -142,7 +142,9 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | `FE FF` | UTF-16 BE 디코딩 |
 | 없음 | UTF-8 디코딩 |
 
-> 저장은 항상 BOM 없는 UTF-8입니다. 원본 인코딩은 왕복되지 않습니다.
+감지한 인코딩(`utf-8`, `utf-8-bom`, `utf-16le`, `utf-16be`)은 열린 문서에 보관되어
+저장할 때 그대로 사용됩니다. 상태바의 인코딩 선택 메뉴로 형식을 바꿀 수 있으며,
+원본과 다른 인코딩으로 처음 저장할 때 확인을 거칩니다.
 
 ### 3.4 워크스페이스 트리
 

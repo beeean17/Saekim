@@ -1,6 +1,6 @@
 import type { BlockLayout } from '../../types/metadata';
 import type { WorkspaceSession } from '../../types/session';
-import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload, TextEncoding } from '../../types/workspace';
 
 export interface BackendAdapter {
   files: FileBackend;
@@ -15,8 +15,8 @@ export interface FileBackend {
   openFileDialog(): Promise<OpenFilePayload | null>;
   importPdf(path: string): Promise<OpenFilePayload>;
   readFile(path: string): Promise<OpenFilePayload>;
-  saveFile(path: string | null, content: string): Promise<string | null>;
-  saveFileAs(content: string, suggestedName: string): Promise<string | null>;
+  saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null>;
+  saveFileAs(content: string, suggestedName: string, encoding: TextEncoding): Promise<string | null>;
 }
 
 export interface FolderBackend {

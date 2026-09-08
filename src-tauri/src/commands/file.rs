@@ -17,7 +17,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{app_state::AppState, core::text_file::TEXT_DIALOG_EXTENSIONS};
+use crate::{
+    app_state::AppState,
+    core::text_file::{encode_text_content, TextEncoding, TEXT_DIALOG_EXTENSIONS},
+};
 
 #[cfg(not(target_os = "android"))]
 use crate::core::text_file::is_known_text_document_path;
@@ -44,6 +47,7 @@ pub struct OpenFilePayload {
     path: String,
     name: String,
     content: String,
+    encoding: TextEncoding,
     display_path: Option<String>,
 }
 
@@ -332,6 +336,7 @@ pub async fn save_file(
     app: AppHandle,
     path: Option<String>,
     content: String,
+    encoding: TextEncoding,
 ) -> CommandResult<Option<String>> {
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let target_path = match path {
@@ -348,7 +353,7 @@ pub async fn save_file(
             return Ok(None);
         };
 
-        write_selected_file(&app, &target_path, content)?;
+        write_selected_file(&app, &target_path, content, encoding)?;
         Ok(Some(target_path.to_string()))
     })
     .await;
@@ -366,6 +371,7 @@ pub async fn save_file_as(
     app: AppHandle,
     content: String,
     suggested_name: String,
+    encoding: TextEncoding,
 ) -> CommandResult<Option<String>> {
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let selected = app
@@ -379,7 +385,7 @@ pub async fn save_file_as(
             return Ok(None);
         };
 
-        write_selected_file(&app, &path, content)?;
+        write_selected_file(&app, &path, content, encoding)?;
         Ok(Some(path.to_string()))
     })
     .await;
@@ -475,7 +481,7 @@ pub fn write_pdf_export(path: String, pdf_data: String) -> CommandResult<String>
 #[cfg(not(target_os = "android"))]
 fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
     let path = PathBuf::from(path);
-    let content = read_text_file(&path)?;
+    let decoded = read_text_file(&path)?;
     let name = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -485,7 +491,8 @@ fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, 
     Ok(OpenFilePayload {
         path: path.to_string_lossy().to_string(),
         name,
-        content,
+        content: decoded.content,
+        encoding: decoded.encoding,
         display_path: None,
     })
 }
@@ -517,12 +524,13 @@ fn read_android_content_file_payload(
         ));
     }
 
-    let content = decode_text_bytes(document.bytes)?;
+    let decoded = decode_text_bytes(document.bytes)?;
     Ok(OpenFilePayload {
         path,
         display_path: selected_display_path(&selected_path, &name),
         name,
-        content,
+        content: decoded.content,
+        encoding: decoded.encoding,
     })
 }
 
@@ -618,13 +626,14 @@ fn read_selected_file_payload(app: &AppHandle, path: FilePath) -> Result<OpenFil
         ));
     }
 
-    let content = decode_text_bytes(bytes)?;
+    let decoded = decode_text_bytes(bytes)?;
     let name = selected_file_name(app, &path);
     Ok(OpenFilePayload {
         path: path.to_string(),
         display_path: selected_display_path(&path, &name),
         name,
-        content,
+        content: decoded.content,
+        encoding: decoded.encoding,
     })
 }
 
@@ -744,7 +753,10 @@ fn write_selected_file(
     _app: &AppHandle,
     path: &tauri_plugin_dialog::FilePath,
     content: String,
+    encoding: TextEncoding,
 ) -> Result<(), String> {
+    let bytes = encode_text_content(&content, encoding);
+
     #[cfg(target_os = "android")]
     {
         let mut options = FsOpenOptions::new();
@@ -753,7 +765,7 @@ fn write_selected_file(
             .fs()
             .open(path.clone(), options)
             .map_err(|error| format!("failed to save file: {error}"))?;
-        file.write_all(content.as_bytes())
+        file.write_all(&bytes)
             .map_err(|error| format!("failed to save file: {error}"))?;
         return Ok(());
     }
@@ -761,7 +773,7 @@ fn write_selected_file(
     #[cfg(not(target_os = "android"))]
     {
         let path = path.clone().into_path().unwrap_or_default();
-        write_file_atomically(&path, content.as_bytes())
+        write_file_atomically(&path, &bytes)
     }
 }
 

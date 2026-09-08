@@ -1,6 +1,6 @@
 import type { BackendAdapter, CloseDecision, ImagePickPayload } from '../common/BackendAdapter';
 import type { BlockLayout } from '../../types/metadata';
-import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
+import type { FileTreeNode, FolderPayload, OpenFilePayload, TextEncoding } from '../../types/workspace';
 
 const sessionKey = 'saekim-browser-session';
 const blockLayoutPrefix = 'saekim-block-layouts:';
@@ -116,6 +116,7 @@ async function readFile(path: string): Promise<OpenFilePayload> {
     path,
     name: path.split('/').pop() || 'untitled.md',
     content,
+    encoding: 'utf-8',
   };
 }
 
@@ -130,13 +131,13 @@ async function readFolderChildren(_path: string): Promise<FileTreeNode[]> {
   return [];
 }
 
-async function saveFile(path: string | null, content: string): Promise<string | null> {
-  if (!path) return saveFileAs(content, 'untitled.md');
+async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {
+  if (!path) return saveFileAs(content, 'untitled.md', encoding);
   localStorage.setItem(`saekim-file:${path}`, content);
   return path;
 }
 
-async function saveFileAs(content: string, suggestedName: string): Promise<string | null> {
+async function saveFileAs(content: string, suggestedName: string, _encoding: TextEncoding): Promise<string | null> {
   const path = `browser://${suggestedName || 'untitled.md'}`;
   localStorage.setItem(`saekim-file:${path}`, content);
   return path;
