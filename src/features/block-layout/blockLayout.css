@@ -219,7 +219,6 @@
 .preview-layout-drag-handle:hover,
 .preview-layout-drag-handle:focus-visible {
   background: var(--accent-soft);
-  outline: none;
 }
 
 .preview-layout-block[data-dragging="true"] {
@@ -267,5 +266,4 @@
 
 .preview-image-resize-handle:focus-visible {
   opacity: 1;
-  outline: none;
 }

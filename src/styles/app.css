@@ -1731,7 +1731,6 @@
   line-height: var(--editor-row-height);
   box-sizing: border-box;
   border: 0;
-  outline: none;
   resize: none;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
