@@ -106,17 +106,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (folderPatch && get().activeFileId === file.id) set((state) => applyFolderPatch(state, folderPatch));
   },
   createFile: async () => {
-    try {
-      const savedPath = await Backend.files.saveFileAs('', 'untitled.md', 'utf-8');
-      if (!savedPath) return;
-
-      const file = toOpenFile(savedPath, fileNameFromPath(savedPath), '');
-      set((state) => upsertOpenFile(state, file));
-      const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
-      if (folderPatch) set((state) => applyFolderPatch(state, folderPatch));
-    } catch (error) {
-      console.error('새 파일 생성 실패:', error);
-    }
+    const untitledNumber = nextUntitledNumber(get().openFiles);
+    const file = toOpenFile(`~untitled-${untitledNumber}`, `untitled-${untitledNumber}.md`, '');
+    set((state) => upsertOpenFile(state, file));
   },
   toggleFolder: async (path) => {
     const node = findTreeNode(get().tree, path);
@@ -228,8 +220,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ),
       activeFileId: current.activeFileId === file.id ? savedPath : current.activeFileId,
       history: {
-        ...current.history,
-        current: current.history.current === file.path ? savedPath : current.history.current,
+        ...replaceHistoryPath(current.history, file.path, savedPath),
       },
     }));
     const folderPatch = await workspaceFolderPatchForOpenFile(
@@ -273,8 +264,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ),
       activeFileId: savedPath,
       history: {
-        ...current.history,
-        current: savedPath,
+        ...replaceHistoryPath(current.history, file.path, savedPath),
       },
     }));
     const folderPatch = await workspaceFolderPatchForOpenFile(
@@ -461,6 +451,31 @@ function toRecentWorkspace(path: string, openedAt = Date.now()): RecentWorkspace
 
 function fileNameFromPath(path: string): string {
   return path.split('/').pop() || 'untitled.md';
+}
+
+function nextUntitledNumber(openFiles: readonly OpenFile[]): number {
+  const used = new Set(
+    openFiles.flatMap((file) => {
+      const match = /^~untitled-(\d+)$/.exec(file.path);
+      return match ? [Number(match[1])] : [];
+    }),
+  );
+  let candidate = 1;
+  while (used.has(candidate)) candidate += 1;
+  return candidate;
+}
+
+function replaceHistoryPath(
+  history: WorkspaceState['history'],
+  previousPath: string,
+  nextPath: string,
+): WorkspaceState['history'] {
+  const replace = (path: string) => (path === previousPath ? nextPath : path);
+  return {
+    back: history.back.map(replace),
+    forward: history.forward.map(replace),
+    current: history.current ? replace(history.current) : null,
+  };
 }
 
 async function workspaceFolderPatchForFile(path: string): Promise<Pick<WorkspaceState, 'rootPath' | 'tree'> | null> {
