@@ -871,6 +871,39 @@
   box-shadow: var(--shadow-lg);
 }
 
+.sidebar-panel-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 12px 8px;
+  padding: 2px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+}
+
+.sidebar-panel-tabs button {
+  flex: 1;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 8px;
+  overflow: hidden;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-panel-tabs button:hover {
+  color: var(--text-primary);
+}
+
+.sidebar-panel-tabs button[aria-selected="true"] {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
 .sidebar-folder-path {
   position: relative;
   display: flex;
@@ -1264,12 +1297,21 @@
 .app[data-sidebar="collapsed"] .sidebar-search,
 .app[data-sidebar="collapsed"] .sidebar-folder-path,
 .app[data-sidebar="collapsed"] .file-tree,
+.app[data-sidebar="collapsed"] .sidebar-panel-tabs,
+.app[data-sidebar="collapsed"] .outline-panel,
+.app[data-sidebar="collapsed"] .outline-empty,
 .app[data-sidebar-resize-preview="collapsed"] .sidebar-search,
 .app[data-sidebar-resize-preview="collapsed"] .sidebar-folder-path,
 .app[data-sidebar-resize-preview="collapsed"] .file-tree,
+.app[data-sidebar-resize-preview="collapsed"] .sidebar-panel-tabs,
+.app[data-sidebar-resize-preview="collapsed"] .outline-panel,
+.app[data-sidebar-resize-preview="collapsed"] .outline-empty,
 .app[data-viewport-profile="compact"] .sidebar-search,
 .app[data-viewport-profile="compact"] .sidebar-folder-path,
-.app[data-viewport-profile="compact"] .file-tree {
+.app[data-viewport-profile="compact"] .file-tree,
+.app[data-viewport-profile="compact"] .sidebar-panel-tabs,
+.app[data-viewport-profile="compact"] .outline-panel,
+.app[data-viewport-profile="compact"] .outline-empty {
   display: none;
 }
 
@@ -1282,6 +1324,10 @@
 }
 
 .app[data-sidebar-resize-preview="expanded"] .sidebar-search {
+  display: flex;
+}
+
+.app[data-sidebar-resize-preview="expanded"] .sidebar-panel-tabs {
   display: flex;
 }
 

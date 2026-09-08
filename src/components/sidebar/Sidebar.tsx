@@ -1,6 +1,8 @@
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
+import { enabledFeatures } from '../../app/featureRegistry';
 import { relativeTime } from '../../core/format/relativeTime';
+import { selectSidebarContributions } from '../../core/sidebar/registry';
 import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
@@ -17,6 +19,8 @@ import { TreeContextMenu, type TreeMenuPosition } from './TreeContextMenu';
 
 interface SidebarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
+  editorScrollRef: RefObject<HTMLDivElement>;
+  previewRef: RefObject<HTMLDivElement>;
   menuHandlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
   effectiveViewMode: ViewMode;
@@ -25,6 +29,8 @@ interface SidebarProps {
 
 export function Sidebar({
   textareaRef,
+  editorScrollRef,
+  previewRef,
   menuHandlers,
   commandRegistry,
   effectiveViewMode,
@@ -42,6 +48,8 @@ export function Sidebar({
   const removeWorkspaceEntry = useWorkspaceStore((state) => state.removeWorkspaceEntry);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const fileOperationsAvailable = currentPlatformCapabilities().has('folder.operations');
+  const sidebarContributions = useMemo(() => selectSidebarContributions(enabledFeatures), []);
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState('explorer');
   const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [workspaceSearchResults, setWorkspaceSearchResults] = useState<WorkspaceSearchItem[] | null>(null);
@@ -190,49 +198,74 @@ export function Sidebar({
           availableViewModes={availableViewModes}
         />
       </div>
-      <FolderPath
-        canCreateFolder={fileOperationsAvailable && Boolean(rootPath)}
-        path={rootPath}
-        onCreateFolder={() => rootPath && void createFolder(rootPath)}
-        onSearch={() => setWorkspaceSearchOpen((open) => !open)}
-        onRefresh={() => void refresh()}
+      <SidebarPanelTabs
+        activeId={activeSidebarPanel}
+        contributions={sidebarContributions}
+        onSelect={(id) => {
+          setTreeMenu(null);
+          setActiveSidebarPanel(id);
+        }}
       />
-      {workspaceSearchOpen ? (
-        <SearchField
-          autoFocus
-          className="sidebar-search"
-          value={workspaceSearchQuery}
-          placeholder="워크스페이스에서 찾기"
-          onChange={setWorkspaceSearchQuery}
-          onEscape={closeSearch}
-        />
-      ) : null}
-      <div className="file-tree">
-        {searchNeedle ? (
-          <WorkspaceSearchResults
-            activePath={activeFile?.path ?? null}
-            error={workspaceSearchError}
-            items={workspaceSearchResults}
-            openFiles={openFiles}
-            onOpen={(path) => void openFile(path)}
-            onPreviewImage={(item) => setImagePreview({ path: item.path, name: item.name })}
+      {activeSidebarPanel === 'explorer' ? (
+        <>
+          <FolderPath
+            canCreateFolder={fileOperationsAvailable && Boolean(rootPath)}
+            path={rootPath}
+            onCreateFolder={() => rootPath && void createFolder(rootPath)}
+            onSearch={() => setWorkspaceSearchOpen((open) => !open)}
+            onRefresh={() => void refresh()}
           />
-        ) : (
-          tree.map((node) => (
-            <FileTreeNodeView
-              activePath={activeFile?.path ?? null}
-              key={node.id}
-              node={node}
-              openFiles={openFiles}
-              onToggle={toggleFolder}
-              onOpen={(path) => void openFile(path)}
-              onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
-              onContextMenu={fileOperationsAvailable ? (node, position) => setTreeMenu({ node, position }) : undefined}
+          {workspaceSearchOpen ? (
+            <SearchField
+              autoFocus
+              className="sidebar-search"
+              value={workspaceSearchQuery}
+              placeholder="워크스페이스에서 찾기"
+              onChange={setWorkspaceSearchQuery}
+              onEscape={closeSearch}
             />
-          ))
-        )}
-      </div>
-      {treeMenu ? (
+          ) : null}
+          <div className="file-tree">
+            {searchNeedle ? (
+              <WorkspaceSearchResults
+                activePath={activeFile?.path ?? null}
+                error={workspaceSearchError}
+                items={workspaceSearchResults}
+                openFiles={openFiles}
+                onOpen={(path) => void openFile(path)}
+                onPreviewImage={(item) => setImagePreview({ path: item.path, name: item.name })}
+              />
+            ) : (
+              tree.map((node) => (
+                <FileTreeNodeView
+                  activePath={activeFile?.path ?? null}
+                  key={node.id}
+                  node={node}
+                  openFiles={openFiles}
+                  onToggle={toggleFolder}
+                  onOpen={(path) => void openFile(path)}
+                  onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
+                  onContextMenu={fileOperationsAvailable ? (node, position) => setTreeMenu({ node, position }) : undefined}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
+      {sidebarContributions.map((contribution) => {
+        if (contribution.id !== activeSidebarPanel) return null;
+        const Panel = contribution.component;
+        return (
+          <Panel
+            activeFile={activeFile}
+            editorScrollRef={editorScrollRef}
+            key={contribution.id}
+            previewRef={previewRef}
+            textareaRef={textareaRef}
+          />
+        );
+      })}
+      {treeMenu && activeSidebarPanel === 'explorer' ? (
         <TreeContextMenu
           node={treeMenu.node}
           position={treeMenu.position}
@@ -252,6 +285,35 @@ export function Sidebar({
         />
       ) : null}
     </aside>
+  );
+}
+
+function SidebarPanelTabs({
+  activeId,
+  contributions,
+  onSelect,
+}: {
+  activeId: string;
+  contributions: ReturnType<typeof selectSidebarContributions>;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="sidebar-panel-tabs" role="tablist" aria-label="사이드바 패널">
+      <button aria-selected={activeId === 'explorer'} role="tab" type="button" onClick={() => onSelect('explorer')}>
+        탐색기
+      </button>
+      {contributions.map((contribution) => (
+        <button
+          aria-selected={activeId === contribution.id}
+          key={contribution.id}
+          role="tab"
+          type="button"
+          onClick={() => onSelect(contribution.id)}
+        >
+          {contribution.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

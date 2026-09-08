@@ -108,6 +108,8 @@ export function App() {
       <main className="body" ref={bodyRef}>
         <Sidebar
           textareaRef={editorRef}
+          editorScrollRef={editorScrollRef}
+          previewRef={previewRef}
           menuHandlers={shortcuts}
           commandRegistry={commandRegistry}
           effectiveViewMode={effectiveViewMode}

@@ -54,7 +54,7 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 
 ## 2. 기능 레지스트리
 
-`src/app/featureRegistry.ts`가 12개 기능을 선언하고, 앱 시작 시 capability와
+`src/app/featureRegistry.ts`가 13개 기능을 선언하고, 앱 시작 시 capability와
 의존성을 검사해 활성 목록을 결정합니다.
 
 | 기능 ID | 의존 | 필요 capability | 기여 항목 |
@@ -71,6 +71,7 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 | `pdf-export` | - | `pdf.save` | commands, pdf |
 | `search` | - | - | editor, commands |
 | `tabs` | `file-workspace` | - | editor, commands |
+| `outline` | `markdown` | - | sidebar |
 
 ### 선택 알고리즘
 
@@ -88,6 +89,7 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 - **`fileTypes`** — 확장자, 라벨, 언어, `previewKind` 매핑
 - **`editor`** — 상단 바, 툴바 항목, 오버레이 컴포넌트, 헬퍼 모달,
   이벤트 핸들러, 이미지 액션
+- **`sidebar`** — 사이드바 패널 탭과 패널 컴포넌트
 - **`commands`** — id, 기본 단축키, 메뉴 배치, 실행 함수
 - **`metadata`** — 블록 레이아웃 읽기/쓰기
 - **`pdf`** — 현재 문서 내보내기
@@ -268,6 +270,15 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 
 Markdown 카탈로그의 이미지 항목에서는 원본 경로 링크 삽입과
 `.assets` 복사 삽입을 바로 실행할 수 있습니다.
+
+### 4.5 문서 아웃라인
+
+- 사이드바의 탐색기/아웃라인 탭은 `sidebar` 기능 기여 레지스트리에서 구성
+- MarkdownIt이 렌더링에 사용하는 토큰의 source map으로 ATX·Setext 제목의 레벨과 행을 추출
+- 현재 커서가 속한 가장 가까운 제목을 표시하고 H1~H6 계층만큼 들여쓰기
+- 제목을 선택하면 해당 소스 행을 편집기에서 선택·스크롤하고, 미리보기의 같은
+  `data-source-line` 제목으로 이동
+- 편집기 이동은 `useScrollSync`와 같은 줄 높이 측정 인프라를 재사용
 
 ---
 

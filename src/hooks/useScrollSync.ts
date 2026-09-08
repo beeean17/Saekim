@@ -35,6 +35,18 @@ const BOTTOM_THRESHOLD_PX = 48;
 const ANCHOR_OFFSET_PX = 8;
 const INPUT_AUTOSCROLL_THRESHOLD_PX = 160;
 
+export function scrollEditorToSourceLine(
+  editor: HTMLTextAreaElement,
+  editorScroller: HTMLElement,
+  line: number,
+): void {
+  const metrics = measureEditorLineMetrics(editor, editor.value, window.getComputedStyle(editor));
+  editorScroller.scrollTo({
+    top: Math.max(0, getEditorTopForLine(editor, line, metrics) - ANCHOR_OFFSET_PX),
+    behavior: 'smooth',
+  });
+}
+
 export function useScrollSync(
   editorRef: RefObject<HTMLTextAreaElement>,
   editorScrollRef: RefObject<HTMLElement>,

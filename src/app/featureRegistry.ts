@@ -4,6 +4,7 @@ import { imageAssetsEditorContribution } from '../features/image-assets';
 import { katexEditorContribution } from '../features/katex';
 import { markdownEditorContribution, markdownPreviewContribution } from '../features/markdown';
 import { mermaidEditorContribution, mermaidPreviewEnhancement } from '../features/mermaid';
+import { outlineSidebarContribution } from '../features/outline';
 import { blockLayoutMetadataContribution, blockLayoutPreviewEnhancement } from '../features/block-layout';
 import { pdfExportCommands, pdfExportContribution } from '../features/pdf-export';
 import { searchCommands, searchEditorContribution } from '../features/search';
@@ -90,6 +91,7 @@ const featureCatalog: SaekimFeature[] = [
   },
   { id: 'search', label: 'Search', editor: searchEditorContribution, commands: searchCommands },
   { id: 'tabs', label: 'Document Tabs', dependsOn: ['file-workspace'], editor: tabsEditorContribution, commands: tabCommands },
+  { id: 'outline', label: 'Document Outline', dependsOn: ['markdown'], sidebar: outlineSidebarContribution },
 ];
 
 export const enabledFeatures = selectSupportedFeatures(featureCatalog, currentPlatformCapabilities());

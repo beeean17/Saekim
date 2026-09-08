@@ -178,6 +178,31 @@ export interface RenderMarkdownOptions {
   resolveImageSrc?: (path: string) => Promise<string | null>;
 }
 
+export interface MarkdownOutlineItem {
+  level: number;
+  line: number;
+  endLine: number;
+  text: string;
+}
+
+export function getMarkdownOutline(text: string): MarkdownOutlineItem[] {
+  ensureMarkdownPluginsApplied();
+  const footnoteDocument = extractFootnotes(normalizeMarkdownInput(text));
+  const tokens = md.parse(footnoteDocument.text, {});
+  return tokens.flatMap((token, index) => {
+    if (token.type !== 'heading_open' || !token.map) return [];
+    const level = Number(token.tag.slice(1));
+    const inline = tokens[index + 1];
+    const title = inline?.type === 'inline' ? inlineTokenText(inline).trim() : '';
+    return [{
+      level,
+      line: token.map[0] + 1,
+      endLine: token.map[1],
+      text: title || `제목 ${token.map[0] + 1}`,
+    }];
+  });
+}
+
 export async function renderMarkdown(
   text: string,
   themeOrOptions: 'light' | 'dark' | RenderMarkdownOptions = 'light',
@@ -201,6 +226,14 @@ function ensureMarkdownPluginsApplied(): void {
   getMarkdownItPlugins().forEach((plugin) => plugin.apply(md));
   installMathRendererRules();
   markdownPluginsApplied = true;
+}
+
+function inlineTokenText(token: Token): string {
+  return (token.children ?? []).map((child) => {
+    if (child.type === 'text' || child.type === 'code_inline' || child.type === 'image') return child.content;
+    if (child.type === 'softbreak' || child.type === 'hardbreak') return ' ';
+    return child.children ? inlineTokenText(child) : '';
+  }).join('');
 }
 
 async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<string> {

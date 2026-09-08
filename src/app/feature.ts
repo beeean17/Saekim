@@ -15,6 +15,7 @@ export interface SaekimFeature {
   preview?: PreviewContribution | PreviewContribution[];
   fileTypes?: FileTypeContribution | FileTypeContribution[];
   editor?: EditorContribution | EditorContribution[];
+  sidebar?: SidebarContribution | SidebarContribution[];
   commands?: CommandContributionFactory;
   metadata?: MetadataContribution | MetadataContribution[];
   pdf?: PdfContribution | PdfContribution[];
@@ -55,6 +56,19 @@ export interface EditorContribution {
   helpers?: EditorHelperContribution[];
   handlers?: EditorEventHandlers;
   imageActions?: EditorImageActions;
+}
+
+export interface SidebarContribution {
+  id: string;
+  label: string;
+  component: ComponentType<SidebarPanelProps>;
+}
+
+export interface SidebarPanelProps {
+  activeFile: OpenFile | null;
+  textareaRef: RefObject<HTMLTextAreaElement>;
+  editorScrollRef: RefObject<HTMLDivElement>;
+  previewRef: RefObject<HTMLDivElement>;
 }
 
 export interface EditorTopBarContribution {
