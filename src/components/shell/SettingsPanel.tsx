@@ -7,6 +7,7 @@ import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { PanelHeader } from '../ui/surface/PanelHeader';
 
 const themes: Array<{ id: ThemeName; label: string }> = [
+  { id: 'system', label: '시스템' },
   { id: 'default', label: 'Light' },
   { id: 'dark', label: 'Dark' },
   { id: 'nord', label: 'Nord' },

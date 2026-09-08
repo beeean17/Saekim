@@ -26,7 +26,7 @@ export function PreviewContent({ previewRef, onPreviewElementChange }: PreviewCo
   const frameCleanupRef = useRef<(() => void) | null>(null);
   const previousRenderContextKeyRef = useRef<string | null>(null);
   const activeFile = useWorkspaceStore(selectActiveFile);
-  const theme = useSettingsStore((state) => state.theme);
+  const theme = useSettingsStore((state) => state.resolvedTheme);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const setHtmlPreviewMode = useSettingsStore((state) => state.setHtmlPreviewMode);
   const previewInteractionMode = useUIStore((state) => state.previewInteractionMode);

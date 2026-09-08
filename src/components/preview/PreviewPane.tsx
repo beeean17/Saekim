@@ -20,7 +20,7 @@ export function PreviewPane({ previewRef, onPreviewElementChange }: PreviewPaneP
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
   const activeFile = useWorkspaceStore(selectActiveFile);
-  const theme = useSettingsStore((state) => state.theme);
+  const theme = useSettingsStore((state) => state.resolvedTheme);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
   const setHtmlPreviewMode = useSettingsStore((state) => state.setHtmlPreviewMode);
   const fileType = getFileTypeInfo(activeFile?.name, activeFile?.path, enabledFeatures);

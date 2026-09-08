@@ -1,4 +1,5 @@
-export type ThemeName = 'default' | 'dark' | 'nord';
+export type ThemeName = 'system' | 'default' | 'dark' | 'nord';
+export type ResolvedThemeName = Exclude<ThemeName, 'system'>;
 export type SidebarMode = 'expanded' | 'collapsed';
 export type ViewMode = 'edit' | 'split' | 'preview';
 export type FileTreeNodeType = 'folder' | 'file';

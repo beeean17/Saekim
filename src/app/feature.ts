@@ -5,7 +5,7 @@ import type { PlatformCapability } from '../platform/common/capabilities';
 import type { PreviewRenderScene } from '../core/preview/renderScene';
 import type { BlockLayout } from '../types/metadata';
 import type { HtmlPreviewMode } from '../types/session';
-import type { ThemeName, OpenFile } from '../types/workspace';
+import type { OpenFile, ResolvedThemeName } from '../types/workspace';
 
 export interface SaekimFeature {
   id: string;
@@ -42,7 +42,7 @@ export interface PreviewMatchContext {
 }
 
 export interface PreviewRenderContext extends PreviewMatchContext {
-  theme: ThemeName;
+  theme: ResolvedThemeName;
   htmlPreviewMode: HtmlPreviewMode;
   setHtmlPreviewMode(value: HtmlPreviewMode): void;
   signal?: AbortSignal;

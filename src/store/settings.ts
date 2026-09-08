@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { HtmlPreviewMode, SettingsSession } from '../types/session';
-import type { ThemeName } from '../types/workspace';
+import type { ResolvedThemeName, ThemeName } from '../types/workspace';
 
 export const fontSizeOptions = [
   { id: 'small', label: '작게', value: 12 },
@@ -13,6 +14,7 @@ const defaultEditorFontFamily = 'Pretendard Variable';
 
 interface SettingsState {
   theme: ThemeName;
+  resolvedTheme: ResolvedThemeName;
   fontSize: number;
   editorFontFamily: string;
   htmlPreviewMode: HtmlPreviewMode;
@@ -21,6 +23,23 @@ interface SettingsState {
   setEditorFontFamily: (editorFontFamily: string) => void;
   setHtmlPreviewMode: (htmlPreviewMode: HtmlPreviewMode) => void;
   restoreSettings: (settings: SettingsSession) => void;
+}
+
+const systemThemeQuery = typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+  ? null
+  : window.matchMedia('(prefers-color-scheme: dark)');
+
+function resolveTheme(theme: ThemeName): ResolvedThemeName {
+  if (theme !== 'system') return theme;
+  return systemThemeQuery?.matches ? 'dark' : 'default';
+}
+
+function applyTheme(theme: ThemeName): ResolvedThemeName {
+  const resolvedTheme = resolveTheme(theme);
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+  }
+  return resolvedTheme;
 }
 
 function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
@@ -43,15 +62,17 @@ export function normalizeFontSize(fontSize: number): number {
 }
 
 applyEditorSettings(defaultFontSize, defaultEditorFontFamily);
+const defaultTheme: ThemeName = 'system';
+const defaultResolvedTheme = applyTheme(defaultTheme);
 
 export const useSettingsStore = create<SettingsState>()((set) => ({
-  theme: 'default',
+  theme: defaultTheme,
+  resolvedTheme: defaultResolvedTheme,
   fontSize: defaultFontSize,
   editorFontFamily: defaultEditorFontFamily,
   htmlPreviewMode: 'browser',
   setTheme: (theme) => {
-    document.documentElement.setAttribute('data-theme', theme);
-    set({ theme });
+    set({ theme, resolvedTheme: applyTheme(theme) });
   },
   setFontSize: (fontSize) => {
     const normalizedFontSize = normalizeFontSize(fontSize);
@@ -68,9 +89,25 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   },
   setHtmlPreviewMode: (htmlPreviewMode) => set({ htmlPreviewMode }),
   restoreSettings: (settings) => {
-    document.documentElement.setAttribute('data-theme', settings.theme);
+    const resolvedTheme = applyTheme(settings.theme);
     const fontSize = normalizeFontSize(settings.fontSize);
     applyEditorSettings(fontSize, settings.editorFontFamily);
-    set({ ...settings, fontSize, htmlPreviewMode: settings.htmlPreviewMode ?? 'browser' });
+    set({ ...settings, resolvedTheme, fontSize, htmlPreviewMode: settings.htmlPreviewMode ?? 'browser' });
   },
 }));
+
+export function useSystemTheme(): void {
+  const theme = useSettingsStore((state) => state.theme);
+
+  useEffect(() => {
+    if (theme !== 'system' || !systemThemeQuery) return;
+
+    const handleChange = () => {
+      useSettingsStore.setState({ resolvedTheme: applyTheme('system') });
+    };
+
+    handleChange();
+    systemThemeQuery.addEventListener('change', handleChange);
+    return () => systemThemeQuery.removeEventListener('change', handleChange);
+  }, [theme]);
+}

@@ -3,7 +3,7 @@ import type { CommandRegistry } from '../../app/commands';
 import type { ViewportProfileSnapshot } from '../../hooks/useViewportProfile';
 import { Backend } from '../../platform/common/backend';
 import { Platform } from '../../platform/common/platform';
-import { useSettingsStore } from '../../store/settings';
+import { useSettingsStore, useSystemTheme } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import type { ViewMode } from '../../types/workspace';
 import { Header, type AppMenuHandlers } from './Header';
@@ -31,6 +31,7 @@ export function AppShell({
   availableViewModes,
   textareaRef,
 }: AppShellProps) {
+  useSystemTheme();
   useNativeWindowChrome();
   const runtime = Platform.shellRuntime;
   const sidebarMode = useUIStore((state) => state.sidebarMode);
@@ -69,7 +70,7 @@ export function AppShell({
 }
 
 function useNativeWindowChrome(): void {
-  const theme = useSettingsStore((state) => state.theme);
+  const resolvedTheme = useSettingsStore((state) => state.resolvedTheme);
 
   useEffect(() => {
     const hasWindowChrome = Platform.capabilities.has('window.chrome');
@@ -84,5 +85,5 @@ function useNativeWindowChrome(): void {
     void Backend.runtime.setWindowBackgroundColor(titlebarColor).catch((error) => {
       console.warn('Failed to sync native titlebar color:', error);
     });
-  }, [theme]);
+  }, [resolvedTheme]);
 }
