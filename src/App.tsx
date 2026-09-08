@@ -150,6 +150,7 @@ export function App() {
     >
       <main className="body" ref={bodyRef}>
         <Sidebar
+          compact={viewportProfile.profile === 'compact'}
           textareaRef={editorRef}
           editorScrollRef={editorScrollRef}
           previewRef={previewRef}

@@ -411,6 +411,7 @@
 }
 
 .body {
+  position: relative;
   display: grid;
   width: 100%;
   min-width: 0;
@@ -770,6 +771,10 @@
   width: var(--sidebar-w-collapsed);
   z-index: 5;
   overflow: visible;
+}
+
+.sidebar-drawer-backdrop {
+  display: none;
 }
 
 .sidebar-head {
@@ -1472,6 +1477,77 @@
   bottom: auto;
   width: 214px;
   min-width: 214px;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-drawer-backdrop {
+  position: absolute;
+  z-index: 190;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.32);
+  cursor: default;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar {
+  z-index: 200;
+  width: min(84vw, 320px);
+  max-width: calc(100vw - 48px);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-head {
+  height: auto;
+  min-height: calc(var(--sidebar-control-size) + 20px);
+  align-items: center;
+  justify-content: flex-end;
+  flex-direction: row;
+  gap: 0;
+  overflow: visible;
+  padding: 10px 14px 10px var(--sidebar-w-collapsed);
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-actions {
+  display: flex;
+  width: auto;
+  align-items: center;
+  flex-direction: row;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-actions::after {
+  display: none;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-menu {
+  align-items: center;
+  flex-direction: row;
+  width: auto;
+  gap: 4px;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-menu-panel {
+  top: calc(100% + 6px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  width: min(214px, calc(84vw - var(--sidebar-w-collapsed) - 16px));
+  min-width: 164px;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-folder-path,
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-search,
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .sidebar-panel-tabs {
+  display: flex;
+}
+
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .file-tree,
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .outline-panel,
+.app[data-viewport-profile="compact"][data-compact-sidebar="open"] .outline-empty {
+  display: block;
 }
 
 .editor-pane {

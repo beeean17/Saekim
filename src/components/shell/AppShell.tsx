@@ -35,6 +35,7 @@ export function AppShell({
   useNativeWindowChrome();
   const runtime = Platform.shellRuntime;
   const sidebarMode = useUIStore((state) => state.sidebarMode);
+  const compactSidebarOpen = useUIStore((state) => state.compactSidebarOpen);
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
   const editorWidth = useUIStore((state) => state.editorWidth);
@@ -53,6 +54,7 @@ export function AppShell({
       className="app"
       data-runtime={runtime}
       data-sidebar={sidebarMode}
+      data-compact-sidebar={compactSidebarOpen ? 'open' : 'closed'}
       data-view={effectiveViewMode}
       data-viewport-profile={viewportProfile.profile}
       style={layoutStyle}

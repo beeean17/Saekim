@@ -29,6 +29,7 @@ function restoreEditorWidth(ui: UISession): number {
 
 interface UIState {
   sidebarMode: SidebarMode;
+  compactSidebarOpen: boolean;
   viewMode: ViewMode;
   sidebarWidth: number;
   splitRatio: number;
@@ -37,6 +38,8 @@ interface UIState {
   previewInteractionMode: PreviewInteractionMode;
   settingsOpen: boolean;
   toggleSidebar: () => void;
+  toggleCompactSidebar: () => void;
+  closeCompactSidebar: () => void;
   setSidebarMode: (mode: SidebarMode) => void;
   setViewMode: (mode: ViewMode) => void;
   setSidebarWidth: (width: number) => void;
@@ -53,6 +56,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>()((set) => ({
   sidebarMode: 'expanded',
+  compactSidebarOpen: false,
   viewMode: 'split',
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   splitRatio: 0.5,
@@ -64,6 +68,8 @@ export const useUIStore = create<UIState>()((set) => ({
     set((state) => ({
       sidebarMode: state.sidebarMode === 'expanded' ? 'collapsed' : 'expanded',
     })),
+  toggleCompactSidebar: () => set((state) => ({ compactSidebarOpen: !state.compactSidebarOpen })),
+  closeCompactSidebar: () => set({ compactSidebarOpen: false }),
   setSidebarMode: (mode) => set({ sidebarMode: mode }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setSidebarWidth: (width) => set({ sidebarWidth: clamp(width, 180, 420) }),
@@ -78,6 +84,7 @@ export const useUIStore = create<UIState>()((set) => ({
   restoreUI: (ui) =>
     set({
       sidebarMode: ui.sidebarMode,
+      compactSidebarOpen: false,
       viewMode: ui.viewMode,
       sidebarWidth: ui.sidebarWidth,
       splitRatio: typeof ui.splitRatio === 'number' ? ui.splitRatio : 0.5,

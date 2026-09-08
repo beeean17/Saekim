@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject, type TouchEvent } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import { enabledFeatures } from '../../app/featureRegistry';
 import { relativeTime } from '../../core/format/relativeTime';
@@ -6,6 +6,7 @@ import { selectSidebarContributions } from '../../core/sidebar/registry';
 import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import { useUIStore } from '../../store/ui';
 import type { FileTreeNode, OpenFile, ViewMode, WorkspaceSearchItem } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
@@ -17,6 +18,7 @@ import { SidebarToggle } from './SidebarToggle';
 import { TreeContextMenu, type TreeMenuPosition } from './TreeContextMenu';
 
 interface SidebarProps {
+  compact: boolean;
   textareaRef: RefObject<HTMLTextAreaElement>;
   editorScrollRef: RefObject<HTMLDivElement>;
   previewRef: RefObject<HTMLDivElement>;
@@ -25,12 +27,17 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  compact,
   textareaRef,
   editorScrollRef,
   previewRef,
   commandRegistry,
   effectiveViewMode,
 }: SidebarProps) {
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const swipeStartXRef = useRef<number | null>(null);
+  const compactSidebarOpen = useUIStore((state) => state.compactSidebarOpen);
+  const closeCompactSidebar = useUIStore((state) => state.closeCompactSidebar);
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
   const openFiles = useWorkspaceStore((state) => state.openFiles);
@@ -56,6 +63,53 @@ export function Sidebar({
     setWorkspaceSearchOpen(false);
   };
   const searchNeedle = workspaceSearchQuery.trim();
+
+  useEffect(() => {
+    if (!compact && compactSidebarOpen) closeCompactSidebar();
+  }, [closeCompactSidebar, compact, compactSidebarOpen]);
+
+  useEffect(() => {
+    if (!compact || !compactSidebarOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = window.requestAnimationFrame(() => {
+      sidebarFocusableElements(sidebarRef.current)[0]?.focus();
+    });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCompactSidebar();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = sidebarFocusableElements(sidebarRef.current);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [closeCompactSidebar, compact, compactSidebarOpen]);
+
+  const handleDrawerTouchStart = (event: TouchEvent<HTMLElement>) => {
+    swipeStartXRef.current = event.touches[0]?.clientX ?? null;
+  };
+  const handleDrawerTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    const startX = swipeStartXRef.current;
+    swipeStartXRef.current = null;
+    const endX = event.changedTouches[0]?.clientX;
+    if (startX !== null && endX !== undefined && startX - endX >= 64) closeCompactSidebar();
+  };
 
   const refreshAfterOperation = async () => {
     try {
@@ -181,9 +235,28 @@ export function Sidebar({
   };
 
   return (
-    <aside className="sidebar">
+    <>
+      {compact && compactSidebarOpen ? (
+        <button
+          aria-label="탐색기 닫기"
+          className="sidebar-drawer-backdrop"
+          tabIndex={-1}
+          type="button"
+          onClick={closeCompactSidebar}
+        />
+      ) : null}
+    <aside
+      aria-label="파일 탐색기"
+      aria-modal={compactSidebarOpen && compact ? true : undefined}
+      className="sidebar"
+      id="saekim-sidebar"
+      ref={sidebarRef}
+      role={compactSidebarOpen && compact ? 'dialog' : undefined}
+      onTouchEnd={handleDrawerTouchEnd}
+      onTouchStart={handleDrawerTouchStart}
+    >
       <div className="sidebar-head">
-        <SidebarToggle />
+        <SidebarToggle compact={compact} />
         <SidebarMenu
           className="sidebar-actions"
           textareaRef={textareaRef}
@@ -278,7 +351,15 @@ export function Sidebar({
         />
       ) : null}
     </aside>
+    </>
   );
+}
+
+function sidebarFocusableElements(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return [];
+  return Array.from(
+    root.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'),
+  ).filter((element) => element.offsetParent !== null);
 }
 
 function SidebarPanelTabs({
