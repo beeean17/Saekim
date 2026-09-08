@@ -31,6 +31,10 @@ export interface FolderBackend {
   readFolder(path: string): Promise<FolderPayload>;
   readFolderChildren(path: string): Promise<FileTreeNode[]>;
   searchWorkspace(request: WorkspaceSearchRequest): Promise<WorkspaceSearchPage>;
+  renameEntry(path: string, newName: string): Promise<string>;
+  createFolder(parentPath: string, name: string): Promise<string>;
+  duplicateFile(path: string): Promise<string>;
+  trashEntry(path: string): Promise<void>;
 }
 
 export interface ImageAssetBackend {

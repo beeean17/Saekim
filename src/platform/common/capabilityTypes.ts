@@ -3,6 +3,7 @@ export type PlatformCapability =
   | 'file.save'
   | 'folder.open'
   | 'folder.tree'
+  | 'folder.operations'
   | 'image.pick'
   | 'image.copyToAssets'
   | 'image.importBytesToAssets'

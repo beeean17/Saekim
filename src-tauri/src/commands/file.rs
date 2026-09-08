@@ -389,6 +389,72 @@ pub async fn search_workspace(
 }
 
 #[tauri::command]
+pub fn rename_workspace_entry(path: String, new_name: String) -> CommandResult<String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = (path, new_name);
+        return fail("workspace file operations are not available on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    match rename_workspace_entry_path(Path::new(&path), &new_name) {
+        Ok(renamed) => ok(renamed.to_string_lossy().into_owned()),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn create_workspace_folder(parent_path: String, name: String) -> CommandResult<String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = (parent_path, name);
+        return fail("workspace file operations are not available on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    match create_workspace_folder_path(Path::new(&parent_path), &name) {
+        Ok(created) => ok(created.to_string_lossy().into_owned()),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn duplicate_workspace_file(path: String) -> CommandResult<String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = path;
+        return fail("workspace file operations are not available on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    match duplicate_workspace_file_path(Path::new(&path)) {
+        Ok(duplicated) => ok(duplicated.to_string_lossy().into_owned()),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn trash_workspace_entry(path: String) -> CommandResult<()> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = path;
+        return fail("workspace file operations are not available on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let target = PathBuf::from(path);
+        if let Err(error) = ensure_workspace_entry_exists(&target) {
+            return fail(error);
+        }
+        match trash::delete(&target) {
+            Ok(()) => ok(()),
+            Err(error) => fail(format!("failed to move workspace entry to trash: {error}")),
+        }
+    }
+}
+
+#[tauri::command]
 pub fn read_file(
     app: AppHandle,
     path: String,
@@ -1894,6 +1960,92 @@ fn collect_workspace_files(
 }
 
 #[cfg(not(target_os = "android"))]
+fn rename_workspace_entry_path(path: &Path, new_name: &str) -> Result<PathBuf, String> {
+    ensure_workspace_entry_exists(path)?;
+    validate_workspace_entry_name(new_name)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "workspace entry has no parent folder".to_string())?;
+    let destination = parent.join(new_name);
+    if destination == path {
+        return Ok(destination);
+    }
+    if destination.exists() {
+        return Err("a workspace entry with that name already exists".to_string());
+    }
+    fs::rename(path, &destination)
+        .map_err(|error| format!("failed to rename workspace entry: {error}"))?;
+    Ok(destination)
+}
+
+#[cfg(not(target_os = "android"))]
+fn create_workspace_folder_path(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    if !parent.is_dir() {
+        return Err("workspace parent is not a directory".to_string());
+    }
+    validate_workspace_entry_name(name)?;
+    let destination = parent.join(name);
+    if destination.exists() {
+        return Err("a workspace entry with that name already exists".to_string());
+    }
+    fs::create_dir(&destination)
+        .map_err(|error| format!("failed to create workspace folder: {error}"))?;
+    Ok(destination)
+}
+
+#[cfg(not(target_os = "android"))]
+fn duplicate_workspace_file_path(path: &Path) -> Result<PathBuf, String> {
+    ensure_workspace_entry_exists(path)?;
+    if !path.is_file() {
+        return Err("only files can be duplicated".to_string());
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| "workspace file has no parent folder".to_string())?;
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "workspace file name is not valid UTF-8".to_string())?;
+    let extension = path.extension().and_then(|value| value.to_str());
+
+    for index in 1..=10_000 {
+        let suffix = if index == 1 {
+            " copy".to_string()
+        } else {
+            format!(" copy {index}")
+        };
+        let name = match extension {
+            Some(extension) => format!("{stem}{suffix}.{extension}"),
+            None => format!("{stem}{suffix}"),
+        };
+        let destination = parent.join(name);
+        if destination.exists() {
+            continue;
+        }
+        fs::copy(path, &destination)
+            .map_err(|error| format!("failed to duplicate workspace file: {error}"))?;
+        return Ok(destination);
+    }
+
+    Err("could not choose an available duplicate file name".to_string())
+}
+
+#[cfg(not(target_os = "android"))]
+fn ensure_workspace_entry_exists(path: &Path) -> Result<(), String> {
+    fs::symlink_metadata(path)
+        .map(|_| ())
+        .map_err(|error| format!("workspace entry does not exist: {error}"))
+}
+
+#[cfg(not(target_os = "android"))]
+fn validate_workspace_entry_name(name: &str) -> Result<(), String> {
+    if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\\']) {
+        return Err("workspace entry name must be a single non-empty path component".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
 struct WorkspaceContentMatch {
     line: usize,
     column: usize,
@@ -2056,6 +2208,34 @@ mod workspace_search_tests {
         let regex_page = search_workspace_files(regex_request).unwrap();
         assert_eq!(regex_page.items.len(), 1);
         assert_eq!(regex_page.items[0].match_line, Some(3));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn creates_renames_and_duplicates_workspace_entries_without_overwriting() {
+        let root = workspace_search_temp_dir("file-operations");
+        fs::create_dir_all(&root).unwrap();
+        let created = create_workspace_folder_path(&root, "notes").unwrap();
+        assert!(created.is_dir());
+
+        let source = created.join("draft.md");
+        fs::write(&source, "body").unwrap();
+        let duplicate = duplicate_workspace_file_path(&source).unwrap();
+        assert_eq!(
+            duplicate.file_name().and_then(|name| name.to_str()),
+            Some("draft copy.md")
+        );
+        assert_eq!(fs::read_to_string(&duplicate).unwrap(), "body");
+
+        let second_duplicate = duplicate_workspace_file_path(&source).unwrap();
+        assert_eq!(
+            second_duplicate.file_name().and_then(|name| name.to_str()),
+            Some("draft copy 2.md")
+        );
+        let renamed = rename_workspace_entry_path(&source, "final.md").unwrap();
+        assert_eq!(fs::read_to_string(&renamed).unwrap(), "body");
+        assert!(rename_workspace_entry_path(&renamed, "draft copy.md").is_err());
+        assert!(create_workspace_folder_path(&root, "../outside").is_err());
         fs::remove_dir_all(root).unwrap();
     }
 

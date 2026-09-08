@@ -30,6 +30,7 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 | --- | :-: | :-: | :-: |
 | `file.open` / `file.save` | O | O | - |
 | `folder.open` / `folder.tree` | O | O | - |
+| `folder.operations` | O | - | - |
 | `image.pick` | O | O | - |
 | `image.copyToAssets` | O | O | - |
 | `image.importBytesToAssets` | O | O | - |
@@ -181,6 +182,8 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | `open_file_dialog` / `open_folder_dialog` | 네이티브 선택 다이얼로그 |
 | `read_file` / `read_folder` / `read_folder_children` | 읽기 |
 | `search_workspace` | 전체 워크스페이스 파일명·내용 검색 (커서 페이지 지원) |
+| `rename_workspace_entry` / `create_workspace_folder` | 트리 항목 이름 변경 / 폴더 생성 |
+| `duplicate_workspace_file` / `trash_workspace_entry` | 충돌 없는 파일 복제 / OS 휴지통 이동 |
 | `save_file` / `save_file_as` | 저장 |
 | `take_pending_open_files` | 외부 열기 큐 소비 |
 | `pick_image_path` | 이미지 선택 |
@@ -204,6 +207,17 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 - 탭 닫기 버튼과 가운데 클릭은 기존 저장·버리기·취소 확인 흐름을 재사용
 - `Cmd/Ctrl+Shift+T`로 가장 최근에 닫은 탭을 다시 열며 최대 20개를 기억
 - 탭 UI는 `tabs` 기능의 `editor.topBars` 기여로 등록
+
+### 3.8 파일 작업
+
+- 데스크톱 트리 항목의 우클릭 또는 `Shift+F10` 메뉴에서 이름 변경, 파일 복제,
+  폴더 내부 새 폴더 생성, 휴지통 이동 지원
+- 워크스페이스 경로 표시줄의 폴더 버튼으로 루트에 새 폴더 생성
+- 복제 이름은 `name copy.ext`, `name copy 2.ext` 순으로 충돌 없이 선택
+- 삭제는 영구 삭제하지 않고 OS 휴지통으로만 이동하며, 열린 dirty 파일은 기존
+  저장·버리기·취소 확인 흐름을 먼저 통과
+- 열린 파일이나 폴더의 이름을 바꾸면 탭, 히스토리, 닫은 탭 경로를 함께 갱신
+- Android SAF와 브라우저 개발 어댑터는 `folder.operations` capability가 없어 UI를 노출하지 않음
 
 ---
 

@@ -1,7 +1,8 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import { relativeTime } from '../../core/format/relativeTime';
 import { Backend } from '../../platform/common/backend';
+import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import type { FileTreeNode, OpenFile, ViewMode, WorkspaceSearchItem } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
@@ -12,6 +13,7 @@ import { CloseButton } from '../ui/primitives/CloseButton';
 import { SearchField } from '../ui/primitives/SearchField';
 import { SidebarMenu } from './SidebarMenu';
 import { SidebarToggle } from './SidebarToggle';
+import { TreeContextMenu, type TreeMenuPosition } from './TreeContextMenu';
 
 interface SidebarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -35,17 +37,81 @@ export function Sidebar({
   const openFile = useWorkspaceStore((state) => state.openFile);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
+  const saveFile = useWorkspaceStore((state) => state.saveFile);
+  const renameWorkspaceEntry = useWorkspaceStore((state) => state.renameWorkspaceEntry);
+  const removeWorkspaceEntry = useWorkspaceStore((state) => state.removeWorkspaceEntry);
   const refresh = useWorkspaceStore((state) => state.refresh);
+  const fileOperationsAvailable = currentPlatformCapabilities().has('folder.operations');
   const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [workspaceSearchResults, setWorkspaceSearchResults] = useState<WorkspaceSearchItem[] | null>(null);
   const [workspaceSearchError, setWorkspaceSearchError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
+  const [treeMenu, setTreeMenu] = useState<{ node: FileTreeNode; position: TreeMenuPosition } | null>(null);
   const closeSearch = () => {
     setWorkspaceSearchQuery('');
     setWorkspaceSearchOpen(false);
   };
   const searchNeedle = workspaceSearchQuery.trim();
+
+  const refreshAfterOperation = async () => {
+    try {
+      await refresh();
+    } catch (error) {
+      reportFileOperationError(error);
+    }
+  };
+  const renameEntry = async (node: FileTreeNode) => {
+    const nextName = window.prompt('새 이름', node.name);
+    if (!nextName || nextName === node.name) return;
+    try {
+      const nextPath = await Backend.folders.renameEntry(node.path, nextName);
+      renameWorkspaceEntry(node.path, nextPath);
+      await refreshAfterOperation();
+    } catch (error) {
+      reportFileOperationError(error);
+    }
+  };
+  const createFolder = async (parentPath: string) => {
+    const name = window.prompt('새 폴더 이름', '새 폴더');
+    if (!name) return;
+    try {
+      await Backend.folders.createFolder(parentPath, name);
+      await refreshAfterOperation();
+    } catch (error) {
+      reportFileOperationError(error);
+    }
+  };
+  const duplicateFile = async (node: FileTreeNode) => {
+    try {
+      await Backend.folders.duplicateFile(node.path);
+      await refreshAfterOperation();
+    } catch (error) {
+      reportFileOperationError(error);
+    }
+  };
+  const trashEntry = async (node: FileTreeNode) => {
+    if (!window.confirm(`“${node.name}”을(를) 휴지통으로 이동할까요?`)) return;
+    const affectedFiles = openFiles.filter((file) => isPathInsideWorkspaceEntry(file.path, node.path));
+    const dirtyFiles = affectedFiles.filter((file) => isDirty(file));
+    if (dirtyFiles.length > 0) {
+      const decision = await Backend.runtime.confirmUnsavedChanges(dirtyFiles.map((file) => file.name));
+      if (decision === 'cancel') return;
+      if (decision === 'save') {
+        for (const file of dirtyFiles) {
+          const savedPath = await saveFile(file.id);
+          if (!savedPath) return;
+        }
+      }
+    }
+    try {
+      await Backend.folders.trashEntry(node.path);
+      removeWorkspaceEntry(node.path);
+      await refreshAfterOperation();
+    } catch (error) {
+      reportFileOperationError(error);
+    }
+  };
 
   useEffect(() => {
     if (!searchNeedle) {
@@ -125,7 +191,9 @@ export function Sidebar({
         />
       </div>
       <FolderPath
+        canCreateFolder={fileOperationsAvailable && Boolean(rootPath)}
         path={rootPath}
+        onCreateFolder={() => rootPath && void createFolder(rootPath)}
         onSearch={() => setWorkspaceSearchOpen((open) => !open)}
         onRefresh={() => void refresh()}
       />
@@ -159,10 +227,22 @@ export function Sidebar({
               onToggle={toggleFolder}
               onOpen={(path) => void openFile(path)}
               onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
+              onContextMenu={fileOperationsAvailable ? (node, position) => setTreeMenu({ node, position }) : undefined}
             />
           ))
         )}
       </div>
+      {treeMenu ? (
+        <TreeContextMenu
+          node={treeMenu.node}
+          position={treeMenu.position}
+          onClose={() => setTreeMenu(null)}
+          onCreateFolder={() => void createFolder(treeMenu.node.path)}
+          onDuplicate={() => void duplicateFile(treeMenu.node)}
+          onRename={() => void renameEntry(treeMenu.node)}
+          onTrash={() => void trashEntry(treeMenu.node)}
+        />
+      ) : null}
       {imagePreview ? (
         <ImagePreviewModal
           canAddToDocument={Boolean(activeFile)}
@@ -176,11 +256,15 @@ export function Sidebar({
 }
 
 function FolderPath({
+  canCreateFolder,
   path,
+  onCreateFolder,
   onSearch,
   onRefresh,
 }: {
+  readonly canCreateFolder: boolean;
   readonly path: string | null;
+  readonly onCreateFolder: () => void;
   readonly onSearch: () => void;
   readonly onRefresh: () => void;
 }) {
@@ -190,6 +274,11 @@ function FolderPath({
     <div className="sidebar-folder-path" title={label}>
       <span className="sidebar-folder-path-text"><span className="sidebar-folder-path-value">{label}</span></span>
       <div className="sidebar-folder-actions">
+        {canCreateFolder ? (
+          <IconButton label="새 폴더" onClick={onCreateFolder}>
+            <Icon name="folder" />
+          </IconButton>
+        ) : null}
         <IconButton label="파일 검색" onClick={onSearch}>
           <Icon name="search" />
         </IconButton>
@@ -284,6 +373,7 @@ function FileTreeNodeView({
   onToggle,
   onOpen,
   onPreviewImage,
+  onContextMenu,
 }: {
   node: FileTreeNode;
   activePath: string | null;
@@ -291,6 +381,7 @@ function FileTreeNodeView({
   onToggle: (path: string) => Promise<void>;
   onOpen: (path: string) => void;
   onPreviewImage: (node: FileTreeNode) => void;
+  onContextMenu?: (node: FileTreeNode, position: TreeMenuPosition) => void;
 }) {
   if (node.type === 'folder') {
     return (
@@ -298,6 +389,8 @@ function FileTreeNodeView({
         <button
           className={`folder ${node.isOpen ? 'open' : ''}`}
           type="button"
+          onContextMenu={(event) => showTreeContextMenu(event, node, onContextMenu)}
+          onKeyDown={(event) => showTreeContextMenuFromKeyboard(event, node, onContextMenu)}
           onClick={() => void onToggle(node.path)}
         >
           <Icon name="chevronRight" className="ic chev" />
@@ -314,6 +407,7 @@ function FileTreeNodeView({
                 onToggle={onToggle}
                 onOpen={onOpen}
                 onPreviewImage={onPreviewImage}
+                onContextMenu={onContextMenu}
               />
             ))}
           </div>
@@ -331,6 +425,8 @@ function FileTreeNodeView({
       className={`file ${active ? 'current' : ''} ${imageAsset ? 'asset-file' : ''}`}
       title={imageAsset ? node.path : undefined}
       type="button"
+      onContextMenu={(event) => showTreeContextMenu(event, node, onContextMenu)}
+      onKeyDown={(event) => showTreeContextMenuFromKeyboard(event, node, onContextMenu)}
       onClick={() => {
         if (imageAsset) {
           onPreviewImage(node);
@@ -344,6 +440,34 @@ function FileTreeNodeView({
       {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(node.modifiedAt)}</span>}
     </button>
   );
+}
+
+function showTreeContextMenu(
+  event: MouseEvent<HTMLButtonElement>,
+  node: FileTreeNode,
+  onContextMenu: ((node: FileTreeNode, position: TreeMenuPosition) => void) | undefined,
+): void {
+  if (!onContextMenu) return;
+  event.preventDefault();
+  onContextMenu(node, clampTreeMenuPosition(event.clientX, event.clientY));
+}
+
+function showTreeContextMenuFromKeyboard(
+  event: ReactKeyboardEvent<HTMLButtonElement>,
+  node: FileTreeNode,
+  onContextMenu: ((node: FileTreeNode, position: TreeMenuPosition) => void) | undefined,
+): void {
+  if (!onContextMenu || (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10'))) return;
+  event.preventDefault();
+  const bounds = event.currentTarget.getBoundingClientRect();
+  onContextMenu(node, clampTreeMenuPosition(bounds.left + 20, bounds.bottom));
+}
+
+function clampTreeMenuPosition(x: number, y: number): TreeMenuPosition {
+  return {
+    x: Math.max(8, Math.min(x, window.innerWidth - 196)),
+    y: Math.max(8, Math.min(y, window.innerHeight - 152)),
+  };
 }
 
 function ImagePreviewModal({
@@ -525,6 +649,15 @@ function normalizePath(path: string): string {
 
 function isPlaceholderDocumentPath(path: string): boolean {
   return path.startsWith('~') || path.startsWith('browser://');
+}
+
+function isPathInsideWorkspaceEntry(path: string, entryPath: string): boolean {
+  return path === entryPath || path.startsWith(`${entryPath}/`) || path.startsWith(`${entryPath}\\`);
+}
+
+function reportFileOperationError(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  window.alert(`파일 작업을 완료하지 못했습니다.\n${message}`);
 }
 
 function isContentUriPath(path: string): boolean {

@@ -25,6 +25,10 @@ export const browserBackend: BackendAdapter = {
     readFolder,
     readFolderChildren,
     searchWorkspace,
+    renameEntry: unsupported('Workspace rename'),
+    createFolder: unsupported('Workspace folder creation'),
+    duplicateFile: unsupported('Workspace file duplication'),
+    trashEntry: unsupported('Workspace trash'),
   },
   images: {
     pickImagePath,
@@ -68,6 +72,12 @@ export const browserBackend: BackendAdapter = {
 };
 
 async function noop(): Promise<void> {}
+
+function unsupported<T>(capability: string): (..._args: unknown[]) => Promise<T> {
+  return async () => {
+    throw new Error(`${capability} is only available in the desktop app.`);
+  };
+}
 
 async function logEvent(scope: string, message: string, details?: unknown): Promise<void> {
   if (details === undefined) console.info(`[saekim:${scope}] ${message}`);

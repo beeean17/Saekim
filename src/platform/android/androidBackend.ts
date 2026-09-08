@@ -52,6 +52,10 @@ export const androidBackend: BackendAdapter = {
     readFolder,
     readFolderChildren,
     searchWorkspace,
+    renameEntry: unsupported('Workspace rename'),
+    createFolder: unsupported('Workspace folder creation'),
+    duplicateFile: unsupported('Workspace file duplication'),
+    trashEntry: unsupported('Workspace trash'),
   },
   images: {
     pickImagePath,

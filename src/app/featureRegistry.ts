@@ -17,7 +17,7 @@ const featureCatalog: SaekimFeature[] = [
     label: 'File Workspace',
     requiresCapabilities: {
       required: ['file.open', 'file.save'],
-      optional: ['folder.open', 'folder.tree', 'externalFile.open'],
+      optional: ['folder.open', 'folder.tree', 'folder.operations', 'externalFile.open'],
     },
   },
   {

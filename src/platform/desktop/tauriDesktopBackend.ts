@@ -5,7 +5,9 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   copyImageToAssets,
+  createFolder,
   downloadImageToAssets,
+  duplicateFile,
   importImageBytesToAssets,
   importPdf,
   openFileDialog,
@@ -15,11 +17,13 @@ import {
   readFile,
   readFolder,
   readFolderChildren,
+  renameEntry,
   searchWorkspace,
   resolveImageSrc,
   saveFile,
   saveFileAs,
   takePendingOpenFiles,
+  trashEntry,
   writePdfExport,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
@@ -72,6 +76,10 @@ export const tauriDesktopBackend: BackendAdapter = {
     readFolder,
     readFolderChildren,
     searchWorkspace,
+    renameEntry,
+    createFolder,
+    duplicateFile,
+    trashEntry,
   },
   images: {
     pickImagePath,

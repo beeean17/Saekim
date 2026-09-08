@@ -5,6 +5,7 @@ export const desktopCapabilities: ReadonlySet<PlatformCapability> = new Set([
   'file.save',
   'folder.open',
   'folder.tree',
+  'folder.operations',
   'image.pick',
   'image.copyToAssets',
   'image.importBytesToAssets',

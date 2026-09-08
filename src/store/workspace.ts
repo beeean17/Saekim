@@ -27,6 +27,8 @@ interface WorkspaceState {
   saveFile: (id: string) => Promise<string | null>;
   saveActive: () => Promise<void>;
   saveActiveAs: () => Promise<void>;
+  renameWorkspaceEntry: (previousPath: string, nextPath: string) => void;
+  removeWorkspaceEntry: (path: string) => void;
   refresh: () => Promise<void>;
   historyPrev: () => Promise<void>;
   historyNext: () => Promise<void>;
@@ -279,6 +281,45 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     );
     if (folderPatch) set((state) => applyFolderPatch(state, folderPatch));
   },
+  renameWorkspaceEntry: (previousPath, nextPath) => {
+    set((state) => ({
+      tree: renameTreeEntryPaths(state.tree, previousPath, nextPath),
+      openFiles: state.openFiles.map((file) => renameOpenFilePath(file, previousPath, nextPath)),
+      activeFileId: state.activeFileId ? mapWorkspaceEntryPath(state.activeFileId, previousPath, nextPath) : null,
+      closedFiles: state.closedFiles.map((file) => renameOpenFilePath(file, previousPath, nextPath)),
+      history: {
+        back: state.history.back.map((path) => mapWorkspaceEntryPath(path, previousPath, nextPath)),
+        forward: state.history.forward.map((path) => mapWorkspaceEntryPath(path, previousPath, nextPath)),
+        current: state.history.current
+          ? mapWorkspaceEntryPath(state.history.current, previousPath, nextPath)
+          : null,
+      },
+    }));
+  },
+  removeWorkspaceEntry: (path) => {
+    set((state) => {
+      const removedActiveIndex = state.openFiles.findIndex((file) => file.id === state.activeFileId);
+      const openFiles = state.openFiles.filter((file) => !isWorkspaceEntryPath(file.path, path));
+      const activeRemoved = state.activeFileId
+        ? isWorkspaceEntryPath(state.activeFileId, path)
+        : false;
+      const activeFileId = activeRemoved
+        ? openFiles[Math.max(0, Math.min(removedActiveIndex, openFiles.length - 1))]?.id ?? null
+        : state.activeFileId;
+      const activeFile = openFiles.find((file) => file.id === activeFileId) ?? null;
+      return {
+        tree: removeTreeEntry(state.tree, path),
+        openFiles,
+        activeFileId,
+        closedFiles: state.closedFiles.filter((file) => !isWorkspaceEntryPath(file.path, path)),
+        history: {
+          back: state.history.back.filter((candidate) => !isWorkspaceEntryPath(candidate, path)),
+          forward: state.history.forward.filter((candidate) => !isWorkspaceEntryPath(candidate, path)),
+          current: activeFile?.path ?? null,
+        },
+      };
+    });
+  },
   refresh: async () => {
     const { rootPath } = get();
     if (!rootPath || isPlaceholderPath(rootPath)) return;
@@ -515,6 +556,54 @@ function savedOpenFilePatch(
     closedFiles: state.closedFiles.filter((candidate) => candidate.path !== savedPath),
     history: replaceHistoryPath(state.history, savedFile.path, savedPath),
   };
+}
+
+function renameOpenFilePath(file: OpenFile, previousPath: string, nextPath: string): OpenFile {
+  const path = mapWorkspaceEntryPath(file.path, previousPath, nextPath);
+  if (path === file.path) return file;
+  return {
+    ...file,
+    id: path,
+    path,
+    displayPath: path,
+    name: fileNameFromPath(path),
+  };
+}
+
+function renameTreeEntryPaths(
+  nodes: readonly FileTreeNode[],
+  previousPath: string,
+  nextPath: string,
+): FileTreeNode[] {
+  return nodes.map((node) => {
+    const path = mapWorkspaceEntryPath(node.path, previousPath, nextPath);
+    return {
+      ...node,
+      id: mapWorkspaceEntryPath(node.id, previousPath, nextPath),
+      path,
+      name: node.path === previousPath ? fileNameFromPath(path) : node.name,
+      children: node.children ? renameTreeEntryPaths(node.children, previousPath, nextPath) : undefined,
+    };
+  });
+}
+
+function removeTreeEntry(nodes: readonly FileTreeNode[], removedPath: string): FileTreeNode[] {
+  return nodes
+    .filter((node) => !isWorkspaceEntryPath(node.path, removedPath))
+    .map((node) => ({
+      ...node,
+      children: node.children ? removeTreeEntry(node.children, removedPath) : undefined,
+    }));
+}
+
+function mapWorkspaceEntryPath(path: string, previousPath: string, nextPath: string): string {
+  if (path === previousPath) return nextPath;
+  if (!isWorkspaceEntryPath(path, previousPath)) return path;
+  return `${nextPath}${path.slice(previousPath.length)}`;
+}
+
+function isWorkspaceEntryPath(path: string, parentPath: string): boolean {
+  return path === parentPath || path.startsWith(`${parentPath}/`) || path.startsWith(`${parentPath}\\`);
 }
 
 async function workspaceFolderPatchForFile(path: string): Promise<Pick<WorkspaceState, 'rootPath' | 'tree'> | null> {

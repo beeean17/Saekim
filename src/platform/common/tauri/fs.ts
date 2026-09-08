@@ -66,6 +66,22 @@ export async function searchWorkspace(request: WorkspaceSearchRequest): Promise<
   return invokeCommand<WorkspaceSearchPage>('search_workspace', { request });
 }
 
+export async function renameEntry(path: string, newName: string): Promise<string> {
+  return invokeCommand<string>('rename_workspace_entry', { path, newName });
+}
+
+export async function createFolder(parentPath: string, name: string): Promise<string> {
+  return invokeCommand<string>('create_workspace_folder', { parentPath, name });
+}
+
+export async function duplicateFile(path: string): Promise<string> {
+  return invokeCommand<string>('duplicate_workspace_file', { path });
+}
+
+export async function trashEntry(path: string): Promise<void> {
+  return invokeCommand<void>('trash_workspace_entry', { path });
+}
+
 export async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {
   if (!isTauriRuntime()) {
     return path;

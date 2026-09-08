@@ -1045,6 +1045,44 @@
   color: var(--accent);
 }
 
+.tree-context-menu {
+  position: fixed;
+  z-index: 260;
+  display: grid;
+  width: 188px;
+  gap: 2px;
+  padding: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.tree-context-menu button {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 9px;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  text-align: left;
+}
+
+.tree-context-menu button:hover,
+.tree-context-menu button:focus-visible {
+  background: var(--bg-elevated);
+}
+
+.tree-context-menu button.danger {
+  color: var(--danger, #c33);
+}
+
+.tree-context-menu [role="separator"] {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--border);
+}
+
 .file.asset-file .ic {
   color: var(--text-muted);
 }
