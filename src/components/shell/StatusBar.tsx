@@ -22,7 +22,9 @@ export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTM
       <span className="sep" />
       <span className="item">{language}</span>
       <span className="sep" />
-      <span className="item">{activeFile?.encoding ?? 'UTF-8'} · {activeFile?.eol ?? 'LF'}</span>
+      <span className="item">
+        {activeFile?.encoding ?? 'UTF-8'} · {activeFile?.hasMixedEol ? 'Mixed' : (activeFile?.eol ?? 'LF')}
+      </span>
       {pdfStatusText ? (
         <>
           <span className="sep" />

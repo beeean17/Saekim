@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { detectLineEndings, serializeLineEndings } from '../core/document/lineEndings';
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
 import type { FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace } from '../types/workspace';
@@ -181,7 +182,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await Backend.files.saveFile(file.path.startsWith('~') ? null : file.path, file.content);
+    const savedPath = await Backend.files.saveFile(
+      file.path.startsWith('~') ? null : file.path,
+      serializeLineEndings(file.content, file.eol),
+    );
     if (!savedPath) return;
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
@@ -194,6 +198,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               displayPath: savedPath,
               name: savedFile.name,
               savedContent: candidate.content,
+              hasMixedEol: false,
             }
           : candidate,
       ),
@@ -211,7 +216,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    const savedPath = await Backend.files.saveFileAs(file.content, file.name);
+    const savedPath = await Backend.files.saveFileAs(serializeLineEndings(file.content, file.eol), file.name);
     if (!savedPath) return;
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
@@ -224,6 +229,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               displayPath: savedPath,
               name: savedFile.name,
               savedContent: candidate.content,
+              hasMixedEol: false,
             }
           : candidate,
       ),
@@ -317,7 +323,7 @@ export function isDirty(file: OpenFile | null): boolean {
 }
 
 function toOpenFile(path: string, name: string, content: string, displayPath?: string): OpenFile {
-  const eol = content.includes('\r\n') ? 'CRLF' : 'LF';
+  const lineEndings = detectLineEndings(content);
   return {
     id: path,
     path,
@@ -326,7 +332,8 @@ function toOpenFile(path: string, name: string, content: string, displayPath?: s
     content,
     savedContent: content,
     encoding: 'UTF-8',
-    eol,
+    eol: lineEndings.eol,
+    hasMixedEol: lineEndings.mixed,
   };
 }
 
@@ -476,9 +483,12 @@ function normalizeRestoredWorkspace(workspace: WorkspaceSession): WorkspaceSessi
 }
 
 function normalizeRestoredOpenFile(file: OpenFile): OpenFile {
+  const lineEndings = detectLineEndings(file.savedContent ?? file.content);
   return {
     ...file,
     displayPath: file.displayPath ?? readablePathFromRawPath(file.path, file.name),
+    eol: file.eol ?? lineEndings.eol,
+    hasMixedEol: file.hasMixedEol ?? lineEndings.mixed,
   };
 }
 

@@ -23,6 +23,7 @@ export interface OpenFile {
   savedContent: string;
   encoding: string;
   eol: 'LF' | 'CRLF';
+  hasMixedEol?: boolean;
 }
 
 export interface RecentWorkspace {
