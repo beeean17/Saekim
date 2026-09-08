@@ -86,7 +86,7 @@ export function App() {
   }, []);
   useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null, previewElement);
   useResponsiveSplitWidth(bodyRef, effectiveViewMode, sidebarMode, sidebarWidth, editorWidth, viewportProfile.profile);
-  useWindowSizeConstraints(effectiveViewMode, sidebarMode, sidebarWidth);
+  useWindowSizeConstraints();
   const { startSidebarResize, startPaneResize } = usePaneResizers({
     bodyRef,
     sidebarMode,
