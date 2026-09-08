@@ -88,7 +88,7 @@ export function PreviewContent({ previewRef, onPreviewElementChange }: PreviewCo
 
   const previewRenderKey =
     previewResult?.kind === 'react'
-      ? `${renderer?.id ?? 'react'}:${previewResult.renderKey ?? activeFile?.id ?? ''}:${activeFile?.content ?? ''}`
+      ? `${renderer?.id ?? 'react'}:${previewResult.renderKey ?? activeFile?.id ?? ''}`
       : previewResult?.html ?? '';
   const inlineHtml = previewResult?.kind === 'html' && !usesBrowserFrame ? previewResult.html : null;
 
