@@ -3,5 +3,9 @@
   "identifier": "default",
   "description": "Allow every Saekim window to receive Tauri events.",
   "windows": ["main", "window*"],
-  "permissions": ["core:event:default"]
+  "permissions": [
+    "core:event:default",
+    "process:allow-restart",
+    "updater:default"
+  ]
 }

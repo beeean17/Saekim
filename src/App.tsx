@@ -15,6 +15,7 @@ import { usePaneResizers } from './hooks/usePaneResizers';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
+import { useAutoUpdater } from './hooks/useAutoUpdater';
 import { useSearchStore } from './features/search';
 import { useCommandPaletteStore } from './features/command-palette';
 import { toggleInlineMarker } from './core/editor/textEditing';
@@ -127,6 +128,7 @@ export function App() {
   useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null, previewElement);
   useResponsiveSplitWidth(bodyRef, effectiveViewMode, sidebarMode, sidebarWidth, editorWidth, viewportProfile.profile);
   useWindowSizeConstraints();
+  useAutoUpdater();
   const { startSidebarResize, startPaneResize } = usePaneResizers({
     bodyRef,
     sidebarMode,
