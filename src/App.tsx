@@ -64,6 +64,7 @@ export function App() {
       onOpenRecentWorkspace: (path: string) => void openWorkspace(path),
       onSave: () => void saveActive(),
       onSaveAs: () => void saveActiveAs(),
+      onPrint: () => window.print(),
       onCloseFile: () => void closeActiveFile(),
       onCloseWindow: () => void Backend.runtime.runWindowAction('close'),
       onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),

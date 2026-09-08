@@ -44,6 +44,7 @@ const menuEvents = {
   openRecentWorkspace: 'saekim-menu-open-recent-workspace',
   save: 'saekim-menu-save',
   saveAs: 'saekim-menu-save-as',
+  print: 'saekim-menu-print',
   closeFile: 'saekim-menu-close-file',
   closeWindow: 'saekim-menu-close-window',
   exportPdf: 'saekim-menu-export-pdf',
@@ -169,6 +170,7 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
     );
     await registerMenuEvent<void>(menuEvents.save, 'save', () => handlers.onSave());
     await registerMenuEvent<void>(menuEvents.saveAs, 'saveAs', () => handlers.onSaveAs());
+    await registerMenuEvent<void>(menuEvents.print, 'print', () => handlers.onPrint());
     await registerMenuEvent<void>(menuEvents.closeFile, 'closeFile', () => handlers.onCloseFile());
     await registerMenuEvent<void>(menuEvents.closeWindow, 'closeWindow', () => handlers.onCloseWindow());
     await registerMenuEvent<void>(menuEvents.exportPdf, 'exportPdf', () => handlers.onExportPdf());

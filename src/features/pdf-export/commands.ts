@@ -6,7 +6,7 @@ import { usePdfExportStore } from './store';
 export const pdfExportCommands: CommandContributionFactory = () => [
   {
     id: 'pdf.exportCurrent',
-    defaultShortcut: 'mod+p',
+    defaultShortcut: 'mod+shift+e',
     menu: { section: 'file', label: 'Export PDF' },
     run: exportCurrentPdf,
   },

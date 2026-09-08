@@ -8,6 +8,7 @@ interface ShortcutHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onPrint: () => void;
   onCloseFile: () => void;
   onCloseWindow: () => void;
 }
@@ -49,8 +50,12 @@ export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegist
       if (event.key.toLowerCase() === 'f') {
         if (dispatchShortcut(commands, 'mod+f')) event.preventDefault();
       }
-      if (event.key.toLowerCase() === 'p') {
-        if (dispatchShortcut(commands, 'mod+p')) event.preventDefault();
+      if (event.key.toLowerCase() === 'e' && event.shiftKey) {
+        if (dispatchShortcut(commands, 'mod+shift+e')) event.preventDefault();
+      }
+      if (event.key.toLowerCase() === 'p' && !event.shiftKey) {
+        event.preventDefault();
+        handlers.onPrint();
       }
     };
 

@@ -10,6 +10,7 @@ export interface AppMenuHandlers {
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onPrint: () => void;
 }
 
 export type AppMenuId = 'file' | 'edit' | 'view' | 'window' | 'help';
@@ -87,6 +88,8 @@ export function buildAppMenus({
         { separator: true },
         { label: 'Save', shortcut: 'Ctrl+S', action: handlers.onSave },
         { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: handlers.onSaveAs },
+        { separator: true },
+        { label: 'Print...', shortcut: 'Ctrl+P', action: handlers.onPrint },
         ...fileCommands.map((command) => ({
           label: command.menu?.label,
           shortcut: formatShortcut(command.defaultShortcut),
