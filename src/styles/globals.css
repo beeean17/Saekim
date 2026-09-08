@@ -85,9 +85,30 @@ textarea {
   border-radius: 5px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-faint);
-  background-clip: padding-box;
+@media (hover: hover) {
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-faint);
+    background-clip: padding-box;
+  }
+}
+
+@media (pointer: coarse) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    background-clip: padding-box;
+    border-width: 1px;
+  }
+}
+
+@media (pointer: fine) {
+  :where(.editor-content, .preview-content, .file-tree, .outline-panel) {
+    scrollbar-gutter: stable;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

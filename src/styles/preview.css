@@ -1,5 +1,6 @@
 .preview-content {
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px 36px 60px;
   color: var(--text-primary);
   font-family: var(--editor-font-family, var(--font-ui));
