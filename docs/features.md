@@ -1,6 +1,6 @@
 # Saekim 기능 명세
 
-Saekim 3.2.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 문서입니다.
+Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 문서입니다.
 설계 원칙은 [platform-architecture.md](platform-architecture.md)를 참고하세요.
 
 - **런타임**: Tauri 2 / React 18.3.1 / TypeScript 5.8.3 / Rust stable

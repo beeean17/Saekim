@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.3.0] - 2026-09-08
+
+### Added
+
+- 창별 위치와 크기를 저장하고 다음 실행에서 복원하도록 창 상태 플러그인을 추가했습니다.
+- 시스템 색상 모드를 따라 밝은 테마와 어두운 테마를 자동으로 전환하는 설정을 추가했습니다.
+- 저장 위치를 정하지 않고 바로 편집할 수 있는 메모리 기반 새 문서를 추가했습니다.
+- 접힌 하위 폴더까지 순회하고 커서 기반으로 페이지를 나누는 워크스페이스 파일명 검색을 추가했습니다.
+
+### Changed
+
+- 보조 창에도 Tauri 이벤트 권한을 적용하고 DOM 이벤트 주입, 중복 emit, 폴링 우회 코드를 제거했습니다.
+- Linux에서 애플리케이션 메뉴를 표시하고 macOS 전용 타이틀바 설정을 플랫폼 설정으로 분리했습니다.
+- 중간 폭에서는 뷰 모드 아이콘을 유지하고, 최소 폭보다 좁은 화면에서는 분할 뷰를 선택할 수 없도록 조정했습니다.
+- 저장된 문서 본문을 세션 메타데이터에서 제외하고 디스크에서 복원하며, 저장되지 않은 본문만 별도 초안으로 보관하도록 스키마를 v3로 변경했습니다.
+- UI와 설정은 400ms, 문서 상태는 2초 또는 창 포커스를 잃을 때 저장하도록 세션 저장 주기를 분리했습니다.
+
+### Fixed
+
+- `Cmd/Ctrl+P`가 인쇄를 실행하도록 복원하고 PDF 내보내기 단축키를 `Cmd/Ctrl+Shift+E`로 옮겼습니다.
+- 닫힌 파일이 탐색 기록에 남아 있어도 뒤로·앞으로 이동할 때 디스크에서 다시 열도록 수정했습니다.
+- UTF-8 BOM과 UTF-16 LE/BE 인코딩을 감지하고 같은 형식으로 왕복 저장하도록 수정했습니다.
+
+---
+
 ## [3.2.1] - 2026-09-08
 
 ### Changed
@@ -305,6 +330,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.3.0 | 2026-09-08 | Secondary-window events, restored window geometry, system theme, in-memory drafts, recursive workspace search, encoding round trips, body-free session metadata |
 | 3.2.1 | 2026-09-08 | Atomic and line-ending-safe saves, serialized metadata access, dirty-close protection, stable workspace roots, responsive window constraints, Android dark system bars |
 | 3.2.0 | Unreleased | Capability-based platform architecture, Android document integration, native app menus, responsive shell, persistent preview layouts, PDF export stability |
 | 3.1.0 | 2026-06-08 | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, source-line preview sync, code block selection stability, recent-file close cleanup, Windows text icon handling |
