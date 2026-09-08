@@ -1,17 +1,8 @@
 import { commandMenuItems, dispatchCommand, formatShortcut, type CommandRegistry } from '../../app/commands';
 import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
+import type { CommandContribution } from '../../app/feature';
 import type { ViewMode } from '../../types/workspace';
-
-export interface AppMenuHandlers {
-  onNewFile: () => void;
-  onNewWindow: () => void;
-  onOpen: () => void;
-  onOpenFolder: () => void;
-  onSave: () => void;
-  onSaveAs: () => void;
-  onPrint: () => void;
-}
 
 export type AppMenuId = 'file' | 'edit' | 'view' | 'window' | 'help';
 
@@ -19,6 +10,7 @@ export interface AppMenuItem {
   label?: string;
   shortcut?: string;
   checked?: boolean;
+  disabled?: boolean;
   separator?: boolean;
   action?: () => void;
 }
@@ -30,72 +22,35 @@ export interface AppMenuGroup {
 }
 
 export interface BuildAppMenusOptions {
-  handlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
   viewMode: ViewMode;
   effectiveViewMode: ViewMode;
-  availableViewModes: readonly ViewMode[];
-  setViewMode: (mode: ViewMode) => void;
-  toggleSidebar: () => void;
   syncScroll: boolean;
   toggleSyncScroll: () => void;
   getDocumentCommandTarget: () => HTMLElement | null;
   includeWindowMenu?: boolean;
 }
 
-const viewModeLabels: Record<ViewMode, string> = {
-  edit: 'Editor Only',
-  split: 'Split View',
-  preview: 'Preview Only',
-};
-
 export function buildAppMenus({
-  handlers,
   commandRegistry,
   viewMode,
   effectiveViewMode,
-  availableViewModes,
-  setViewMode,
-  toggleSidebar,
   syncScroll,
   toggleSyncScroll,
   getDocumentCommandTarget,
   includeWindowMenu = currentPlatformCapabilities().has('window.chrome'),
 }: BuildAppMenusOptions): AppMenuGroup[] {
-  const capabilities = currentPlatformCapabilities();
-  const fileCommands = commandMenuItems(commandRegistry, 'file').filter(
-    (command) => command.id !== 'pdf.exportCurrent' || capabilities.has('pdf.save'),
-  );
-  const editCommands = commandMenuItems(commandRegistry, 'edit');
-  const viewItems = availableViewModes.map((mode) => ({
-    label: viewModeLabels[mode],
-    checked: effectiveViewMode === mode,
-    action: () => setViewMode(mode),
+  const fileItems = registeredMenuItems(commandRegistry, 'file');
+  const editItems = registeredMenuItems(commandRegistry, 'edit');
+  const viewItems = registeredMenuItems(commandRegistry, 'view').map((item) => ({
+    ...item,
+    checked: item.commandId === `view.${effectiveViewMode}` ? true : item.checked,
   }));
   const menus: AppMenuGroup[] = [
     {
       id: 'file',
       label: 'File',
-      items: [
-        { label: 'New File', shortcut: 'Ctrl+N', action: handlers.onNewFile },
-        ...(includeWindowMenu
-          ? [{ label: 'New Window', shortcut: 'Ctrl+Shift+N', action: handlers.onNewWindow }]
-          : []),
-        { label: 'Open File...', shortcut: 'Ctrl+O', action: handlers.onOpen },
-        ...(capabilities.has('folder.open')
-          ? [{ label: 'Open Folder...', shortcut: 'Ctrl+Shift+O', action: handlers.onOpenFolder }]
-          : []),
-        { separator: true },
-        { label: 'Save', shortcut: 'Ctrl+S', action: handlers.onSave },
-        { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: handlers.onSaveAs },
-        { separator: true },
-        { label: 'Print...', shortcut: 'Ctrl+P', action: handlers.onPrint },
-        ...fileCommands.map((command) => ({
-          label: command.menu?.label,
-          shortcut: formatShortcut(command.defaultShortcut),
-          action: () => dispatchCommand(commandRegistry, command.id),
-        })),
-      ],
+      items: includeWindowMenu ? fileItems : fileItems.filter((item) => item.commandId !== 'window.new'),
     },
     {
       id: 'edit',
@@ -108,11 +63,7 @@ export function buildAppMenus({
         { label: 'Copy', shortcut: 'Ctrl+C', action: () => runDocumentCommand('copy', getDocumentCommandTarget()) },
         { label: 'Paste', shortcut: 'Ctrl+V', action: () => void runPasteCommand(getDocumentCommandTarget()) },
         { separator: true },
-        ...editCommands.map((command) => ({
-          label: command.menu?.label,
-          shortcut: formatShortcut(command.defaultShortcut),
-          action: () => dispatchCommand(commandRegistry, command.id),
-        })),
+        ...editItems,
         { label: 'Select All', shortcut: 'Ctrl+A', action: () => runDocumentCommand('selectAll', getDocumentCommandTarget()) },
       ],
     },
@@ -121,10 +72,8 @@ export function buildAppMenus({
       label: 'View',
       items: [
         ...viewItems,
-        { separator: true },
-        { label: 'Toggle Sidebar', action: toggleSidebar },
         ...(viewMode === 'split' && effectiveViewMode === 'split'
-          ? [{ label: 'Sync Scroll', checked: syncScroll, action: toggleSyncScroll }]
+          ? [{ separator: true }, { label: 'Sync Scroll', checked: syncScroll, action: toggleSyncScroll }]
           : []),
       ],
     },
@@ -137,8 +86,7 @@ export function buildAppMenus({
       items: [
         { label: 'Minimize', action: () => void runWindowAction('minimize') },
         { label: 'Maximize / Restore', action: () => void runWindowAction('toggleMaximize') },
-        { separator: true },
-        { label: 'Close Window', action: () => void runWindowAction('close') },
+        ...withLeadingSeparator(registeredMenuItems(commandRegistry, 'window')),
       ],
     });
   }
@@ -150,6 +98,38 @@ export function buildAppMenus({
   });
 
   return menus;
+}
+
+interface RegisteredMenuItem extends AppMenuItem {
+  commandId?: string;
+}
+
+function registeredMenuItems(commandRegistry: CommandRegistry, section: string): RegisteredMenuItem[] {
+  const items: RegisteredMenuItem[] = [];
+  let previousGroup: string | undefined;
+
+  for (const command of commandMenuItems(commandRegistry, section)) {
+    const group = command.menu?.group;
+    if (items.length > 0 && group !== previousGroup) items.push({ separator: true });
+    items.push(commandMenuItem(commandRegistry, command));
+    previousGroup = group;
+  }
+
+  return items;
+}
+
+function commandMenuItem(commandRegistry: CommandRegistry, command: CommandContribution): RegisteredMenuItem {
+  return {
+    commandId: command.id,
+    label: command.menu?.label ?? command.label,
+    shortcut: formatShortcut(command.defaultShortcut),
+    disabled: command.isEnabled?.() === false,
+    action: () => dispatchCommand(commandRegistry, command.id),
+  };
+}
+
+function withLeadingSeparator(items: AppMenuItem[]): AppMenuItem[] {
+  return items.length > 0 ? [{ separator: true }, ...items] : [];
 }
 
 function runDocumentCommand(command: string, target: HTMLElement | null): void {

@@ -4,58 +4,44 @@ import { useUIStore } from '../../store/ui';
 import type { ViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { MenuSurface } from '../ui/surface/MenuSurface';
-import { buildAppMenus, type AppMenuGroup, type AppMenuHandlers, type AppMenuId } from '../shell/appMenus';
+import { buildAppMenus, type AppMenuGroup, type AppMenuId } from '../shell/appMenus';
 
 interface SidebarMenuProps {
   readonly className?: string;
   readonly textareaRef: RefObject<HTMLTextAreaElement>;
-  readonly handlers: AppMenuHandlers;
   readonly commandRegistry: CommandRegistry;
   readonly effectiveViewMode: ViewMode;
-  readonly availableViewModes: readonly ViewMode[];
 }
 
 export function SidebarMenu({
   className,
   textareaRef,
-  handlers,
   commandRegistry,
   effectiveViewMode,
-  availableViewModes,
 }: SidebarMenuProps) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const viewMode = useUIStore((state) => state.viewMode);
-  const setViewMode = useUIStore((state) => state.setViewMode);
-  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
 
   const menus = useMemo<AppMenuGroup[]>(
     () =>
       buildAppMenus({
-        handlers,
         commandRegistry,
         viewMode,
         effectiveViewMode,
-        availableViewModes,
-        setViewMode,
-        toggleSidebar,
         syncScroll,
         toggleSyncScroll,
         getDocumentCommandTarget: () => lastFocusedRef.current ?? textareaRef.current,
         includeWindowMenu: false,
       }).filter((menu) => menu.id !== 'window' && menu.id !== 'help'),
     [
-      availableViewModes,
       commandRegistry,
       effectiveViewMode,
-      handlers,
-      setViewMode,
       syncScroll,
       textareaRef,
-      toggleSidebar,
       toggleSyncScroll,
       viewMode,
     ],
@@ -144,6 +130,7 @@ function SidebarMenuGroup({
             ) : (
               <button
                 className="app-menu-item"
+                disabled={item.disabled}
                 key={`${menu.id}-${item.label}`}
                 type="button"
                 role="menuitem"

@@ -46,6 +46,7 @@ interface UIState {
   setPreviewInteractionMode: (mode: PreviewInteractionMode) => void;
   toggleSyncScroll: () => void;
   toggleSettings: () => void;
+  openSettings: () => void;
   closeSettings: () => void;
   restoreUI: (ui: UISession) => void;
 }
@@ -72,6 +73,7 @@ export const useUIStore = create<UIState>()((set) => ({
   setPreviewInteractionMode: (mode) => set({ previewInteractionMode: mode }),
   toggleSyncScroll: () => set((state) => ({ syncScroll: !state.syncScroll })),
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
+  openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
   restoreUI: (ui) =>
     set({

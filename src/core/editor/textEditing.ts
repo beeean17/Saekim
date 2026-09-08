@@ -73,6 +73,28 @@ export function insertTextAtSelection(textarea: HTMLTextAreaElement | null, snip
   textarea.selectionEnd = start + snippet.length;
 }
 
+export function toggleInlineMarker(textarea: HTMLTextAreaElement | null, marker: string): void {
+  if (!textarea) return;
+  const value = textarea.value;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = value.slice(start, end);
+  const wrapped = value.slice(Math.max(0, start - marker.length), start) === marker
+    && value.slice(end, end + marker.length) === marker;
+
+  if (wrapped) {
+    const nextStart = start - marker.length;
+    replaceTextRange(textarea, nextStart, end + marker.length, selected);
+    textarea.selectionStart = nextStart;
+    textarea.selectionEnd = nextStart + selected.length;
+  } else {
+    replaceTextRange(textarea, start, end, `${marker}${selected}${marker}`);
+    textarea.selectionStart = start + marker.length;
+    textarea.selectionEnd = end + marker.length;
+  }
+  textarea.focus();
+}
+
 export function setTextareaValue(textarea: HTMLTextAreaElement, value: string): void {
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
   if (valueSetter) {

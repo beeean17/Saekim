@@ -16,6 +16,8 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
 import { useSearchStore } from './features/search';
+import { useCommandPaletteStore } from './features/command-palette';
+import { toggleInlineMarker } from './core/editor/textEditing';
 import { Backend } from './platform/common/backend';
 import { useUIStore } from './store/ui';
 import { selectActiveFile, useWorkspaceStore } from './store/workspace';
@@ -46,35 +48,77 @@ export function App() {
   const setSidebarMode = useUIStore((state) => state.setSidebarMode);
   const setEditorWidth = useUIStore((state) => state.setEditorWidth);
   const setViewMode = useUIStore((state) => state.setViewMode);
+  const openSettings = useUIStore((state) => state.openSettings);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+  const openCommandPalette = useCommandPaletteStore((state) => state.open);
   const { viewportProfile, availableViewModes, effectiveViewMode } = useResponsiveViewMode(viewMode);
 
   const commandRegistry = useMemo(
     () =>
       createCommandRegistry(enabledFeatures, {
+        file: {
+          newFile: () => void createFile(),
+          openFile: () => void openFile(),
+          openFolder: () => void openFolder(),
+          save: () => void saveActive(),
+          saveAs: () => void saveActiveAs(),
+          print: () => window.print(),
+          close: () => void closeActiveFile(),
+        },
+        window: {
+          newWindow: () => void Backend.runtime.openNewWindow(),
+          close: () => void Backend.runtime.runWindowAction('close'),
+        },
+        editor: {
+          hasTarget: () => Boolean(editorRef.current),
+          toggleBold: () => toggleInlineMarker(editorRef.current, '**'),
+          toggleItalic: () => toggleInlineMarker(editorRef.current, '*'),
+        },
+        view: {
+          openSettings,
+          setMode: setViewMode,
+          canSetMode: (mode) => availableViewModes.includes(mode),
+          toggleSidebar,
+        },
         search: { openFind, openReplace },
+        palette: { open: openCommandPalette },
       }),
-    [openFind, openReplace],
+    [
+      availableViewModes,
+      closeActiveFile,
+      createFile,
+      openCommandPalette,
+      openFile,
+      openFind,
+      openFolder,
+      openReplace,
+      openSettings,
+      saveActive,
+      saveActiveAs,
+      setViewMode,
+      toggleSidebar,
+    ],
   );
 
-  const shortcuts = useMemo(
+  const nativeMenuHandlers = useMemo(
     () => ({
-      onNewFile: () => void createFile(),
-      onNewWindow: () => void Backend.runtime.openNewWindow(),
-      onOpen: () => void openFile(),
-      onOpenFolder: () => void openFolder(),
+      onNewFile: () => dispatchCommand(commandRegistry, 'file.new'),
+      onNewWindow: () => dispatchCommand(commandRegistry, 'window.new'),
+      onOpen: () => dispatchCommand(commandRegistry, 'file.open'),
+      onOpenFolder: () => dispatchCommand(commandRegistry, 'folder.open'),
       onOpenRecentWorkspace: (path: string) => void openWorkspace(path),
-      onSave: () => void saveActive(),
-      onSaveAs: () => void saveActiveAs(),
-      onPrint: () => window.print(),
-      onCloseFile: () => void closeActiveFile(),
-      onCloseWindow: () => void Backend.runtime.runWindowAction('close'),
+      onSave: () => dispatchCommand(commandRegistry, 'file.save'),
+      onSaveAs: () => dispatchCommand(commandRegistry, 'file.saveAs'),
+      onPrint: () => dispatchCommand(commandRegistry, 'file.print'),
+      onCloseFile: () => dispatchCommand(commandRegistry, 'file.close'),
+      onCloseWindow: () => dispatchCommand(commandRegistry, 'window.close'),
       onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),
     }),
-    [closeActiveFile, commandRegistry, createFile, openFile, openFolder, openWorkspace, saveActive, saveActiveAs],
+    [commandRegistry, openWorkspace],
   );
 
-  useShortcuts(shortcuts, commandRegistry);
-  useNativeMenuCommands(shortcuts);
+  useShortcuts(commandRegistry);
+  useNativeMenuCommands(nativeMenuHandlers);
   const sessionLoaded = useSessionPersistence();
   useExternalFileOpen(openFile, sessionLoaded);
   const handlePreviewElementChange = useCallback((element: HTMLDivElement | null) => {
@@ -98,7 +142,6 @@ export function App() {
 
   return (
     <AppShell
-      menuHandlers={shortcuts}
       commandRegistry={commandRegistry}
       viewportProfile={viewportProfile}
       effectiveViewMode={effectiveViewMode}
@@ -110,10 +153,8 @@ export function App() {
           textareaRef={editorRef}
           editorScrollRef={editorScrollRef}
           previewRef={previewRef}
-          menuHandlers={shortcuts}
           commandRegistry={commandRegistry}
           effectiveViewMode={effectiveViewMode}
-          availableViewModes={availableViewModes}
         />
         <PaneResizer
           hidden={viewportProfile.profile === 'compact'}

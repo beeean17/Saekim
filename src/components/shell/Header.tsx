@@ -8,19 +8,16 @@ import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
 import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { MenuSurface } from '../ui/surface/MenuSurface';
-import { buildAppMenus, type AppMenuGroup, type AppMenuHandlers, type AppMenuId } from './appMenus';
+import { buildAppMenus, type AppMenuGroup, type AppMenuId } from './appMenus';
 import { handleTitlebarMouseDown } from './titlebarWindowControls';
 
-export type { AppMenuHandlers } from './appMenus';
-
 interface HeaderProps {
-  menuHandlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
   effectiveViewMode: ViewMode;
   availableViewModes: readonly ViewMode[];
 }
 
-export function Header({ menuHandlers, commandRegistry, effectiveViewMode, availableViewModes }: HeaderProps) {
+export function Header({ commandRegistry, effectiveViewMode, availableViewModes }: HeaderProps) {
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const settingsOpen = useUIStore((state) => state.settingsOpen);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -36,10 +33,8 @@ export function Header({ menuHandlers, commandRegistry, effectiveViewMode, avail
       <div className="titlebar-drag" data-tauri-drag-region />
       {showHeaderMenu ? (
         <AppMenu
-          handlers={menuHandlers}
           commandRegistry={commandRegistry}
           effectiveViewMode={effectiveViewMode}
-          availableViewModes={availableViewModes}
         />
       ) : null}
       <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.name}>
@@ -96,47 +91,33 @@ function ViewToggle({
 }
 
 function AppMenu({
-  handlers,
   commandRegistry,
   effectiveViewMode,
-  availableViewModes,
 }: {
-  handlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
   effectiveViewMode: ViewMode;
-  availableViewModes: readonly ViewMode[];
 }) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const viewMode = useUIStore((state) => state.viewMode);
-  const setViewMode = useUIStore((state) => state.setViewMode);
-  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
 
   const menus = useMemo<AppMenuGroup[]>(
     () =>
       buildAppMenus({
-        handlers,
         commandRegistry,
         viewMode,
         effectiveViewMode,
-        availableViewModes,
-        setViewMode,
-        toggleSidebar,
         syncScroll,
         toggleSyncScroll,
         getDocumentCommandTarget: () => lastFocusedRef.current,
       }),
     [
-      availableViewModes,
       commandRegistry,
       effectiveViewMode,
-      handlers,
-      setViewMode,
       syncScroll,
-      toggleSidebar,
       toggleSyncScroll,
       viewMode,
     ],
@@ -189,6 +170,7 @@ function AppMenu({
                 ) : (
                   <button
                     className="app-menu-item"
+                    disabled={item.disabled}
                     key={`${menu.id}-${item.label}`}
                     type="button"
                     role="menuitem"

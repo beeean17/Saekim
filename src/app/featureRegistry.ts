@@ -1,4 +1,6 @@
 import type { SaekimFeature } from './feature';
+import { appCommands } from '../features/app-commands';
+import { commandPaletteAppContribution, commandPaletteCommands } from '../features/command-palette';
 import { htmlPreviewContribution } from '../features/html-preview';
 import { imageAssetsEditorContribution } from '../features/image-assets';
 import { katexEditorContribution } from '../features/katex';
@@ -20,6 +22,19 @@ const featureCatalog: SaekimFeature[] = [
       required: ['file.open', 'file.save'],
       optional: ['folder.open', 'folder.tree', 'folder.operations', 'externalFile.open'],
     },
+  },
+  {
+    id: 'app-commands',
+    label: 'Application Commands',
+    dependsOn: ['file-workspace'],
+    commands: appCommands,
+  },
+  {
+    id: 'command-palette',
+    label: 'Command Palette',
+    dependsOn: ['app-commands'],
+    app: commandPaletteAppContribution,
+    commands: commandPaletteCommands,
   },
   {
     id: 'markdown',

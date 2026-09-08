@@ -1,12 +1,14 @@
-import { useEffect, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { CommandRegistry } from '../../app/commands';
+import { enabledFeatures } from '../../app/featureRegistry';
+import { selectAppOverlays } from '../../core/app/registry';
 import type { ViewportProfileSnapshot } from '../../hooks/useViewportProfile';
 import { Backend } from '../../platform/common/backend';
 import { Platform } from '../../platform/common/platform';
 import { useSettingsStore, useSystemTheme } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import type { ViewMode } from '../../types/workspace';
-import { Header, type AppMenuHandlers } from './Header';
+import { Header } from './Header';
 import { SettingsPanel } from './SettingsPanel';
 import { StatusBar } from './StatusBar';
 
@@ -14,7 +16,6 @@ const COLLAPSED_SIDEBAR_WIDTH = 56;
 
 interface AppShellProps {
   children: ReactNode;
-  menuHandlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
   viewportProfile: ViewportProfileSnapshot;
   effectiveViewMode: ViewMode;
@@ -24,7 +25,6 @@ interface AppShellProps {
 
 export function AppShell({
   children,
-  menuHandlers,
   commandRegistry,
   viewportProfile,
   effectiveViewMode,
@@ -38,6 +38,7 @@ export function AppShell({
   const sidebarWidth = useUIStore((state) => state.sidebarWidth);
   const splitRatio = useUIStore((state) => state.splitRatio);
   const editorWidth = useUIStore((state) => state.editorWidth);
+  const appOverlays = useMemo(() => selectAppOverlays(enabledFeatures), []);
   const visibleSidebarWidth = sidebarMode === 'collapsed' ? COLLAPSED_SIDEBAR_WIDTH : sidebarWidth;
   const layoutStyle = {
     '--sidebar-w': `${sidebarWidth}px`,
@@ -57,12 +58,15 @@ export function AppShell({
       style={layoutStyle}
     >
       <Header
-        menuHandlers={menuHandlers}
         commandRegistry={commandRegistry}
         effectiveViewMode={effectiveViewMode}
         availableViewModes={availableViewModes}
       />
       <SettingsPanel effectiveViewMode={effectiveViewMode} availableViewModes={availableViewModes} />
+      {appOverlays.map((overlay) => {
+        const Overlay = overlay.component;
+        return <Overlay commandRegistry={commandRegistry} key={overlay.id} />;
+      })}
       {children}
       <StatusBar textareaRef={textareaRef} />
     </div>

@@ -9,7 +9,6 @@ import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/worksp
 import type { FileTreeNode, OpenFile, ViewMode, WorkspaceSearchItem } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
-import type { AppMenuHandlers } from '../shell/appMenus';
 import { Dialog } from '../ui/overlay/Dialog';
 import { CloseButton } from '../ui/primitives/CloseButton';
 import { SearchField } from '../ui/primitives/SearchField';
@@ -21,20 +20,16 @@ interface SidebarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
   editorScrollRef: RefObject<HTMLDivElement>;
   previewRef: RefObject<HTMLDivElement>;
-  menuHandlers: AppMenuHandlers;
   commandRegistry: CommandRegistry;
   effectiveViewMode: ViewMode;
-  availableViewModes: readonly ViewMode[];
 }
 
 export function Sidebar({
   textareaRef,
   editorScrollRef,
   previewRef,
-  menuHandlers,
   commandRegistry,
   effectiveViewMode,
-  availableViewModes,
 }: SidebarProps) {
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
@@ -192,10 +187,8 @@ export function Sidebar({
         <SidebarMenu
           className="sidebar-actions"
           textareaRef={textareaRef}
-          handlers={menuHandlers}
           commandRegistry={commandRegistry}
           effectiveViewMode={effectiveViewMode}
-          availableViewModes={availableViewModes}
         />
       </div>
       <SidebarPanelTabs

@@ -16,9 +16,23 @@ export interface SaekimFeature {
   fileTypes?: FileTypeContribution | FileTypeContribution[];
   editor?: EditorContribution | EditorContribution[];
   sidebar?: SidebarContribution | SidebarContribution[];
+  app?: AppContribution | AppContribution[];
   commands?: CommandContributionFactory;
   metadata?: MetadataContribution | MetadataContribution[];
   pdf?: PdfContribution | PdfContribution[];
+}
+
+export interface AppContribution {
+  overlays?: AppOverlayContribution[];
+}
+
+export interface AppOverlayContribution {
+  id: string;
+  component: ComponentType<AppOverlayProps>;
+}
+
+export interface AppOverlayProps {
+  commandRegistry: ReadonlyMap<string, CommandContribution>;
 }
 
 export interface FeatureCapabilityRequirements {
@@ -134,17 +148,47 @@ export interface EditorEventHandlers {
 
 export interface CommandContribution {
   id: string;
-  run(ctx: CommandRuntimeContext): void | Promise<void>;
+  label: string;
+  run(): void | Promise<void>;
+  isEnabled?(): boolean;
   defaultShortcut?: string;
-  menu?: { section: string; label: string };
+  keywords?: string[];
+  menu?: { section: string; label?: string; group?: string; order?: number };
 }
 
 export type CommandContributionFactory = (ctx: CommandRuntimeContext) => CommandContribution[];
 
 export interface CommandRuntimeContext {
+  file: {
+    newFile(): void;
+    openFile(): void;
+    openFolder(): void;
+    save(): void;
+    saveAs(): void;
+    print(): void;
+    close(): void;
+  };
+  window: {
+    newWindow(): void;
+    close(): void;
+  };
+  editor: {
+    hasTarget(): boolean;
+    toggleBold(): void;
+    toggleItalic(): void;
+  };
+  view: {
+    openSettings(): void;
+    setMode(mode: 'edit' | 'split' | 'preview'): void;
+    canSetMode(mode: 'edit' | 'split' | 'preview'): boolean;
+    toggleSidebar(): void;
+  };
   search: {
     openFind(): void;
     openReplace(): void;
+  };
+  palette: {
+    open(): void;
   };
 }
 
