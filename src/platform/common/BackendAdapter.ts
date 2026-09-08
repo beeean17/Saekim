@@ -1,4 +1,4 @@
-import type { BlockLayout } from '../../types/metadata';
+import type { BlockLayout, DocumentSnapshot, DocumentSnapshotSummary } from '../../types/metadata';
 import type { WorkspaceSession } from '../../types/session';
 import type {
   FileTreeNode,
@@ -62,6 +62,8 @@ export interface MetadataBackend {
   loadSession<T>(): Promise<T | null>;
   saveSession<T>(session: T, scope: SessionSaveScope): Promise<void>;
   deleteDocumentDraft(filePath: string): Promise<void>;
+  listDocumentSnapshots(filePath: string): Promise<DocumentSnapshotSummary[]>;
+  loadDocumentSnapshot(snapshotId: string): Promise<DocumentSnapshot | null>;
   loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null>;
   loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;
   saveBlockLayout(layout: BlockLayout): Promise<void>;
@@ -130,6 +132,7 @@ export interface NativeMenuCommandHandlers {
   onCloseFile(): void;
   onCloseWindow(): void;
   onExportPdf(): void;
+  onOpenVersionHistory(): void;
   onFind(): void;
   onReplace(): void;
   onZoomIn(): void;

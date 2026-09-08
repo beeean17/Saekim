@@ -20,6 +20,8 @@ import {
 import { isTauriRuntime } from '../common/tauri/invoke';
 import {
   deleteDocumentDraft,
+  listDocumentSnapshots,
+  loadDocumentSnapshot,
   loadBlockLayouts,
   loadSession,
   loadWorkspaceSession,
@@ -68,6 +70,8 @@ export const androidBackend: BackendAdapter = {
     loadSession,
     saveSession,
     deleteDocumentDraft,
+    listDocumentSnapshots,
+    loadDocumentSnapshot,
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,

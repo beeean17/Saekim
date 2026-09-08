@@ -14,7 +14,9 @@ use tauri::Manager;
 use super::file::CommandResult;
 use crate::app_state::AppState;
 
-pub(super) const SCHEMA_VERSION: i64 = 3;
+pub(super) const SCHEMA_VERSION: i64 = 4;
+const CONTENT_EXTERNALIZATION_SCHEMA_VERSION: i64 = 3;
+const MAX_DOCUMENT_SNAPSHOTS: i64 = 100;
 const DEFAULT_WORKSPACE_ID: &str = "ws_default";
 const DEFAULT_VIEW_ID: &str = "view_default";
 const LEGACY_DRAFT_WINDOW: &str = "__legacy__";
@@ -47,6 +49,31 @@ pub enum SessionSaveScope {
     Documents,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSnapshotSummary {
+    id: String,
+    file_path: String,
+    encoding: String,
+    eol: String,
+    source: String,
+    character_count: i64,
+    created_at: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSnapshot {
+    id: String,
+    file_path: String,
+    content: String,
+    encoding: String,
+    eol: String,
+    source: String,
+    character_count: i64,
+    created_at: i64,
+}
+
 #[tauri::command]
 pub fn delete_document_draft(
     app: tauri::AppHandle,
@@ -55,6 +82,28 @@ pub fn delete_document_draft(
 ) -> CommandResult<Option<()>> {
     match delete_document_draft_from_metadata(&app, window.label(), &file_path) {
         Ok(()) => ok(Some(())),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn list_document_snapshots(
+    app: tauri::AppHandle,
+    file_path: String,
+) -> CommandResult<Vec<DocumentSnapshotSummary>> {
+    match list_document_snapshots_from_metadata(&app, &file_path) {
+        Ok(snapshots) => ok(snapshots),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
+pub fn load_document_snapshot(
+    app: tauri::AppHandle,
+    snapshot_id: String,
+) -> CommandResult<Option<DocumentSnapshot>> {
+    match load_document_snapshot_from_metadata(&app, &snapshot_id) {
+        Ok(snapshot) => ok(snapshot),
         Err(error) => fail(error),
     }
 }
@@ -724,6 +773,19 @@ fn initialize_schema(connection: &mut Connection) -> Result<(), String> {
               FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS document_snapshots (
+              id TEXT PRIMARY KEY,
+              file_id TEXT NOT NULL,
+              content TEXT NOT NULL,
+              encoding TEXT NOT NULL,
+              eol TEXT NOT NULL,
+              base_content_hash TEXT,
+              content_hash TEXT NOT NULL,
+              source TEXT NOT NULL,
+              created_at INTEGER NOT NULL,
+              FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS block_layouts (
               id TEXT PRIMARY KEY,
               file_id TEXT NOT NULL,
@@ -773,6 +835,8 @@ fn initialize_schema(connection: &mut Connection) -> Result<(), String> {
               ON window_file_view_state(window_label, workspace_id, is_open, open_order);
             CREATE INDEX IF NOT EXISTS idx_drafts_window_workspace
               ON drafts(window_label, workspace_id, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_document_snapshots_file_created
+              ON document_snapshots(file_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_block_layouts_file
               ON block_layouts(file_id, block_kind);
             ",
@@ -780,7 +844,8 @@ fn initialize_schema(connection: &mut Connection) -> Result<(), String> {
         .map_err(|error| format!("failed to initialize metadata schema: {error}"))?;
 
     migrate_embedded_file_content(connection)?;
-    super::layout_metadata::initialize_schema(connection)
+    super::layout_metadata::initialize_schema(connection)?;
+    save_metadata_value(connection, "schema_version", &SCHEMA_VERSION.to_string())
 }
 
 struct EmbeddedFileStateRow {
@@ -796,7 +861,7 @@ fn migrate_embedded_file_content(connection: &mut Connection) -> Result<(), Stri
     let schema_version = metadata_value(connection, "schema_version")?
         .and_then(|value| value.parse::<i64>().ok())
         .unwrap_or_default();
-    if schema_version >= SCHEMA_VERSION {
+    if schema_version >= CONTENT_EXTERNALIZATION_SCHEMA_VERSION {
         return Ok(());
     }
 
@@ -866,7 +931,11 @@ fn migrate_embedded_file_content(connection: &mut Connection) -> Result<(), Stri
     connection
         .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;")
         .map_err(|error| format!("failed to compact migrated session metadata: {error}"))?;
-    save_metadata_value(connection, "schema_version", &SCHEMA_VERSION.to_string())
+    save_metadata_value(
+        connection,
+        "schema_version",
+        &CONTENT_EXTERNALIZATION_SCHEMA_VERSION.to_string(),
+    )
 }
 
 fn migrate_embedded_file_state(
@@ -970,6 +1039,73 @@ fn delete_document_draft_from_metadata(
         )
         .map_err(|error| format!("failed to delete saved document draft: {error}"))?;
     Ok(())
+}
+
+fn list_document_snapshots_from_metadata(
+    app: &tauri::AppHandle,
+    file_path: &str,
+) -> Result<Vec<DocumentSnapshotSummary>, String> {
+    let connection = open_metadata_connection(app)?;
+    let mut statement = connection
+        .prepare(
+            "SELECT document_snapshots.id, files.absolute_path,
+                    document_snapshots.encoding, document_snapshots.eol,
+                    document_snapshots.source, length(document_snapshots.content),
+                    document_snapshots.created_at
+             FROM document_snapshots
+             JOIN files ON files.id = document_snapshots.file_id
+             WHERE files.absolute_path = ?1
+             ORDER BY document_snapshots.created_at DESC, document_snapshots.rowid DESC
+             LIMIT ?2",
+        )
+        .map_err(|error| format!("failed to prepare document snapshot list: {error}"))?;
+    let rows = statement
+        .query_map(params![file_path, MAX_DOCUMENT_SNAPSHOTS], |row| {
+            Ok(DocumentSnapshotSummary {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                encoding: row.get(2)?,
+                eol: row.get(3)?,
+                source: row.get(4)?,
+                character_count: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })
+        .map_err(|error| format!("failed to query document snapshots: {error}"))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to read document snapshots: {error}"))
+}
+
+fn load_document_snapshot_from_metadata(
+    app: &tauri::AppHandle,
+    snapshot_id: &str,
+) -> Result<Option<DocumentSnapshot>, String> {
+    let connection = open_metadata_connection(app)?;
+    connection
+        .query_row(
+            "SELECT document_snapshots.id, files.absolute_path,
+                    document_snapshots.content, document_snapshots.encoding,
+                    document_snapshots.eol, document_snapshots.source,
+                    length(document_snapshots.content), document_snapshots.created_at
+             FROM document_snapshots
+             JOIN files ON files.id = document_snapshots.file_id
+             WHERE document_snapshots.id = ?1",
+            params![snapshot_id],
+            |row| {
+                Ok(DocumentSnapshot {
+                    id: row.get(0)?,
+                    file_path: row.get(1)?,
+                    content: row.get(2)?,
+                    encoding: row.get(3)?,
+                    eol: row.get(4)?,
+                    source: row.get(5)?,
+                    character_count: row.get(6)?,
+                    created_at: row.get(7)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to load document snapshot: {error}"))
 }
 
 pub(super) fn find_file_for_path(
@@ -1228,6 +1364,108 @@ fn save_window_open_file(
         )?;
     }
 
+    insert_document_snapshot(
+        connection,
+        &file_id,
+        content,
+        encoding,
+        eol,
+        &content_hash,
+        if path.starts_with('~') || content != saved_content || encoding != saved_encoding {
+            "autosave"
+        } else {
+            "saved"
+        },
+        now,
+    )?;
+
+    Ok(())
+}
+
+fn insert_document_snapshot(
+    connection: &Connection,
+    file_id: &str,
+    content: &str,
+    encoding: &str,
+    eol: &str,
+    base_content_hash: &str,
+    source: &str,
+    created_at: i64,
+) -> Result<(), String> {
+    let content_hash = stable_hash(&serialize_document_content(content, eol));
+    let latest: Option<(String, String, String, String, String)> = connection
+        .query_row(
+            "SELECT id, content_hash, encoding, eol, source
+             FROM document_snapshots
+             WHERE file_id = ?1
+             ORDER BY created_at DESC, rowid DESC
+             LIMIT 1",
+            params![file_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to find latest document snapshot: {error}"))?;
+    if latest.as_ref().is_some_and(
+        |(_, latest_hash, latest_encoding, latest_eol, latest_source)| {
+            latest_hash == &content_hash
+                && latest_encoding == encoding
+                && latest_eol == eol
+                && latest_source == source
+        },
+    ) {
+        return Ok(());
+    }
+
+    let snapshot_id = stable_id(
+        "snapshot",
+        &format!(
+            "{file_id}:{content_hash}:{source}:{created_at}:{}",
+            latest
+                .as_ref()
+                .map(|(id, ..)| id.as_str())
+                .unwrap_or_default()
+        ),
+    );
+    connection
+        .execute(
+            "INSERT OR IGNORE INTO document_snapshots
+               (id, file_id, content, encoding, eol, base_content_hash,
+                content_hash, source, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                snapshot_id,
+                file_id,
+                content,
+                encoding,
+                eol,
+                base_content_hash,
+                content_hash,
+                source,
+                created_at
+            ],
+        )
+        .map_err(|error| format!("failed to save document snapshot: {error}"))?;
+    connection
+        .execute(
+            "DELETE FROM document_snapshots
+             WHERE file_id = ?1
+               AND id NOT IN (
+                 SELECT id FROM document_snapshots
+                 WHERE file_id = ?1
+                 ORDER BY created_at DESC, rowid DESC
+                 LIMIT ?2
+               )",
+            params![file_id, MAX_DOCUMENT_SNAPSHOTS],
+        )
+        .map_err(|error| format!("failed to prune document snapshots: {error}"))?;
     Ok(())
 }
 
@@ -2217,6 +2455,114 @@ mod tests {
         assert!(!dirty_state.contains("saved body"));
         assert!(!dirty_state.contains("unsaved body"));
         assert_eq!(draft_content, "unsaved body");
+    }
+
+    #[test]
+    fn document_session_keeps_deduplicated_local_snapshots() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_schema(&mut connection).unwrap();
+        ensure_workspace(&connection, "ws_test", "/project").unwrap();
+
+        let clean_file = json!({
+            "id": "/project/note.md",
+            "path": "/project/note.md",
+            "name": "note.md",
+            "content": "saved body",
+            "savedContent": "saved body",
+            "encoding": "utf-8",
+            "savedEncoding": "utf-8",
+            "eol": "LF"
+        });
+        for now in [1, 2] {
+            save_window_open_file(
+                &connection,
+                "main",
+                "ws_test",
+                "/project",
+                &clean_file,
+                0,
+                Some("/project/note.md"),
+                now,
+            )
+            .unwrap();
+        }
+
+        let dirty_file = json!({
+            "id": "/project/note.md",
+            "path": "/project/note.md",
+            "name": "note.md",
+            "content": "autosaved body",
+            "savedContent": "saved body",
+            "encoding": "utf-8",
+            "savedEncoding": "utf-8",
+            "eol": "CRLF"
+        });
+        save_window_open_file(
+            &connection,
+            "main",
+            "ws_test",
+            "/project",
+            &dirty_file,
+            0,
+            Some("/project/note.md"),
+            3,
+        )
+        .unwrap();
+
+        let snapshots: Vec<(String, String, String, i64)> = connection
+            .prepare(
+                "SELECT content, source, eol, created_at
+                 FROM document_snapshots
+                 ORDER BY created_at",
+            )
+            .unwrap()
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            snapshots,
+            vec![
+                ("saved body".into(), "saved".into(), "LF".into(), 1),
+                ("autosaved body".into(), "autosave".into(), "CRLF".into(), 3),
+            ]
+        );
+
+        for now in 4..=110 {
+            let content = format!("autosaved body {now}");
+            let file = json!({
+                "id": "/project/note.md",
+                "path": "/project/note.md",
+                "name": "note.md",
+                "content": content,
+                "savedContent": "saved body",
+                "encoding": "utf-8",
+                "savedEncoding": "utf-8",
+                "eol": "LF"
+            });
+            save_window_open_file(
+                &connection,
+                "main",
+                "ws_test",
+                "/project",
+                &file,
+                0,
+                Some("/project/note.md"),
+                now,
+            )
+            .unwrap();
+        }
+        let (snapshot_count, oldest_snapshot): (i64, i64) = connection
+            .query_row(
+                "SELECT COUNT(*), MIN(created_at) FROM document_snapshots",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(snapshot_count, 100);
+        assert_eq!(oldest_snapshot, 11);
     }
 
     #[test]

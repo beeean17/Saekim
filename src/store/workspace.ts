@@ -3,6 +3,7 @@ import { detectLineEndings, serializeLineEndings } from '../core/document/lineEn
 import { requestExternalChangeDecision } from '../core/document/externalChangeDecision';
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
+import type { DocumentSnapshot } from '../types/metadata';
 import type { FileRevision, FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace, TextEncoding } from '../types/workspace';
 import { translateCurrent } from '../i18n/current';
 
@@ -26,6 +27,7 @@ interface WorkspaceState {
   reopenClosedFile: () => Promise<void>;
   updateContent: (id: string, text: string) => void;
   setEncoding: (id: string, encoding: TextEncoding) => void;
+  restoreDocumentSnapshot: (id: string, snapshot: DocumentSnapshot) => void;
   saveFile: (id: string) => Promise<string | null>;
   saveActive: () => Promise<void>;
   saveActiveAs: () => Promise<void>;
@@ -227,6 +229,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     confirmedEncodingChanges.delete(id);
     set((state) => ({
       openFiles: state.openFiles.map((file) => (file.id === id ? { ...file, encoding } : file)),
+    }));
+  },
+  restoreDocumentSnapshot: (id, snapshot) => {
+    confirmedEncodingChanges.delete(id);
+    set((state) => ({
+      openFiles: state.openFiles.map((file) =>
+        file.id === id
+          ? { ...file, content: snapshot.content, encoding: snapshot.encoding, eol: snapshot.eol }
+          : file,
+      ),
     }));
   },
   saveFile: async (id) => {

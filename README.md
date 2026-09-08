@@ -29,6 +29,7 @@ that stay next to the source file.
   handling through Tauri
 - Markdown/text default-app support for macOS and Windows packaging
 - Instant Korean/English UI switching with the language saved between sessions
+- Automatic local snapshots with a version browser and one-click five-minute restore
 - PDF export from the rendered preview
 - Local `.assets/` image workflow:
   - insert images by original path
@@ -39,7 +40,7 @@ that stay next to the source file.
 - Structured previews for JSON, YAML, TOML, CSV, TSV, and OpenAPI documents
 - Preview block layout metadata for image/table/list/code/Mermaid/KaTeX blocks,
   including width, alignment, and 2-column/3-column grouping
-- SQLite-backed metadata/session storage in the OS application support path
+- SQLite-backed metadata/session, draft, and local version-history storage in the OS application support path
 
 ---
 

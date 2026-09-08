@@ -7,6 +7,7 @@ const MENU_SAVE: &str = "save";
 const MENU_SAVE_AS: &str = "save-as";
 const MENU_PRINT: &str = "print";
 const MENU_EXPORT_PDF: &str = "export-pdf";
+const MENU_VERSION_HISTORY: &str = "version-history";
 const MENU_NEW_FILE: &str = "new-file";
 const MENU_NEW_WINDOW: &str = "new-window";
 const MENU_OPEN_FILE: &str = "open-file";
@@ -27,6 +28,7 @@ const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_PRINT: &str = "saekim-menu-print";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
+const EVENT_VERSION_HISTORY: &str = "saekim-menu-version-history";
 const EVENT_NEW_FILE: &str = "saekim-menu-new-file";
 const EVENT_NEW_WINDOW: &str = "saekim-menu-new-window";
 const EVENT_OPEN_FILE: &str = "saekim-menu-open-file";
@@ -96,6 +98,13 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         "Export PDF",
         true,
         Some("CmdOrCtrl+Shift+E"),
+    )?;
+    let version_history = MenuItem::with_id(
+        app,
+        MENU_VERSION_HISTORY,
+        "Local Version History...",
+        true,
+        Some("CmdOrCtrl+Shift+H"),
     )?;
     let print = MenuItem::with_id(app, MENU_PRINT, "Print...", true, Some("CmdOrCtrl+P"))?;
     let close_file = MenuItem::with_id(
@@ -169,6 +178,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::separator(app)?,
             &save,
             &save_as,
+            &version_history,
             &PredefinedMenuItem::separator(app)?,
             &print,
             &export_pdf,
@@ -400,6 +410,7 @@ fn menu_event_name(menu_id: &str) -> Option<&'static str> {
         MENU_SAVE_AS => Some(EVENT_SAVE_AS),
         MENU_PRINT => Some(EVENT_PRINT),
         MENU_EXPORT_PDF => Some(EVENT_EXPORT_PDF),
+        MENU_VERSION_HISTORY => Some(EVENT_VERSION_HISTORY),
         MENU_NEW_FILE => Some(EVENT_NEW_FILE),
         MENU_NEW_WINDOW => Some(EVENT_NEW_WINDOW),
         MENU_OPEN_FILE => Some(EVENT_OPEN_FILE),

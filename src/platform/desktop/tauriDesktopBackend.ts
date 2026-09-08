@@ -29,6 +29,8 @@ import {
 import { isTauriRuntime } from '../common/tauri/invoke';
 import {
   deleteDocumentDraft,
+  listDocumentSnapshots,
+  loadDocumentSnapshot,
   loadBlockLayouts,
   loadSession,
   loadWorkspaceSession,
@@ -62,6 +64,7 @@ const menuEvents = {
   closeFile: 'saekim-menu-close-file',
   closeWindow: 'saekim-menu-close-window',
   exportPdf: 'saekim-menu-export-pdf',
+  versionHistory: 'saekim-menu-version-history',
   find: 'saekim-menu-find',
   replace: 'saekim-menu-replace',
   zoomIn: 'saekim-menu-zoom-in',
@@ -100,6 +103,8 @@ export const tauriDesktopBackend: BackendAdapter = {
     loadSession,
     saveSession,
     deleteDocumentDraft,
+    listDocumentSnapshots,
+    loadDocumentSnapshot,
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
@@ -212,6 +217,7 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
     await registerMenuEvent<void>(menuEvents.closeFile, 'closeFile', () => handlers.onCloseFile());
     await registerMenuEvent<void>(menuEvents.closeWindow, 'closeWindow', () => handlers.onCloseWindow());
     await registerMenuEvent<void>(menuEvents.exportPdf, 'exportPdf', () => handlers.onExportPdf());
+    await registerMenuEvent<void>(menuEvents.versionHistory, 'versionHistory', () => handlers.onOpenVersionHistory());
     await registerMenuEvent<void>(menuEvents.find, 'find', () => handlers.onFind());
     await registerMenuEvent<void>(menuEvents.replace, 'replace', () => handlers.onReplace());
     await registerMenuEvent<void>(menuEvents.zoomIn, 'zoomIn', () => handlers.onZoomIn());

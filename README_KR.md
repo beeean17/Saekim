@@ -27,6 +27,7 @@ Tauri 2, React, TypeScript, Rust 기반으로 동작하며, 편집기와 미리�
   OS 기본 앱 파일 열기 처리
 - macOS와 Windows 패키징에서 Markdown/text 기본 앱 연결 지원
 - 세션 간 선택을 유지하는 한국어/영어 UI 즉시 전환
+- 로컬 자동 스냅샷, 버전 탐색, 5분 전 원클릭 복원
 - 렌더링된 미리보기 기준 PDF 내보내기
 - 문서 옆 `.assets/` 이미지 워크플로우:
   - 원본 경로로 이미지 연결
@@ -37,7 +38,7 @@ Tauri 2, React, TypeScript, Rust 기반으로 동작하며, 편집기와 미리�
 - JSON, YAML, TOML, CSV, TSV, OpenAPI 문서의 구조화 미리보기
 - 이미지, 표, 리스트, 코드, Mermaid, KaTeX 블럭의 크기/정렬/2열/3열
   그룹 metadata 저장
-- OS Application Support 경로에 저장되는 SQLite 기반 metadata/session 저장소
+- OS Application Support 경로에 저장되는 SQLite 기반 metadata/session/초안/로컬 버전 히스토리 저장소
 
 ---
 

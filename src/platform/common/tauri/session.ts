@@ -1,5 +1,5 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
-import type { BlockLayout } from '../../../types/metadata';
+import type { BlockLayout, DocumentSnapshot, DocumentSnapshotSummary } from '../../../types/metadata';
 import type { WorkspaceSession } from '../../../types/session';
 import type { SessionSaveScope } from '../BackendAdapter';
 
@@ -16,6 +16,16 @@ export async function saveSession<T>(session: T, scope: SessionSaveScope): Promi
 export async function deleteDocumentDraft(filePath: string): Promise<void> {
   if (!isTauriRuntime()) return;
   await invokeCommand<null>('delete_document_draft', { filePath });
+}
+
+export async function listDocumentSnapshots(filePath: string): Promise<DocumentSnapshotSummary[]> {
+  if (!isTauriRuntime()) return [];
+  return invokeCommand<DocumentSnapshotSummary[]>('list_document_snapshots', { filePath });
+}
+
+export async function loadDocumentSnapshot(snapshotId: string): Promise<DocumentSnapshot | null> {
+  if (!isTauriRuntime()) return null;
+  return invokeCommand<DocumentSnapshot | null>('load_document_snapshot', { snapshotId });
 }
 
 export async function loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null> {

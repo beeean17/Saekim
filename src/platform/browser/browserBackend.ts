@@ -1,5 +1,6 @@
 import type { BackendAdapter, CloseDecision, ImagePickPayload } from '../common/BackendAdapter';
-import type { BlockLayout } from '../../types/metadata';
+import type { BlockLayout, DocumentSnapshot, DocumentSnapshotSummary } from '../../types/metadata';
+import type { AppSession } from '../../types/session';
 import type {
   FileTreeNode,
   FolderPayload,
@@ -14,6 +15,8 @@ import { translateCurrent } from '../../i18n/current';
 
 const sessionKey = 'saekim-browser-session';
 const blockLayoutPrefix = 'saekim-block-layouts:';
+const documentSnapshotPrefix = 'saekim-document-snapshots:';
+const maxDocumentSnapshots = 100;
 
 export const browserBackend: BackendAdapter = {
   files: {
@@ -44,6 +47,8 @@ export const browserBackend: BackendAdapter = {
     loadSession,
     saveSession,
     deleteDocumentDraft,
+    listDocumentSnapshots,
+    loadDocumentSnapshot,
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
@@ -297,11 +302,99 @@ async function loadSession<T>(): Promise<T | null> {
   return raw ? (JSON.parse(raw) as T) : null;
 }
 
-async function saveSession<T>(session: T, _scope: import('../common/BackendAdapter').SessionSaveScope): Promise<void> {
+async function saveSession<T>(session: T, scope: import('../common/BackendAdapter').SessionSaveScope): Promise<void> {
   localStorage.setItem(sessionKey, JSON.stringify(session));
+  if (scope === 'documents') saveBrowserDocumentSnapshots(session as AppSession);
 }
 
 async function deleteDocumentDraft(_filePath: string): Promise<void> {}
+
+async function listDocumentSnapshots(filePath: string): Promise<DocumentSnapshotSummary[]> {
+  return readBrowserDocumentSnapshots(filePath).map(({ content: _content, ...summary }) => summary);
+}
+
+async function loadDocumentSnapshot(snapshotId: string): Promise<DocumentSnapshot | null> {
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(documentSnapshotPrefix)) continue;
+    const snapshot = readBrowserSnapshotKey(key).find((item) => item.id === snapshotId);
+    if (snapshot) return snapshot;
+  }
+  return null;
+}
+
+function saveBrowserDocumentSnapshots(session: AppSession): void {
+  const createdAt = Date.now();
+  for (const file of session.workspace.openFiles) {
+    const source = file.path.startsWith('~') || file.content !== file.savedContent || file.encoding !== file.savedEncoding
+      ? 'autosave'
+      : 'saved';
+    const snapshots = readBrowserDocumentSnapshots(file.path);
+    const previous = snapshots[0];
+    if (
+      previous?.content === file.content &&
+      previous.encoding === file.encoding &&
+      previous.eol === file.eol &&
+      previous.source === source
+    ) {
+      continue;
+    }
+    const snapshot: DocumentSnapshot = {
+      id: browserSnapshotId(file.path, file.content, source, createdAt, previous?.id),
+      filePath: file.path,
+      content: file.content,
+      encoding: file.encoding,
+      eol: file.eol,
+      source,
+      characterCount: Array.from(file.content).length,
+      createdAt,
+    };
+    persistBrowserDocumentSnapshots(file.path, [snapshot, ...snapshots].slice(0, maxDocumentSnapshots));
+  }
+}
+
+function readBrowserDocumentSnapshots(filePath: string): DocumentSnapshot[] {
+  return readBrowserSnapshotKey(browserSnapshotKey(filePath));
+}
+
+function readBrowserSnapshotKey(key: string): DocumentSnapshot[] {
+  const raw = localStorage.getItem(key);
+  if (!raw) return [];
+  try {
+    const snapshots = JSON.parse(raw) as DocumentSnapshot[];
+    return Array.isArray(snapshots) ? snapshots : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistBrowserDocumentSnapshots(filePath: string, snapshots: DocumentSnapshot[]): void {
+  const key = browserSnapshotKey(filePath);
+  const candidates = [...snapshots];
+  while (candidates.length > 0) {
+    try {
+      localStorage.setItem(key, JSON.stringify(candidates));
+      return;
+    } catch {
+      candidates.pop();
+    }
+  }
+  console.warn('Local version history could not store this document snapshot.');
+}
+
+function browserSnapshotKey(filePath: string): string {
+  return `${documentSnapshotPrefix}${encodeURIComponent(filePath)}`;
+}
+
+function browserSnapshotId(filePath: string, content: string, source: string, createdAt: number, previousId?: string): string {
+  let hash = 2166136261;
+  const input = `${filePath}\u0000${content}\u0000${source}\u0000${createdAt}\u0000${previousId ?? ''}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `snapshot_${createdAt}_${(hash >>> 0).toString(16)}`;
+}
 
 async function loadWorkspaceSession(_workspacePath: string): Promise<null> {
   return null;

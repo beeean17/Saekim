@@ -20,6 +20,7 @@ import { useAutoUpdater } from './hooks/useAutoUpdater';
 import { useWindowDocumentState } from './hooks/useWindowDocumentState';
 import { useSearchStore } from './features/search';
 import { useCommandPaletteStore } from './features/command-palette';
+import { useVersionHistoryStore } from './features/version-history';
 import { toggleInlineMarker } from './core/editor/textEditing';
 import { Backend } from './platform/common/backend';
 import { useUIStore } from './store/ui';
@@ -57,6 +58,7 @@ export function App() {
   const openSettings = useUIStore((state) => state.openSettings);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const openCommandPalette = useCommandPaletteStore((state) => state.open);
+  const openVersionHistory = useVersionHistoryStore((state) => state.open);
   const zoomIn = useCallback(() => {
     const settings = useSettingsStore.getState();
     settings.setFontSize(stepFontSize(settings.fontSize, 1));
@@ -100,6 +102,10 @@ export function App() {
         },
         search: { openFind, openReplace },
         palette: { open: openCommandPalette },
+        history: {
+          hasDocument: () => Boolean(useWorkspaceStore.getState().activeFileId),
+          open: openVersionHistory,
+        },
       }),
     [
       availableViewModes,
@@ -111,6 +117,7 @@ export function App() {
       openFolder,
       openReplace,
       openSettings,
+      openVersionHistory,
       saveActive,
       saveActiveAs,
       setViewMode,
@@ -136,6 +143,7 @@ export function App() {
       onCloseFile: () => dispatchCommand(commandRegistry, 'file.close'),
       onCloseWindow: () => dispatchCommand(commandRegistry, 'window.close'),
       onExportPdf: () => dispatchCommand(commandRegistry, 'pdf.exportCurrent'),
+      onOpenVersionHistory: () => dispatchCommand(commandRegistry, 'documents.openVersionHistory'),
       onFind: () => dispatchCommand(commandRegistry, 'search.openFind'),
       onReplace: () => dispatchCommand(commandRegistry, 'search.openReplace'),
       onZoomIn: () => dispatchCommand(commandRegistry, 'view.zoomIn'),

@@ -13,6 +13,7 @@ import { pdfExportCommands, pdfExportContribution } from '../features/pdf-export
 import { searchCommands, searchEditorContribution } from '../features/search';
 import { structuredDataPreviewContribution, tabularDataPreviewContribution } from '../features/structured-data';
 import { tabCommands, tabsEditorContribution } from '../features/tabs';
+import { versionHistoryAppContribution, versionHistoryCommands } from '../features/version-history';
 import { currentPlatformCapabilities, type PlatformCapability } from '../platform/common/capabilities';
 
 const featureCatalog: SaekimFeature[] = [
@@ -42,6 +43,13 @@ const featureCatalog: SaekimFeature[] = [
     label: 'External Change Protection',
     dependsOn: ['file-workspace'],
     app: externalChangesAppContribution,
+  },
+  {
+    id: 'version-history',
+    label: 'Local Version History',
+    dependsOn: ['file-workspace'],
+    app: versionHistoryAppContribution,
+    commands: versionHistoryCommands,
   },
   {
     id: 'markdown',

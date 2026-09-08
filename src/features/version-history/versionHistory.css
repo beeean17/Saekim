@@ -1,0 +1,106 @@
+.version-history-dialog {
+  width: min(840px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.version-history-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.version-history-header h2,
+.version-history-header p {
+  margin: 0;
+}
+
+.version-history-header p,
+.version-history-item span,
+.version-history-notice {
+  color: var(--text-muted);
+}
+
+.version-history-header p {
+  margin-top: 4px;
+}
+
+.version-history-body {
+  min-height: 360px;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.version-history-list,
+.version-history-preview {
+  min-height: 0;
+  overflow: auto;
+}
+
+.version-history-list {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.version-history-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.version-history-item:hover,
+.version-history-item[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+
+.version-history-preview {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg-sunken);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.version-history-notice {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .version-history-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    padding: 16px;
+  }
+
+  .version-history-body {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(120px, 0.7fr) minmax(180px, 1fr);
+  }
+
+  .version-history-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+}

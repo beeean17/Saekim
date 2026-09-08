@@ -98,6 +98,8 @@ pub fn run() {
             commands::session::load_session,
             commands::session::load_workspace_session,
             commands::session::delete_document_draft,
+            commands::session::list_document_snapshots,
+            commands::session::load_document_snapshot,
             commands::layout_metadata::load_block_layouts,
             commands::session::save_session,
             commands::layout_metadata::save_block_layout,

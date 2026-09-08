@@ -25,3 +25,19 @@ export interface BlockLayout {
   identityHash?: string | null;
   layoutJson?: Record<string, unknown> | null;
 }
+
+export type DocumentSnapshotSource = 'autosave' | 'saved';
+
+export interface DocumentSnapshotSummary {
+  id: string;
+  filePath: string;
+  encoding: import('./workspace').TextEncoding;
+  eol: 'LF' | 'CRLF';
+  source: DocumentSnapshotSource;
+  characterCount: number;
+  createdAt: number;
+}
+
+export interface DocumentSnapshot extends DocumentSnapshotSummary {
+  content: string;
+}

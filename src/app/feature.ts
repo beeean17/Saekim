@@ -193,6 +193,10 @@ export interface CommandRuntimeContext {
   palette: {
     open(): void;
   };
+  history: {
+    hasDocument(): boolean;
+    open(): void;
+  };
 }
 
 export interface MetadataContribution {
