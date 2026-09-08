@@ -46,14 +46,14 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 | --- | :-: | --- | :-: |
 | macOS | 없음 (네이티브 메뉴 사용) | - | O |
 | Windows | 있음 | `windows-titlebar menu-titlebar` | O |
-| Linux | 없음 | - | O |
+| Linux | 있음 | `menu-titlebar` | O |
 | Android | 없음 | - | - |
 
 ---
 
 ## 2. 기능 레지스트리
 
-`src/app/featureRegistry.ts`가 11개 기능을 선언하고, 앱 시작 시 capability와
+`src/app/featureRegistry.ts`가 12개 기능을 선언하고, 앱 시작 시 capability와
 의존성을 검사해 활성 목록을 결정합니다.
 
 | 기능 ID | 의존 | 필요 capability | 기여 항목 |
@@ -69,6 +69,7 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 | `block-layout` | `markdown`, `metadata` | `metadata.sqlite` | preview, metadata |
 | `pdf-export` | - | `pdf.save` | commands, pdf |
 | `search` | - | - | editor, commands |
+| `tabs` | `file-workspace` | - | editor, commands |
 
 ### 선택 알고리즘
 
@@ -84,8 +85,8 @@ Saekim 3.3.0 기준으로 현재 구현되어 있는 기능을 전부 정리한 
 - **`preview`** — `match` / `priority` / `render` / `afterRender` / `cleanup` /
   `head` / `supportsBlockLayouts`
 - **`fileTypes`** — 확장자, 라벨, 언어, `previewKind` 매핑
-- **`editor`** — 툴바 항목, 오버레이 컴포넌트, 헬퍼 모달, 이벤트 핸들러,
-  이미지 액션
+- **`editor`** — 상단 바, 툴바 항목, 오버레이 컴포넌트, 헬퍼 모달,
+  이벤트 핸들러, 이미지 액션
 - **`commands`** — id, 기본 단축키, 메뉴 배치, 실행 함수
 - **`metadata`** — 블록 레이아웃 읽기/쓰기
 - **`pdf`** — 현재 문서 내보내기
@@ -194,6 +195,14 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | `open_new_window` / `set_window_min_size` / `start_window_drag` | 창 |
 | `open_external_url` | 외부 링크 (http/https/mailto/tel/file 허용) |
 | `log_frontend_event` | 프론트엔드 로그를 stderr로 |
+
+### 3.7 문서 탭
+
+- 열린 문서를 편집기 상단 탭 스트립에 표시하고 active·dirty 상태를 구분
+- 탭 선택 또는 `Cmd/Ctrl+1~9`로 문서 전환
+- 탭 닫기 버튼과 가운데 클릭은 기존 저장·버리기·취소 확인 흐름을 재사용
+- `Cmd/Ctrl+Shift+T`로 가장 최근에 닫은 탭을 다시 열며 최대 20개를 기억
+- 탭 UI는 `tabs` 기능의 `editor.topBars` 기여로 등록
 
 ---
 

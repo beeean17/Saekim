@@ -12,6 +12,7 @@ interface WorkspaceState {
   openFiles: OpenFile[];
   recentWorkspaces: RecentWorkspace[];
   activeFileId: string | null;
+  closedFiles: OpenFile[];
   history: { back: string[]; forward: string[]; current: string | null };
   openFolder: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
@@ -20,6 +21,7 @@ interface WorkspaceState {
   toggleFolder: (path: string) => Promise<void>;
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
+  reopenClosedFile: () => Promise<void>;
   updateContent: (id: string, text: string) => void;
   setEncoding: (id: string, encoding: TextEncoding) => void;
   saveFile: (id: string) => Promise<string | null>;
@@ -39,6 +41,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFiles: [],
   recentWorkspaces: [],
   activeFileId: null,
+  closedFiles: [],
   history: { back: [], forward: [], current: null },
   openFolder: async () => {
     try {
@@ -151,10 +154,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         state.activeFileId === id ? openFiles[Math.max(0, Math.min(closedIndex, openFiles.length - 1))] ?? null : null;
       const activeFileId = nextActiveFile?.id ?? (state.activeFileId === id ? null : state.activeFileId);
       const closedPath = closedFile?.path;
+      const closedSnapshot = closedFile
+        ? {
+            ...closedFile,
+            content: closedFile.savedContent,
+            encoding: closedFile.savedEncoding,
+          }
+        : null;
+      const closedFiles = closedSnapshot
+        ? [closedSnapshot, ...state.closedFiles.filter((file) => file.path !== closedSnapshot.path)].slice(0, 20)
+        : state.closedFiles;
       nextActivePath = nextActiveFile?.path ?? null;
 
       if (state.activeFileId !== id) {
-        return { openFiles, activeFileId, history: state.history };
+        return { openFiles, activeFileId, closedFiles, history: state.history };
       }
 
       const back = nextActivePath === state.history.back[state.history.back.length - 1]
@@ -167,6 +180,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         openFiles,
         activeFileId,
+        closedFiles,
         history: {
           back,
           forward,
@@ -180,6 +194,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
         if (folderPatch && activeFile?.path === nextActivePath) set((state) => applyFolderPatch(state, folderPatch));
       });
+  },
+  reopenClosedFile: async () => {
+    const closedFile = get().closedFiles[0];
+    if (!closedFile) return;
+    set((state) => ({ closedFiles: state.closedFiles.slice(1) }));
+
+    if (isPlaceholderPath(closedFile.path)) {
+      set((state) => upsertOpenFile(state, closedFile));
+      return;
+    }
+
+    try {
+      const opened = await Backend.files.readFile(closedFile.path);
+      await get().openFileFromPayload(opened);
+    } catch (error) {
+      console.error('닫은 탭 다시 열기 실패:', error);
+      set((state) => ({
+        closedFiles: [closedFile, ...state.closedFiles.filter((file) => file.path !== closedFile.path)].slice(0, 20),
+      }));
+    }
   },
   updateContent: (id, text) =>
     set((state) => ({
@@ -313,6 +347,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tree: normalizedWorkspace.tree,
       openFiles,
       activeFileId,
+      closedFiles: [],
       recentWorkspaces: normalizedWorkspace.rootPath
         ? upsertRecentWorkspace(get().recentWorkspaces, normalizedWorkspace.rootPath)
         : get().recentWorkspaces,
@@ -548,12 +583,13 @@ function workspaceFolderPatch(
   state: WorkspaceState,
   rootPath: string,
   tree: FileTreeNode[],
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'closedFiles' | 'history' | 'recentWorkspaces'> {
   return {
     rootPath,
     tree,
     openFiles: [],
     activeFileId: null,
+    closedFiles: [],
     history: { back: [], forward: [], current: null },
     recentWorkspaces: upsertRecentWorkspace(state.recentWorkspaces, rootPath),
   };
@@ -562,7 +598,7 @@ function workspaceFolderPatch(
 function workspaceSessionPatch(
   state: WorkspaceState,
   workspace: WorkspaceSession,
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'history' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'closedFiles' | 'history' | 'recentWorkspaces'> {
   const normalizedWorkspace = normalizeRestoredWorkspace(workspace);
   const openFiles = normalizedWorkspace.openFiles;
   const activeFileId =
@@ -576,6 +612,7 @@ function workspaceSessionPatch(
     tree: normalizedWorkspace.tree,
     openFiles,
     activeFileId,
+    closedFiles: [],
     history: { back: [], forward: [], current: activeFile?.path ?? null },
     recentWorkspaces: normalizedWorkspace.rootPath
       ? upsertRecentWorkspace(state.recentWorkspaces, normalizedWorkspace.rootPath)

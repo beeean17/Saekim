@@ -57,6 +57,12 @@ export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegist
         event.preventDefault();
         handlers.onPrint();
       }
+      if (/^[1-9]$/.test(event.key) && dispatchShortcut(commands, `mod+${event.key}`)) {
+        event.preventDefault();
+      }
+      if (event.key.toLowerCase() === 't' && event.shiftKey) {
+        if (dispatchShortcut(commands, 'mod+shift+t')) event.preventDefault();
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);

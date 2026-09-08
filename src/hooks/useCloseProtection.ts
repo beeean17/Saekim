@@ -43,25 +43,32 @@ export function useCloseProtection(): () => Promise<void> {
         await Backend.runtime.runWindowAction('close');
         return;
       }
-
-      let fileId = file.id;
-      if (isDirty(file)) {
-        const decision = await Backend.runtime.confirmUnsavedChanges([file.name]);
-        if (decision === 'cancel') return;
-        if (decision === 'save') {
-          const savedPath = await useWorkspaceStore.getState().saveFile(file.id);
-          if (!savedPath) return;
-          fileId = savedPath;
-        } else {
-          await Backend.metadata.deleteDocumentDraft(file.path);
-        }
-      }
-
-      useWorkspaceStore.getState().closeFile(fileId);
+      await closeFileWithProtection(file.id);
     } catch (error) {
       console.error('파일 닫기 요청 처리 실패:', error);
     }
   }, []);
+}
+
+export async function closeFileWithProtection(fileId: string): Promise<boolean> {
+  const file = useWorkspaceStore.getState().openFiles.find((candidate) => candidate.id === fileId);
+  if (!file) return false;
+
+  let closingFileId = file.id;
+  if (isDirty(file)) {
+    const decision = await Backend.runtime.confirmUnsavedChanges([file.name]);
+    if (decision === 'cancel') return false;
+    if (decision === 'save') {
+      const savedPath = await useWorkspaceStore.getState().saveFile(file.id);
+      if (!savedPath) return false;
+      closingFileId = savedPath;
+    } else {
+      await Backend.metadata.deleteDocumentDraft(file.path);
+    }
+  }
+
+  useWorkspaceStore.getState().closeFile(closingFileId);
+  return true;
 }
 
 async function approveClosingFiles(dirtyFiles: OpenFile[]): Promise<boolean> {

@@ -49,11 +49,17 @@ export interface PreviewRenderContext extends PreviewMatchContext {
 }
 
 export interface EditorContribution {
+  topBars?: EditorTopBarContribution[];
   toolbar?: EditorToolbarItem[];
   overlays?: EditorOverlayContribution[];
   helpers?: EditorHelperContribution[];
   handlers?: EditorEventHandlers;
   imageActions?: EditorImageActions;
+}
+
+export interface EditorTopBarContribution {
+  id: string;
+  component: ComponentType;
 }
 
 export interface EditorOverlayContribution {

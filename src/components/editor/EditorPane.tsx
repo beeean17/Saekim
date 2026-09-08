@@ -65,6 +65,10 @@ export function EditorPane({
 
   return (
     <section className="editor-pane" data-disabled={!activeFile}>
+      {editorContributions.topBars.map((contribution) => {
+        const TopBar = contribution.component;
+        return <TopBar key={contribution.id} />;
+      })}
       <EditorToolbar commandRegistry={commandRegistry} contributions={editorContributions} textareaRef={textareaRef} />
       <EditorOverlays activeFile={activeFile} contributions={editorContributions} textareaRef={textareaRef} />
       {activeFile ? (

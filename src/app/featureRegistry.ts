@@ -8,6 +8,7 @@ import { blockLayoutMetadataContribution, blockLayoutPreviewEnhancement } from '
 import { pdfExportCommands, pdfExportContribution } from '../features/pdf-export';
 import { searchCommands, searchEditorContribution } from '../features/search';
 import { structuredDataPreviewContribution, tabularDataPreviewContribution } from '../features/structured-data';
+import { tabCommands, tabsEditorContribution } from '../features/tabs';
 import { currentPlatformCapabilities, type PlatformCapability } from '../platform/common/capabilities';
 
 const featureCatalog: SaekimFeature[] = [
@@ -88,6 +89,7 @@ const featureCatalog: SaekimFeature[] = [
     pdf: pdfExportContribution,
   },
   { id: 'search', label: 'Search', editor: searchEditorContribution, commands: searchCommands },
+  { id: 'tabs', label: 'Document Tabs', dependsOn: ['file-workspace'], editor: tabsEditorContribution, commands: tabCommands },
 ];
 
 export const enabledFeatures = selectSupportedFeatures(featureCatalog, currentPlatformCapabilities());

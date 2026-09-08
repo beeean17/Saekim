@@ -1,6 +1,7 @@
 import type { EditorContribution, SaekimFeature } from '../../app/feature';
 
 export interface EditorContributionSet {
+  topBars: NonNullable<EditorContribution['topBars']>;
   toolbar: NonNullable<EditorContribution['toolbar']>;
   overlays: NonNullable<EditorContribution['overlays']>;
   helpers: NonNullable<EditorContribution['helpers']>;
@@ -11,6 +12,7 @@ export interface EditorContributionSet {
 export function selectEditorContributions(features: SaekimFeature[]): EditorContributionSet {
   const contributions = editorContributions(features);
   return {
+    topBars: contributions.flatMap((contribution) => contribution.topBars ?? []),
     toolbar: contributions.flatMap((contribution) => contribution.toolbar ?? []),
     overlays: contributions.flatMap((contribution) => contribution.overlays ?? []),
     helpers: contributions.flatMap((contribution) => contribution.helpers ?? []),
