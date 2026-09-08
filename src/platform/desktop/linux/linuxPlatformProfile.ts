@@ -8,7 +8,7 @@ class LinuxPlatformProfile extends BaseDesktopPlatformProfile {
       capabilities: desktopCapabilities,
       windowChrome: {
         titlebarClassName: '',
-        showsApplicationMenu: false,
+        showsApplicationMenu: true,
         syncsNativeTitlebarColor: true,
       },
     });

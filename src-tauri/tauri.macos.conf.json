@@ -2,5 +2,26 @@
   "build": {
     "beforeDevCommand": "corepack pnpm dev --port 1421",
     "devUrl": "http://127.0.0.1:1421"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Saekim",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 622,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "dragDropEnabled": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 13,
+          "y": 19
+        },
+        "backgroundColor": "#ffffff"
+      }
+    ]
   }
 }
