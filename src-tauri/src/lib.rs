@@ -25,6 +25,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
+            commands::session::initialize_metadata_connection(app.handle())
+                .map_err(std::io::Error::other)?;
             remember_active_window(app.handle(), "main");
             #[cfg(target_os = "macos")]
             platform::macos::open_documents::install(app.handle());

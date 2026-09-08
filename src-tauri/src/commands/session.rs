@@ -1,7 +1,9 @@
 use std::{
     fs,
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    sync::MutexGuard,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
@@ -10,6 +12,7 @@ use serde_json::{json, Value};
 use tauri::Manager;
 
 use super::file::CommandResult;
+use crate::app_state::AppState;
 
 pub(super) const SCHEMA_VERSION: i64 = 2;
 const DEFAULT_WORKSPACE_ID: &str = "ws_default";
@@ -459,6 +462,7 @@ fn save_session_to_metadata(
     {
         let recent_workspace_snapshot_after =
             recent_workspace_menu_snapshot(&connection).unwrap_or_default();
+        drop(connection);
         if recent_workspace_snapshot_before != recent_workspace_snapshot_after {
             crate::platform::macos::native_menu::refresh_menu(app);
         }
@@ -467,7 +471,51 @@ fn save_session_to_metadata(
     Ok(())
 }
 
-pub(super) fn open_metadata_connection(app: &tauri::AppHandle) -> Result<Connection, String> {
+pub(crate) fn initialize_metadata_connection(app: &tauri::AppHandle) -> Result<(), String> {
+    drop(open_metadata_connection(app)?);
+    Ok(())
+}
+
+pub(super) struct MetadataConnectionGuard<'a> {
+    guard: MutexGuard<'a, Option<Connection>>,
+}
+
+impl Deref for MetadataConnectionGuard<'_> {
+    type Target = Connection;
+
+    fn deref(&self) -> &Self::Target {
+        self.guard
+            .as_ref()
+            .expect("metadata connection must be initialized")
+    }
+}
+
+impl DerefMut for MetadataConnectionGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.guard
+            .as_mut()
+            .expect("metadata connection must be initialized")
+    }
+}
+
+pub(super) fn open_metadata_connection(
+    app: &tauri::AppHandle,
+) -> Result<MetadataConnectionGuard<'_>, String> {
+    let state = app.state::<AppState>();
+    let state = state.inner();
+    let mut guard = state
+        .metadata_connection
+        .lock()
+        .map_err(|_| "metadata connection lock is poisoned".to_string())?;
+
+    if guard.is_none() {
+        *guard = Some(create_metadata_connection(app)?);
+    }
+
+    Ok(MetadataConnectionGuard { guard })
+}
+
+fn create_metadata_connection(app: &tauri::AppHandle) -> Result<Connection, String> {
     let path = metadata_path(app)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -476,8 +524,18 @@ pub(super) fn open_metadata_connection(app: &tauri::AppHandle) -> Result<Connect
 
     let connection = Connection::open(&path)
         .map_err(|error| format!("failed to open metadata database: {error}"))?;
+    configure_metadata_connection(&connection)?;
     initialize_schema(&connection)?;
     Ok(connection)
+}
+
+fn configure_metadata_connection(connection: &Connection) -> Result<(), String> {
+    connection
+        .pragma_update(None, "journal_mode", "WAL")
+        .map_err(|error| format!("failed to enable metadata WAL mode: {error}"))?;
+    connection
+        .busy_timeout(Duration::from_millis(3_000))
+        .map_err(|error| format!("failed to set metadata busy timeout: {error}"))
 }
 
 fn initialize_schema(connection: &Connection) -> Result<(), String> {
@@ -1312,7 +1370,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{relative_path, stable_hash};
+    use super::{configure_metadata_connection, initialize_schema, relative_path, stable_hash};
+    use rusqlite::Connection;
+    use std::{
+        env, fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     #[test]
     fn relative_path_uses_workspace_root() {
@@ -1326,5 +1389,32 @@ mod tests {
     fn stable_hash_is_repeatable() {
         assert_eq!(stable_hash("docs/guide.md"), stable_hash("docs/guide.md"));
         assert_ne!(stable_hash("docs/guide.md"), stable_hash("README.md"));
+    }
+
+    #[test]
+    fn metadata_connection_uses_wal_and_busy_timeout() {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = env::temp_dir().join(format!("saekim-metadata-{timestamp}.sqlite3"));
+        let connection = Connection::open(&path).unwrap();
+
+        configure_metadata_connection(&connection).unwrap();
+        initialize_schema(&connection).unwrap();
+
+        let journal_mode: String = connection
+            .pragma_query_value(None, "journal_mode", |row| row.get(0))
+            .unwrap();
+        let busy_timeout: i64 = connection
+            .pragma_query_value(None, "busy_timeout", |row| row.get(0))
+            .unwrap();
+        assert_eq!(journal_mode, "wal");
+        assert_eq!(busy_timeout, 3_000);
+
+        drop(connection);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("sqlite3-shm"));
+        let _ = fs::remove_file(path.with_extension("sqlite3-wal"));
     }
 }
