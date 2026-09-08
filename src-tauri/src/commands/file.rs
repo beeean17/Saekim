@@ -1,6 +1,6 @@
 use std::{
-    fs,
-    io::Write,
+    fs::{self, OpenOptions},
+    io::{self, Write},
     net::IpAddr,
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -761,7 +761,163 @@ fn write_selected_file(
     #[cfg(not(target_os = "android"))]
     {
         let path = path.clone().into_path().unwrap_or_default();
-        fs::write(&path, content).map_err(|error| format!("failed to save file: {error}"))
+        write_file_atomically(&path, content.as_bytes())
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn write_file_atomically(path: &Path, content: &[u8]) -> Result<(), String> {
+    let original_permissions = fs::metadata(path)
+        .ok()
+        .map(|metadata| metadata.permissions());
+    let (temp_path, mut temp_file) = create_atomic_save_temp_file(path)?;
+
+    let result = (|| -> Result<(), String> {
+        temp_file
+            .write_all(content)
+            .map_err(|error| format!("failed to write temporary save file: {error}"))?;
+
+        if let Some(permissions) = original_permissions {
+            fs::set_permissions(&temp_path, permissions)
+                .map_err(|error| format!("failed to preserve file permissions: {error}"))?;
+        }
+
+        temp_file
+            .sync_all()
+            .map_err(|error| format!("failed to sync temporary save file: {error}"))?;
+        drop(temp_file);
+
+        replace_file_atomically(&temp_path, path)
+            .map_err(|error| format!("failed to replace saved file: {error}"))
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    result
+}
+
+#[cfg(not(target_os = "android"))]
+fn create_atomic_save_temp_file(path: &Path) -> Result<(PathBuf, fs::File), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "save path does not have a parent folder".to_string())?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "save path does not have a valid file name".to_string())?;
+
+    for index in 0..1000 {
+        let suffix = if index == 0 {
+            String::new()
+        } else {
+            format!("-{index}")
+        };
+        let temp_path = parent.join(format!(".{file_name}.saekim-tmp{suffix}"));
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+        {
+            Ok(file) => return Ok((temp_path, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(format!("failed to create temporary save file: {error}"));
+            }
+        }
+    }
+
+    Err("failed to allocate a temporary save file".to_string())
+}
+
+#[cfg(all(not(target_os = "android"), not(target_os = "windows")))]
+fn replace_file_atomically(temp_path: &Path, target_path: &Path) -> io::Result<()> {
+    fs::rename(temp_path, target_path)
+}
+
+#[cfg(target_os = "windows")]
+fn replace_file_atomically(temp_path: &Path, target_path: &Path) -> io::Result<()> {
+    use std::{iter, os::windows::ffi::OsStrExt};
+
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+
+    #[link(name = "Kernel32")]
+    extern "system" {
+        fn MoveFileExW(
+            existing_file_name: *const u16,
+            new_file_name: *const u16,
+            flags: u32,
+        ) -> i32;
+    }
+
+    let temp_path = temp_path
+        .as_os_str()
+        .encode_wide()
+        .chain(iter::once(0))
+        .collect::<Vec<_>>();
+    let target_path = target_path
+        .as_os_str()
+        .encode_wide()
+        .chain(iter::once(0))
+        .collect::<Vec<_>>();
+    let result = unsafe {
+        MoveFileExW(
+            temp_path.as_ptr(),
+            target_path.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+
+    if result == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(all(test, not(target_os = "android")))]
+mod atomic_save_tests {
+    use super::*;
+
+    fn test_directory(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("saekim-{name}-{}-{nonce}", std::process::id()))
+    }
+
+    #[test]
+    fn atomic_save_replaces_content_and_preserves_permissions() {
+        let directory = test_directory("atomic-save");
+        fs::create_dir_all(&directory).unwrap();
+        let target = directory.join("note.md");
+        fs::write(&target, "before").unwrap();
+        let permissions = fs::metadata(&target).unwrap().permissions();
+
+        write_file_atomically(&target, b"after").unwrap();
+
+        assert_eq!(fs::read_to_string(&target).unwrap(), "after");
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().readonly(),
+            permissions.readonly()
+        );
+        assert!(!directory.join(".note.md.saekim-tmp").exists());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn atomic_save_removes_temporary_file_when_replace_fails() {
+        let directory = test_directory("atomic-save-failure");
+        fs::create_dir_all(&directory).unwrap();
+        let target = directory.join("note.md");
+        fs::create_dir(&target).unwrap();
+
+        assert!(write_file_atomically(&target, b"content").is_err());
+        assert!(!directory.join(".note.md.saekim-tmp").exists());
+        fs::remove_dir_all(directory).unwrap();
     }
 }
 
