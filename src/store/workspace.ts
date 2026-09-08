@@ -223,6 +223,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...replaceHistoryPath(current.history, file.path, savedPath),
       },
     }));
+    try {
+      await Backend.metadata.deleteDocumentDraft(file.path);
+    } catch (error) {
+      console.error('임시 문서 정리 실패:', error);
+    }
     const folderPatch = await workspaceFolderPatchForOpenFile(
       { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
       get().rootPath,
@@ -267,6 +272,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...replaceHistoryPath(current.history, file.path, savedPath),
       },
     }));
+    try {
+      await Backend.metadata.deleteDocumentDraft(file.path);
+    } catch (error) {
+      console.error('임시 문서 정리 실패:', error);
+    }
     const folderPatch = await workspaceFolderPatchForOpenFile(
       { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
       get().rootPath,

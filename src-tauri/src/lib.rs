@@ -82,6 +82,7 @@ pub fn run() {
             commands::file::write_pdf_export,
             commands::session::load_session,
             commands::session::load_workspace_session,
+            commands::session::delete_document_draft,
             commands::layout_metadata::load_block_layouts,
             commands::session::save_session,
             commands::layout_metadata::save_block_layout,

@@ -1,15 +1,21 @@
 import { invokeCommand, isTauriRuntime } from './invoke';
 import type { BlockLayout } from '../../../types/metadata';
 import type { WorkspaceSession } from '../../../types/session';
+import type { SessionSaveScope } from '../BackendAdapter';
 
 export async function loadSession<T>(): Promise<T | null> {
   if (!isTauriRuntime()) return null;
   return invokeCommand<T | null>('load_session');
 }
 
-export async function saveSession<T>(session: T): Promise<void> {
+export async function saveSession<T>(session: T, scope: SessionSaveScope): Promise<void> {
   if (!isTauriRuntime()) return;
-  await invokeCommand<null>('save_session', { session });
+  await invokeCommand<null>('save_session', { session, scope });
+}
+
+export async function deleteDocumentDraft(filePath: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invokeCommand<null>('delete_document_draft', { filePath });
 }
 
 export async function loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null> {

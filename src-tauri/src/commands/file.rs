@@ -44,11 +44,11 @@ where
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenFilePayload {
-    path: String,
-    name: String,
-    content: String,
-    encoding: TextEncoding,
-    display_path: Option<String>,
+    pub(super) path: String,
+    pub(super) name: String,
+    pub(super) content: String,
+    pub(super) encoding: TextEncoding,
+    pub(super) display_path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -537,7 +537,7 @@ pub fn write_pdf_export(path: String, pdf_data: String) -> CommandResult<String>
 }
 
 #[cfg(not(target_os = "android"))]
-fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
+pub(super) fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
     let path = PathBuf::from(path);
     let decoded = read_text_file(&path)?;
     let name = path
@@ -556,7 +556,7 @@ fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, 
 }
 
 #[cfg(target_os = "android")]
-fn read_file_payload(app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
+pub(super) fn read_file_payload(app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
     if path.starts_with("content://") {
         return read_android_content_file_payload(app, path);
     }

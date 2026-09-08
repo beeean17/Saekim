@@ -52,6 +52,8 @@ export function useCloseProtection(): () => Promise<void> {
           const savedPath = await useWorkspaceStore.getState().saveFile(file.id);
           if (!savedPath) return;
           fileId = savedPath;
+        } else {
+          await Backend.metadata.deleteDocumentDraft(file.path);
         }
       }
 
@@ -67,7 +69,10 @@ async function approveClosingFiles(dirtyFiles: OpenFile[]): Promise<boolean> {
 
   const decision = await Backend.runtime.confirmUnsavedChanges(dirtyFiles.map((file) => file.name));
   if (decision === 'cancel') return false;
-  if (decision === 'discard') return true;
+  if (decision === 'discard') {
+    await Promise.all(dirtyFiles.map((file) => Backend.metadata.deleteDocumentDraft(file.path)));
+    return true;
+  }
 
   for (const file of dirtyFiles) {
     const latest = useWorkspaceStore.getState().openFiles.find((candidate) => candidate.id === file.id);

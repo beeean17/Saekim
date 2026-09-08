@@ -62,9 +62,52 @@ function clearLegacyLocalStorage(): void {
   }
 }
 
+function buildSession(): AppSession {
+  const workspace = useWorkspaceStore.getState();
+  const ui = useUIStore.getState();
+  const settings = useSettingsStore.getState();
+
+  return {
+    version: 3,
+    savedAt: new Date().toISOString(),
+    window: {
+      id: 'browser-window',
+      label: 'browser-window',
+    },
+    workspace: {
+      rootPath: workspace.rootPath,
+      tree: workspace.tree,
+      openFiles: workspace.openFiles,
+      activeFileId: workspace.activeFileId,
+    },
+    recentWorkspaces: workspace.recentWorkspaces,
+    ui: {
+      sidebarMode: ui.sidebarMode,
+      viewMode: ui.viewMode,
+      sidebarWidth: ui.sidebarWidth,
+      splitRatio: ui.splitRatio,
+      editorWidth: ui.editorWidth,
+      syncScroll: ui.syncScroll,
+    },
+    settings: {
+      theme: settings.theme,
+      fontSize: settings.fontSize,
+      editorFontFamily: settings.editorFontFamily,
+      htmlPreviewMode: settings.htmlPreviewMode,
+    },
+  };
+}
+
+function saveSession(scope: 'ui' | 'documents'): void {
+  void Backend.metadata.saveSession(buildSession(), scope).catch((error) => {
+    console.error('세션 저장 실패:', error);
+  });
+}
+
 export function useSessionPersistence(): boolean {
   const [loaded, setLoaded] = useState(false);
-  const saveTimer = useRef<number | null>(null);
+  const uiSaveTimer = useRef<number | null>(null);
+  const documentSaveTimer = useRef<number | null>(null);
 
   const rootPath = useWorkspaceStore((state) => state.rootPath);
   const tree = useWorkspaceStore((state) => state.tree);
@@ -117,67 +160,63 @@ export function useSessionPersistence(): boolean {
 
   useEffect(() => {
     if (!loaded) return;
-    if (saveTimer.current) {
-      window.clearTimeout(saveTimer.current);
+    if (uiSaveTimer.current) {
+      window.clearTimeout(uiSaveTimer.current);
     }
 
-    saveTimer.current = window.setTimeout(() => {
-      const session: AppSession = {
-        version: 2,
-        savedAt: new Date().toISOString(),
-        window: {
-          id: 'browser-window',
-          label: 'browser-window',
-        },
-        workspace: {
-          rootPath,
-          tree,
-          openFiles,
-          activeFileId,
-        },
-        recentWorkspaces,
-        ui: {
-          sidebarMode,
-          viewMode,
-          sidebarWidth,
-          splitRatio,
-          editorWidth,
-          syncScroll,
-        },
-        settings: {
-          theme,
-          fontSize,
-          editorFontFamily,
-          htmlPreviewMode,
-        },
-      };
-
-      void Backend.metadata.saveSession(session);
+    uiSaveTimer.current = window.setTimeout(() => {
+      saveSession('ui');
     }, 400);
 
     return () => {
-      if (saveTimer.current) {
-        window.clearTimeout(saveTimer.current);
+      if (uiSaveTimer.current) {
+        window.clearTimeout(uiSaveTimer.current);
       }
     };
   }, [
-    activeFileId,
     editorFontFamily,
     editorWidth,
     fontSize,
     htmlPreviewMode,
     loaded,
-    openFiles,
-    recentWorkspaces,
-    rootPath,
     sidebarMode,
     sidebarWidth,
     splitRatio,
     syncScroll,
     theme,
-    tree,
     viewMode,
   ]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (documentSaveTimer.current) {
+      window.clearTimeout(documentSaveTimer.current);
+    }
+
+    documentSaveTimer.current = window.setTimeout(() => {
+      saveSession('documents');
+    }, 2_000);
+
+    return () => {
+      if (documentSaveTimer.current) {
+        window.clearTimeout(documentSaveTimer.current);
+      }
+    };
+  }, [activeFileId, loaded, openFiles, recentWorkspaces, rootPath, tree]);
+
+  useEffect(() => {
+    if (!loaded) return;
+
+    const flushDocuments = () => {
+      if (documentSaveTimer.current) {
+        window.clearTimeout(documentSaveTimer.current);
+        documentSaveTimer.current = null;
+      }
+      saveSession('documents');
+    };
+    window.addEventListener('blur', flushDocuments);
+    return () => window.removeEventListener('blur', flushDocuments);
+  }, [loaded]);
 
   return loaded;
 }

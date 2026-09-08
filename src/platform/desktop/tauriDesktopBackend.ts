@@ -23,7 +23,15 @@ import {
   writePdfExport,
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
-import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveBlockLayouts, saveSession } from '../common/tauri/session';
+import {
+  deleteDocumentDraft,
+  loadBlockLayouts,
+  loadSession,
+  loadWorkspaceSession,
+  saveBlockLayout,
+  saveBlockLayouts,
+  saveSession,
+} from '../common/tauri/session';
 import type {
   BackendAdapter,
   CloseDecision,
@@ -75,6 +83,7 @@ export const tauriDesktopBackend: BackendAdapter = {
   metadata: {
     loadSession,
     saveSession,
+    deleteDocumentDraft,
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,

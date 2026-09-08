@@ -183,7 +183,8 @@ MIT, Apache-2.0, BSD-3-Clause, ISC, OFL-1.1, and public-domain components.
 ## Notes
 
 - User settings, sessions, recent files, and metadata are stored in the OS
-  application support directory.
+  application support directory. Saved document bodies stay on disk; SQLite
+  keeps only view state and temporary unsaved drafts for crash recovery.
 - Document-local image assets are stored next to the active document under
   `.assets/`.
 - For the full release history, see [CHANGELOG.md](CHANGELOG.md).

@@ -49,12 +49,15 @@ export interface ImagePickPayload {
 
 export interface MetadataBackend {
   loadSession<T>(): Promise<T | null>;
-  saveSession<T>(session: T): Promise<void>;
+  saveSession<T>(session: T, scope: SessionSaveScope): Promise<void>;
+  deleteDocumentDraft(filePath: string): Promise<void>;
   loadWorkspaceSession(workspacePath: string): Promise<WorkspaceSession | null>;
   loadBlockLayouts(filePath: string): Promise<BlockLayout[]>;
   saveBlockLayout(layout: BlockLayout): Promise<void>;
   saveBlockLayouts(layouts: readonly BlockLayout[]): Promise<void>;
 }
+
+export type SessionSaveScope = 'ui' | 'documents';
 
 export interface ExportBackend {
   pickPdfExportPath(suggestedName: string): Promise<string | null>;

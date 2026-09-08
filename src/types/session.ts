@@ -38,7 +38,7 @@ export interface SettingsSession {
 }
 
 export interface AppSession {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   savedAt: string;
   window?: WindowSession;
   workspace: WorkspaceSession;

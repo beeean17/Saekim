@@ -188,7 +188,8 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | `download_image_to_assets` | 원격 이미지 내려받기 |
 | `pick_pdf_export_path` / `write_pdf_export` | PDF 저장 |
 | `import_pdf` | 3.x에서 비활성 (2.x 안내 메시지 반환) |
-| `load_session` / `save_session` / `load_workspace_session` | 세션 |
+| `load_session` / `save_session` / `load_workspace_session` | 세션 (UI·문서 범위 분리 저장) |
+| `delete_document_draft` | 저장을 마친 문서의 복구 초안 삭제 |
 | `load_block_layouts` / `save_block_layout` / `save_block_layouts` | 레이아웃 |
 | `open_new_window` / `set_window_min_size` / `start_window_drag` | 창 |
 | `open_external_url` | 외부 링크 (http/https/mailto/tel/file 허용) |
@@ -543,7 +544,7 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 - Linux: `~/.config/Saekim/`
 - Android: Tauri `app_config_dir()`
 
-### 12.2 스키마 (버전 2)
+### 12.2 스키마 (버전 3)
 
 | 테이블 | 내용 |
 | --- | --- |
@@ -553,7 +554,8 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 | `workspace_windows` | 창별 활성 워크스페이스·뷰·파일, UI/설정 JSON |
 | `files` | 파일 레코드 + `last_content_hash` + 최근 열람 시각 |
 | `file_view_state` | 레거시 열린 파일 상태 |
-| `window_file_view_state` | 창별 열린 파일 상태 (`state_json`, 순서, 활성 여부) |
+| `window_file_view_state` | 창별 열린 파일 뷰 상태 (`state_json`, 순서, 활성 여부, 본문 제외) |
+| `drafts` | 창별 저장되지 않은 본문 1벌, 인코딩, 기준·초안 해시 |
 
 `PRAGMA foreign_keys = ON`. 창별로 세션이 분리되어 창마다 다른 워크스페이스를
 띄울 수 있습니다.
@@ -562,18 +564,25 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 
 | 범주 | 항목 |
 | --- | --- |
-| 워크스페이스 | 루트 경로, 트리, 열린 파일 목록, 활성 파일 |
+| 워크스페이스 | 루트 경로, 트리, 열린 파일의 경로·이름·뷰 상태, 활성 파일 |
 | 최근 항목 | 최근 워크스페이스 (id, 경로, 이름, 열람 시각, 창 id) |
 | UI | 사이드바 모드·폭, 뷰 모드, 분할 비율, 편집기 폭, 스크롤 동기화 |
 | 설정 | 테마, 글자 크기, 글꼴, HTML 프리뷰 모드 |
 
-400ms 디바운스로 저장합니다.
+UI와 설정은 400ms 디바운스로 저장합니다. 열린 문서 상태는 타이핑 중 SQLite
+쓰기를 줄이기 위해 2초 디바운스 또는 창 blur 시점에 저장합니다. 저장된 문서
+본문은 DB에 넣지 않고 복원할 때 디스크에서 다시 읽으며 `last_content_hash`와
+비교합니다. 디스크가 외부에서 바뀌었어도 저장되지 않은 초안은 버리지 않고,
+현재 디스크 내용을 `savedContent`로 삼아 dirty 상태로 복원합니다.
 
 ### 12.4 레거시 마이그레이션
 
 - `localStorage`의 `saekim-ui` / `saekim-settings`를 읽어 최초 1회 이관 후 삭제
 - SQLite 안에서도 `metadata_kv` → `workspace_windows` 경로로 폴백 지원
-- 세션 버전 1 / 2 동시 처리
+- 세션 버전 1 / 2 / 3 동시 처리
+- 스키마 v3 최초 실행에서 기존 `state_json`의 `content`와 `savedContent`를
+  제거합니다. dirty 본문만 `drafts`로 옮기고 저장된 본문은 폐기하며,
+  WAL 체크포인트와 `VACUUM`으로 기존 본문이 차지하던 페이지도 정리합니다.
 
 ---
 

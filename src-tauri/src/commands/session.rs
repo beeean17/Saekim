@@ -7,16 +7,17 @@ use std::{
 };
 
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::Manager;
 
 use super::file::CommandResult;
 use crate::app_state::AppState;
 
-pub(super) const SCHEMA_VERSION: i64 = 2;
+pub(super) const SCHEMA_VERSION: i64 = 3;
 const DEFAULT_WORKSPACE_ID: &str = "ws_default";
 const DEFAULT_VIEW_ID: &str = "view_default";
+const LEGACY_DRAFT_WINDOW: &str = "__legacy__";
 
 #[tauri::command]
 pub fn load_session(app: tauri::AppHandle, window: tauri::Window) -> CommandResult<Option<Value>> {
@@ -31,8 +32,28 @@ pub fn save_session(
     app: tauri::AppHandle,
     window: tauri::Window,
     session: Value,
+    scope: SessionSaveScope,
 ) -> CommandResult<Option<()>> {
-    match save_session_to_metadata(&app, window.label(), &session) {
+    match save_session_to_metadata(&app, window.label(), &session, scope) {
+        Ok(()) => ok(Some(())),
+        Err(error) => fail(error),
+    }
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionSaveScope {
+    Ui,
+    Documents,
+}
+
+#[tauri::command]
+pub fn delete_document_draft(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    file_path: String,
+) -> CommandResult<Option<()>> {
+    match delete_document_draft_from_metadata(&app, window.label(), &file_path) {
         Ok(()) => ok(Some(())),
         Err(error) => fail(error),
     }
@@ -59,7 +80,7 @@ fn load_session_from_metadata(
         return Ok(None);
     };
 
-    load_session_for_context(&connection, window_label, context).map(Some)
+    load_session_for_context(app, &connection, window_label, context).map(Some)
 }
 
 struct WindowSessionContext {
@@ -132,6 +153,7 @@ fn load_legacy_window_session_context(
 }
 
 fn load_session_for_context(
+    app: &tauri::AppHandle,
     connection: &Connection,
     window_label: &str,
     context: WindowSessionContext,
@@ -170,6 +192,7 @@ fn load_session_for_context(
     };
 
     let open_files = load_open_files(
+        app,
         connection,
         window_label,
         &context.workspace_id,
@@ -178,7 +201,7 @@ fn load_session_for_context(
     let recent_workspaces = load_recent_workspaces(connection)?;
 
     Ok(json!({
-        "version": 2,
+        "version": 3,
         "savedAt": context.saved_at,
         "window": {
             "id": window_label,
@@ -233,7 +256,7 @@ fn load_workspace_session_from_metadata(
     };
 
     let root_path = resolve_view_root(canonical_root_path, &view_relative_path);
-    let open_files = load_open_files(&connection, window_label, &workspace_id, &view_id)?;
+    let open_files = load_open_files(app, &connection, window_label, &workspace_id, &view_id)?;
     let active_file_id = match active_file_id {
         Some(active_file_id) => Some(active_file_id),
         None => active_file_id_for_window_workspace(&connection, window_label, &workspace_id)?,
@@ -311,6 +334,7 @@ fn save_session_to_metadata(
     app: &tauri::AppHandle,
     window_label: &str,
     session: &Value,
+    scope: SessionSaveScope,
 ) -> Result<(), String> {
     let mut connection = open_metadata_connection(app)?;
     #[cfg(target_os = "macos")]
@@ -376,68 +400,121 @@ fn save_session_to_metadata(
         )
         .map_err(|error| format!("failed to save workspace metadata: {error}"))?;
 
-    transaction
-        .execute(
-            "INSERT INTO workspace_views
-               (id, workspace_id, view_root_relative_path, layout_json, tree_json, created_at, last_opened_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
-             ON CONFLICT(id) DO UPDATE SET
-               workspace_id = excluded.workspace_id,
-               view_root_relative_path = excluded.view_root_relative_path,
-               layout_json = excluded.layout_json,
-               tree_json = excluded.tree_json,
-               last_opened_at = excluded.last_opened_at",
-            params![view_id, workspace_id, view_relative_path, ui_json, tree_json, now],
-        )
-        .map_err(|error| format!("failed to save workspace view metadata: {error}"))?;
+    match scope {
+        SessionSaveScope::Ui => {
+            transaction
+                .execute(
+                    "INSERT INTO workspace_views
+                       (id, workspace_id, view_root_relative_path, layout_json, tree_json, created_at, last_opened_at)
+                     VALUES (?1, ?2, ?3, ?4, '[]', ?5, ?5)
+                     ON CONFLICT(id) DO UPDATE SET
+                       workspace_id = excluded.workspace_id,
+                       view_root_relative_path = excluded.view_root_relative_path,
+                       layout_json = excluded.layout_json,
+                       last_opened_at = excluded.last_opened_at",
+                    params![view_id, workspace_id, view_relative_path, ui_json, now],
+                )
+                .map_err(|error| format!("failed to save workspace UI metadata: {error}"))?;
 
-    transaction
-        .execute(
-            "DELETE FROM window_file_view_state WHERE window_label = ?1 AND workspace_id = ?2",
-            params![window_label, workspace_id],
-        )
-        .map_err(|error| format!("failed to reset window file view state: {error}"))?;
+            transaction
+                .execute(
+                    "INSERT INTO workspace_windows
+                       (id, window_label, workspace_id, workspace_view_id, active_file_id,
+                        ui_json, settings_json, saved_at, created_at, last_active_at)
+                     VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8, ?8)
+                     ON CONFLICT(window_label) DO UPDATE SET
+                       active_file_id = CASE
+                         WHEN workspace_windows.workspace_id = excluded.workspace_id
+                           THEN workspace_windows.active_file_id
+                         ELSE NULL
+                       END,
+                       workspace_id = excluded.workspace_id,
+                       workspace_view_id = excluded.workspace_view_id,
+                       ui_json = excluded.ui_json,
+                       settings_json = excluded.settings_json,
+                       saved_at = excluded.saved_at,
+                       last_active_at = excluded.last_active_at",
+                    params![
+                        stable_id("win", window_label),
+                        window_label,
+                        workspace_id.as_str(),
+                        view_id.as_str(),
+                        ui_json.as_str(),
+                        settings_json.as_str(),
+                        saved_at.as_str(),
+                        now
+                    ],
+                )
+                .map_err(|error| format!("failed to save window UI metadata: {error}"))?;
+        }
+        SessionSaveScope::Documents => {
+            transaction
+                .execute(
+                    "INSERT INTO workspace_views
+                       (id, workspace_id, view_root_relative_path, layout_json, tree_json, created_at, last_opened_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+                     ON CONFLICT(id) DO UPDATE SET
+                       workspace_id = excluded.workspace_id,
+                       view_root_relative_path = excluded.view_root_relative_path,
+                       tree_json = excluded.tree_json,
+                       last_opened_at = excluded.last_opened_at",
+                    params![view_id, workspace_id, view_relative_path, ui_json, tree_json, now],
+                )
+                .map_err(|error| format!("failed to save workspace document metadata: {error}"))?;
 
-    for (index, open_file) in open_files.iter().enumerate() {
-        save_window_open_file(
-            &transaction,
-            window_label,
-            &workspace_id,
-            &canonical_root_path,
-            open_file,
-            index,
-            active_file_id.as_deref(),
-            now,
-        )?;
+            transaction
+                .execute(
+                    "DELETE FROM window_file_view_state WHERE window_label = ?1 AND workspace_id = ?2",
+                    params![window_label, workspace_id],
+                )
+                .map_err(|error| format!("failed to reset window file view state: {error}"))?;
+            transaction
+                .execute(
+                    "DELETE FROM drafts WHERE window_label = ?1 AND workspace_id = ?2",
+                    params![window_label, workspace_id],
+                )
+                .map_err(|error| format!("failed to reset window drafts: {error}"))?;
+
+            for (index, open_file) in open_files.iter().enumerate() {
+                save_window_open_file(
+                    &transaction,
+                    window_label,
+                    &workspace_id,
+                    &canonical_root_path,
+                    open_file,
+                    index,
+                    active_file_id.as_deref(),
+                    now,
+                )?;
+            }
+
+            transaction
+                .execute(
+                    "INSERT INTO workspace_windows
+                       (id, window_label, workspace_id, workspace_view_id, active_file_id,
+                        ui_json, settings_json, saved_at, created_at, last_active_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+                     ON CONFLICT(window_label) DO UPDATE SET
+                       workspace_id = excluded.workspace_id,
+                       workspace_view_id = excluded.workspace_view_id,
+                       active_file_id = excluded.active_file_id,
+                       saved_at = excluded.saved_at,
+                       last_active_at = excluded.last_active_at",
+                    params![
+                        stable_id("win", window_label),
+                        window_label,
+                        workspace_id.as_str(),
+                        view_id.as_str(),
+                        active_file_id.as_deref(),
+                        ui_json.as_str(),
+                        settings_json.as_str(),
+                        saved_at.as_str(),
+                        now
+                    ],
+                )
+                .map_err(|error| format!("failed to save window document metadata: {error}"))?;
+        }
     }
-
-    transaction
-        .execute(
-            "INSERT INTO workspace_windows
-               (id, window_label, workspace_id, workspace_view_id, active_file_id,
-                ui_json, settings_json, saved_at, created_at, last_active_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
-             ON CONFLICT(window_label) DO UPDATE SET
-               workspace_id = excluded.workspace_id,
-               workspace_view_id = excluded.workspace_view_id,
-               active_file_id = excluded.active_file_id,
-               ui_json = excluded.ui_json,
-               settings_json = excluded.settings_json,
-               saved_at = excluded.saved_at,
-               last_active_at = excluded.last_active_at",
-            params![
-                stable_id("win", window_label),
-                window_label,
-                workspace_id.as_str(),
-                view_id.as_str(),
-                active_file_id.as_deref(),
-                ui_json.as_str(),
-                settings_json.as_str(),
-                saved_at.as_str(),
-                now
-            ],
-        )
-        .map_err(|error| format!("failed to save window workspace metadata: {error}"))?;
 
     let open_window_labels = app.webview_windows().keys().cloned().collect::<Vec<_>>();
     prune_closed_workspace_windows(&transaction, &open_window_labels)?;
@@ -447,11 +524,17 @@ fn save_session_to_metadata(
     save_metadata_value(&transaction, "saved_at", &saved_at)?;
     save_metadata_value(&transaction, "active_workspace_id", &workspace_id)?;
     save_metadata_value(&transaction, "active_view_id", &view_id)?;
-    save_metadata_value(&transaction, "settings_json", &settings_json)?;
-    if let Some(active_file_id) = active_file_id {
-        save_metadata_value(&transaction, "active_file_id", &active_file_id)?;
-    } else {
-        delete_metadata_value(&transaction, "active_file_id")?;
+    match scope {
+        SessionSaveScope::Ui => {
+            save_metadata_value(&transaction, "settings_json", &settings_json)?;
+        }
+        SessionSaveScope::Documents => {
+            if let Some(active_file_id) = active_file_id {
+                save_metadata_value(&transaction, "active_file_id", &active_file_id)?;
+            } else {
+                delete_metadata_value(&transaction, "active_file_id")?;
+            }
+        }
     }
 
     transaction
@@ -522,10 +605,10 @@ fn create_metadata_connection(app: &tauri::AppHandle) -> Result<Connection, Stri
             .map_err(|error| format!("failed to create metadata directory: {error}"))?;
     }
 
-    let connection = Connection::open(&path)
+    let mut connection = Connection::open(&path)
         .map_err(|error| format!("failed to open metadata database: {error}"))?;
     configure_metadata_connection(&connection)?;
-    initialize_schema(&connection)?;
+    initialize_schema(&mut connection)?;
     Ok(connection)
 }
 
@@ -538,7 +621,7 @@ fn configure_metadata_connection(connection: &Connection) -> Result<(), String> 
         .map_err(|error| format!("failed to set metadata busy timeout: {error}"))
 }
 
-fn initialize_schema(connection: &Connection) -> Result<(), String> {
+fn initialize_schema(connection: &mut Connection) -> Result<(), String> {
     connection
         .execute_batch(
             "
@@ -628,6 +711,21 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS drafts (
+              id TEXT PRIMARY KEY,
+              window_label TEXT NOT NULL,
+              workspace_id TEXT NOT NULL,
+              file_id TEXT NOT NULL,
+              content TEXT NOT NULL,
+              encoding TEXT NOT NULL,
+              base_content_hash TEXT,
+              content_hash TEXT NOT NULL,
+              updated_at INTEGER NOT NULL,
+              UNIQUE(window_label, workspace_id, file_id),
+              FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+              FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS block_layouts (
               id TEXT PRIMARY KEY,
               file_id TEXT NOT NULL,
@@ -675,13 +773,205 @@ fn initialize_schema(connection: &Connection) -> Result<(), String> {
               ON workspace_windows(last_active_at DESC);
             CREATE INDEX IF NOT EXISTS idx_window_file_view_state_order
               ON window_file_view_state(window_label, workspace_id, is_open, open_order);
+            CREATE INDEX IF NOT EXISTS idx_drafts_window_workspace
+              ON drafts(window_label, workspace_id, updated_at DESC);
             CREATE INDEX IF NOT EXISTS idx_block_layouts_file
               ON block_layouts(file_id, block_kind);
             ",
         )
         .map_err(|error| format!("failed to initialize metadata schema: {error}"))?;
 
+    migrate_embedded_file_content(connection)?;
     super::layout_metadata::initialize_schema(connection)
+}
+
+struct EmbeddedFileStateRow {
+    row_id: String,
+    window_label: String,
+    workspace_id: String,
+    file_id: String,
+    state_json: String,
+    updated_at: i64,
+}
+
+fn migrate_embedded_file_content(connection: &mut Connection) -> Result<(), String> {
+    let schema_version = metadata_value(connection, "schema_version")?
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or_default();
+    if schema_version >= SCHEMA_VERSION {
+        return Ok(());
+    }
+
+    let transaction = connection
+        .transaction()
+        .map_err(|error| format!("failed to start session metadata migration: {error}"))?;
+
+    let window_rows = {
+        let mut statement = transaction
+            .prepare(
+                "SELECT id, window_label, workspace_id, file_id, state_json, updated_at
+                 FROM window_file_view_state",
+            )
+            .map_err(|error| format!("failed to prepare window session migration: {error}"))?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(EmbeddedFileStateRow {
+                    row_id: row.get(0)?,
+                    window_label: row.get(1)?,
+                    workspace_id: row.get(2)?,
+                    file_id: row.get(3)?,
+                    state_json: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            })
+            .map_err(|error| format!("failed to query window session migration: {error}"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| format!("failed to read window session migration: {error}"))?
+    };
+    for row in window_rows {
+        migrate_embedded_file_state(&transaction, "window_file_view_state", row)?;
+    }
+
+    let legacy_rows = {
+        let mut statement = transaction
+            .prepare(
+                "SELECT file_view_state.id, workspace_views.workspace_id,
+                        file_view_state.file_id, file_view_state.state_json,
+                        file_view_state.updated_at
+                 FROM file_view_state
+                 JOIN workspace_views
+                   ON workspace_views.id = file_view_state.workspace_view_id",
+            )
+            .map_err(|error| format!("failed to prepare legacy session migration: {error}"))?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(EmbeddedFileStateRow {
+                    row_id: row.get(0)?,
+                    window_label: LEGACY_DRAFT_WINDOW.to_string(),
+                    workspace_id: row.get(1)?,
+                    file_id: row.get(2)?,
+                    state_json: row.get(3)?,
+                    updated_at: row.get(4)?,
+                })
+            })
+            .map_err(|error| format!("failed to query legacy session migration: {error}"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| format!("failed to read legacy session migration: {error}"))?
+    };
+    for row in legacy_rows {
+        migrate_embedded_file_state(&transaction, "file_view_state", row)?;
+    }
+
+    transaction
+        .commit()
+        .map_err(|error| format!("failed to commit session metadata migration: {error}"))?;
+    connection
+        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;")
+        .map_err(|error| format!("failed to compact migrated session metadata: {error}"))?;
+    save_metadata_value(connection, "schema_version", &SCHEMA_VERSION.to_string())
+}
+
+fn migrate_embedded_file_state(
+    connection: &Connection,
+    table: &str,
+    row: EmbeddedFileStateRow,
+) -> Result<(), String> {
+    let Ok(mut state) = serde_json::from_str::<Value>(&row.state_json) else {
+        return Ok(());
+    };
+    let Some(object) = state.as_object_mut() else {
+        return Ok(());
+    };
+
+    let path = object
+        .get("path")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    let encoding = object
+        .get("encoding")
+        .and_then(Value::as_str)
+        .unwrap_or("utf-8")
+        .to_string();
+    let saved_encoding = object
+        .get("savedEncoding")
+        .and_then(Value::as_str)
+        .unwrap_or(&encoding)
+        .to_string();
+    let eol = object
+        .get("eol")
+        .and_then(Value::as_str)
+        .unwrap_or("LF")
+        .to_string();
+    let content = object
+        .remove("content")
+        .and_then(|value| value.as_str().map(str::to_string));
+    let saved_content = object
+        .remove("savedContent")
+        .and_then(|value| value.as_str().map(str::to_string));
+
+    if content.is_none() && saved_content.is_none() {
+        return Ok(());
+    }
+
+    let saved_content = saved_content.unwrap_or_default();
+    let disk_content = serialize_document_content(&saved_content, &eol);
+    let base_content_hash = stable_hash(&disk_content);
+    connection
+        .execute(
+            "UPDATE files SET last_content_hash = ?1 WHERE id = ?2",
+            params![base_content_hash, row.file_id],
+        )
+        .map_err(|error| format!("failed to migrate file content hash: {error}"))?;
+
+    if let Some(content) = content {
+        let is_dirty =
+            path.starts_with('~') || content != saved_content || encoding != saved_encoding;
+        if is_dirty {
+            upsert_draft(
+                connection,
+                &row.window_label,
+                &row.workspace_id,
+                &row.file_id,
+                &content,
+                &encoding,
+                &base_content_hash,
+                &eol,
+                row.updated_at,
+            )?;
+        }
+    }
+
+    let state_json = serde_json::to_string(&state)
+        .map_err(|error| format!("failed to serialize migrated file state: {error}"))?;
+    let sql = match table {
+        "window_file_view_state" => {
+            "UPDATE window_file_view_state SET state_json = ?1 WHERE id = ?2"
+        }
+        "file_view_state" => "UPDATE file_view_state SET state_json = ?1 WHERE id = ?2",
+        _ => return Err("unsupported session metadata migration table".to_string()),
+    };
+    connection
+        .execute(sql, params![state_json, row.row_id])
+        .map_err(|error| format!("failed to remove embedded file content: {error}"))?;
+    Ok(())
+}
+
+fn delete_document_draft_from_metadata(
+    app: &tauri::AppHandle,
+    window_label: &str,
+    file_path: &str,
+) -> Result<(), String> {
+    let connection = open_metadata_connection(app)?;
+    connection
+        .execute(
+            "DELETE FROM drafts
+             WHERE window_label IN (?1, ?2)
+               AND file_id IN (SELECT id FROM files WHERE absolute_path = ?3)",
+            params![window_label, LEGACY_DRAFT_WINDOW, file_path],
+        )
+        .map_err(|error| format!("failed to delete saved document draft: {error}"))?;
+    Ok(())
 }
 
 pub(super) fn find_file_for_path(
@@ -854,20 +1144,40 @@ fn save_window_open_file(
         .and_then(Value::as_str)
         .map(str::to_string)
         .unwrap_or_else(|| file_name_from_path(path));
-    let content_hash = open_file
+    let content = open_file
         .get("content")
         .and_then(Value::as_str)
-        .map(|content| stable_hash(content));
+        .unwrap_or_default();
+    let saved_content = open_file
+        .get("savedContent")
+        .and_then(Value::as_str)
+        .unwrap_or(content);
+    let encoding = open_file
+        .get("encoding")
+        .and_then(Value::as_str)
+        .unwrap_or("utf-8");
+    let saved_encoding = open_file
+        .get("savedEncoding")
+        .and_then(Value::as_str)
+        .unwrap_or(encoding);
+    let eol = open_file.get("eol").and_then(Value::as_str).unwrap_or("LF");
+    let disk_content = serialize_document_content(saved_content, eol);
+    let content_hash = stable_hash(&disk_content);
     let file_id = upsert_file(
         connection,
         workspace_id,
         canonical_root_path,
         path,
         &name,
-        content_hash.as_deref(),
+        Some(&content_hash),
         now,
     )?;
-    let state_json = serde_json::to_string(open_file)
+    let mut view_state = open_file.clone();
+    if let Some(object) = view_state.as_object_mut() {
+        object.remove("content");
+        object.remove("savedContent");
+    }
+    let state_json = serde_json::to_string(&view_state)
         .map_err(|error| format!("failed to serialize file session metadata: {error}"))?;
     let state_id = stable_id("wfvs", &format!("{window_label}:{workspace_id}:{file_id}"));
     let is_active = file_id_from_session
@@ -899,6 +1209,68 @@ fn save_window_open_file(
         )
         .map_err(|error| format!("failed to save window file view state: {error}"))?;
 
+    connection
+        .execute(
+            "DELETE FROM drafts WHERE window_label = ?1 AND workspace_id = ?2 AND file_id = ?3",
+            params![LEGACY_DRAFT_WINDOW, workspace_id, file_id],
+        )
+        .map_err(|error| format!("failed to remove migrated document draft: {error}"))?;
+
+    if path.starts_with('~') || content != saved_content || encoding != saved_encoding {
+        upsert_draft(
+            connection,
+            window_label,
+            workspace_id,
+            &file_id,
+            content,
+            encoding,
+            &content_hash,
+            eol,
+            now,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn upsert_draft(
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+    file_id: &str,
+    content: &str,
+    encoding: &str,
+    base_content_hash: &str,
+    eol: &str,
+    updated_at: i64,
+) -> Result<(), String> {
+    let content_hash = stable_hash(&serialize_document_content(content, eol));
+    let draft_id = stable_id("draft", &format!("{window_label}:{workspace_id}:{file_id}"));
+    connection
+        .execute(
+            "INSERT INTO drafts
+               (id, window_label, workspace_id, file_id, content, encoding,
+                base_content_hash, content_hash, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(window_label, workspace_id, file_id) DO UPDATE SET
+               content = excluded.content,
+               encoding = excluded.encoding,
+               base_content_hash = excluded.base_content_hash,
+               content_hash = excluded.content_hash,
+               updated_at = excluded.updated_at",
+            params![
+                draft_id,
+                window_label,
+                workspace_id,
+                file_id,
+                content,
+                encoding,
+                base_content_hash,
+                content_hash,
+                updated_at
+            ],
+        )
+        .map_err(|error| format!("failed to save document draft: {error}"))?;
     Ok(())
 }
 
@@ -944,70 +1316,245 @@ pub(super) fn upsert_file(
 }
 
 fn load_open_files(
+    app: &tauri::AppHandle,
     connection: &Connection,
     window_label: &str,
     workspace_id: &str,
     view_id: &str,
 ) -> Result<Value, String> {
-    let files = load_window_open_files(connection, window_label, workspace_id)?;
+    let files = load_window_open_files(app, connection, window_label, workspace_id)?;
     if !files.is_empty() {
         return Ok(Value::Array(files));
     }
 
-    Ok(Value::Array(load_legacy_open_files(connection, view_id)?))
+    Ok(Value::Array(load_legacy_open_files(
+        app,
+        connection,
+        window_label,
+        workspace_id,
+        view_id,
+    )?))
 }
 
 fn load_window_open_files(
+    app: &tauri::AppHandle,
     connection: &Connection,
     window_label: &str,
     workspace_id: &str,
 ) -> Result<Vec<Value>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT state_json FROM window_file_view_state
-             WHERE window_label = ?1 AND workspace_id = ?2 AND is_open = 1
-             ORDER BY open_order ASC",
+            "SELECT window_file_view_state.state_json, files.id, files.absolute_path,
+                    files.last_content_hash
+             FROM window_file_view_state
+             JOIN files ON files.id = window_file_view_state.file_id
+             WHERE window_file_view_state.window_label = ?1
+               AND window_file_view_state.workspace_id = ?2
+               AND window_file_view_state.is_open = 1
+             ORDER BY window_file_view_state.open_order ASC",
         )
         .map_err(|error| format!("failed to prepare window open files query: {error}"))?;
 
     let rows = statement
         .query_map(params![window_label, workspace_id], |row| {
-            row.get::<_, String>(0)
+            Ok(FileStateRow {
+                state_json: row.get(0)?,
+                file_id: row.get(1)?,
+                absolute_path: row.get(2)?,
+                expected_content_hash: row.get(3)?,
+            })
         })
         .map_err(|error| format!("failed to query window open files: {error}"))?;
 
-    read_file_state_rows(rows, "window open file")
+    let rows = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to read window open file row: {error}"))?;
+    drop(statement);
+    restore_file_state_rows(app, connection, window_label, workspace_id, rows)
 }
 
-fn load_legacy_open_files(connection: &Connection, view_id: &str) -> Result<Vec<Value>, String> {
+fn load_legacy_open_files(
+    app: &tauri::AppHandle,
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+    view_id: &str,
+) -> Result<Vec<Value>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT state_json FROM file_view_state
-             WHERE workspace_view_id = ?1 AND is_open = 1
-             ORDER BY open_order ASC",
+            "SELECT file_view_state.state_json, files.id, files.absolute_path,
+                    files.last_content_hash
+             FROM file_view_state
+             JOIN files ON files.id = file_view_state.file_id
+             WHERE file_view_state.workspace_view_id = ?1
+               AND file_view_state.is_open = 1
+             ORDER BY file_view_state.open_order ASC",
         )
         .map_err(|error| format!("failed to prepare open files query: {error}"))?;
 
     let rows = statement
-        .query_map(params![view_id], |row| row.get::<_, String>(0))
+        .query_map(params![view_id], |row| {
+            Ok(FileStateRow {
+                state_json: row.get(0)?,
+                file_id: row.get(1)?,
+                absolute_path: row.get(2)?,
+                expected_content_hash: row.get(3)?,
+            })
+        })
         .map_err(|error| format!("failed to query open files: {error}"))?;
 
-    read_file_state_rows(rows, "open file")
+    let rows = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to read legacy open file row: {error}"))?;
+    drop(statement);
+    restore_file_state_rows(app, connection, window_label, workspace_id, rows)
 }
 
-fn read_file_state_rows(
-    rows: rusqlite::MappedRows<'_, impl FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<String>>,
-    label: &str,
+struct FileStateRow {
+    state_json: String,
+    file_id: String,
+    absolute_path: String,
+    expected_content_hash: Option<String>,
+}
+
+struct DraftState {
+    id: String,
+    content: String,
+    encoding: String,
+    base_content_hash: Option<String>,
+    content_hash: String,
+}
+
+fn restore_file_state_rows(
+    app: &tauri::AppHandle,
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+    rows: Vec<FileStateRow>,
 ) -> Result<Vec<Value>, String> {
     let mut files = Vec::new();
     for row in rows {
-        let state_json = row.map_err(|error| format!("failed to read {label} row: {error}"))?;
-        if let Ok(file) = serde_json::from_str::<Value>(&state_json) {
+        let Ok(mut file) = serde_json::from_str::<Value>(&row.state_json) else {
+            continue;
+        };
+        let draft = load_draft(connection, window_label, workspace_id, &row.file_id)?;
+        if restore_file_content(app, connection, &row, draft, &mut file)? {
             files.push(file);
         }
     }
 
     Ok(files)
+}
+
+fn load_draft(
+    connection: &Connection,
+    window_label: &str,
+    workspace_id: &str,
+    file_id: &str,
+) -> Result<Option<DraftState>, String> {
+    connection
+        .query_row(
+            "SELECT id, content, encoding, base_content_hash, content_hash
+             FROM drafts
+             WHERE workspace_id = ?1 AND file_id = ?2
+               AND window_label IN (?3, ?4)
+             ORDER BY CASE WHEN window_label = ?3 THEN 0 ELSE 1 END, updated_at DESC
+             LIMIT 1",
+            params![workspace_id, file_id, window_label, LEGACY_DRAFT_WINDOW],
+            |row| {
+                Ok(DraftState {
+                    id: row.get(0)?,
+                    content: row.get(1)?,
+                    encoding: row.get(2)?,
+                    base_content_hash: row.get(3)?,
+                    content_hash: row.get(4)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to load document draft: {error}"))
+}
+
+fn restore_file_content(
+    app: &tauri::AppHandle,
+    connection: &Connection,
+    row: &FileStateRow,
+    mut draft: Option<DraftState>,
+    file: &mut Value,
+) -> Result<bool, String> {
+    let disk_file = super::file::read_file_payload(app, row.absolute_path.clone());
+    let (saved_content, saved_encoding, display_path) = match disk_file {
+        Ok(payload) => {
+            let actual_hash = stable_hash(&payload.content);
+            if row.expected_content_hash.as_deref() != Some(actual_hash.as_str()) {
+                eprintln!(
+                    "[saekim:session] content hash changed for {} (expected {:?}, actual {})",
+                    row.absolute_path, row.expected_content_hash, actual_hash
+                );
+            }
+
+            let disk_encoding = encoding_value(payload.encoding);
+            if let Some(candidate) = draft.as_ref() {
+                if candidate.content_hash == actual_hash && candidate.encoding == disk_encoding {
+                    connection
+                        .execute("DELETE FROM drafts WHERE id = ?1", params![candidate.id])
+                        .map_err(|error| {
+                            format!("failed to delete completed document draft: {error}")
+                        })?;
+                    draft = None;
+                } else if candidate.base_content_hash.as_deref() != Some(actual_hash.as_str()) {
+                    eprintln!(
+                        "[saekim:session] preserving draft over externally changed file {}",
+                        row.absolute_path
+                    );
+                }
+            }
+            (payload.content, disk_encoding, payload.display_path)
+        }
+        Err(error) => {
+            if draft.is_none() {
+                eprintln!(
+                    "[saekim:session] skipping unavailable file {}: {}",
+                    row.absolute_path, error
+                );
+                return Ok(false);
+            }
+            let saved_encoding = file
+                .get("savedEncoding")
+                .and_then(Value::as_str)
+                .unwrap_or("utf-8")
+                .to_string();
+            (String::new(), saved_encoding, None)
+        }
+    };
+
+    let Some(object) = file.as_object_mut() else {
+        return Ok(false);
+    };
+    object.insert("path".to_string(), Value::String(row.absolute_path.clone()));
+    object.insert(
+        "savedContent".to_string(),
+        Value::String(saved_content.clone()),
+    );
+    object.insert(
+        "savedEncoding".to_string(),
+        Value::String(saved_encoding.clone()),
+    );
+    if let Some(display_path) = display_path {
+        object.insert("displayPath".to_string(), Value::String(display_path));
+    }
+
+    if let Some(draft) = draft {
+        object.insert("content".to_string(), Value::String(draft.content));
+        object.insert("encoding".to_string(), Value::String(draft.encoding));
+    } else {
+        let (eol, mixed) = detect_line_endings(&saved_content);
+        object.insert("content".to_string(), Value::String(saved_content));
+        object.insert("encoding".to_string(), Value::String(saved_encoding));
+        object.insert("eol".to_string(), Value::String(eol.to_string()));
+        object.insert("hasMixedEol".to_string(), Value::Bool(mixed));
+    }
+    Ok(true)
 }
 
 fn load_recent_workspaces(connection: &Connection) -> Result<Value, String> {
@@ -1305,6 +1852,47 @@ fn stable_hash(value: &str) -> String {
     format!("{hash:016x}")
 }
 
+fn encoding_value(encoding: crate::core::text_file::TextEncoding) -> String {
+    match encoding {
+        crate::core::text_file::TextEncoding::Utf8 => "utf-8",
+        crate::core::text_file::TextEncoding::Utf8Bom => "utf-8-bom",
+        crate::core::text_file::TextEncoding::Utf16Le => "utf-16le",
+        crate::core::text_file::TextEncoding::Utf16Be => "utf-16be",
+    }
+    .to_string()
+}
+
+fn serialize_document_content(content: &str, eol: &str) -> String {
+    let normalized = content.replace("\r\n", "\n");
+    if eol == "CRLF" {
+        normalized.replace('\n', "\r\n")
+    } else {
+        normalized
+    }
+}
+
+fn detect_line_endings(content: &str) -> (&'static str, bool) {
+    let bytes = content.as_bytes();
+    let mut crlf_count = 0;
+    let mut lf_count = 0;
+    for (index, byte) in bytes.iter().enumerate() {
+        if *byte != b'\n' {
+            continue;
+        }
+        if index > 0 && bytes[index - 1] == b'\r' {
+            crlf_count += 1;
+        } else {
+            lf_count += 1;
+        }
+    }
+    let eol = if crlf_count >= lf_count && crlf_count > 0 {
+        "CRLF"
+    } else {
+        "LF"
+    };
+    (eol, crlf_count > 0 && lf_count > 0)
+}
+
 pub(super) fn normalized_unit(value: &str) -> String {
     match value {
         "px" | "%" | "auto" => value.to_string(),
@@ -1370,8 +1958,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{configure_metadata_connection, initialize_schema, relative_path, stable_hash};
-    use rusqlite::Connection;
+    use super::{
+        configure_metadata_connection, ensure_workspace, initialize_schema,
+        migrate_embedded_file_content, relative_path, save_metadata_value, save_window_open_file,
+        stable_hash, upsert_file,
+    };
+    use rusqlite::{params, Connection, OptionalExtension};
+    use serde_json::json;
     use std::{
         env, fs,
         time::{SystemTime, UNIX_EPOCH},
@@ -1398,10 +1991,10 @@ mod tests {
             .unwrap()
             .as_nanos();
         let path = env::temp_dir().join(format!("saekim-metadata-{timestamp}.sqlite3"));
-        let connection = Connection::open(&path).unwrap();
+        let mut connection = Connection::open(&path).unwrap();
 
         configure_metadata_connection(&connection).unwrap();
-        initialize_schema(&connection).unwrap();
+        initialize_schema(&mut connection).unwrap();
 
         let journal_mode: String = connection
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
@@ -1416,5 +2009,154 @@ mod tests {
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(path.with_extension("sqlite3-shm"));
         let _ = fs::remove_file(path.with_extension("sqlite3-wal"));
+    }
+
+    #[test]
+    fn document_session_keeps_body_only_for_dirty_drafts() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_schema(&mut connection).unwrap();
+        ensure_workspace(&connection, "ws_test", "/project").unwrap();
+
+        let clean_file = json!({
+            "id": "/project/clean.md",
+            "path": "/project/clean.md",
+            "name": "clean.md",
+            "content": "saved body",
+            "savedContent": "saved body",
+            "encoding": "utf-8",
+            "savedEncoding": "utf-8",
+            "eol": "LF"
+        });
+        save_window_open_file(
+            &connection,
+            "main",
+            "ws_test",
+            "/project",
+            &clean_file,
+            0,
+            Some("/project/clean.md"),
+            1,
+        )
+        .unwrap();
+
+        let stored_state: String = connection
+            .query_row(
+                "SELECT state_json FROM window_file_view_state WHERE window_label = 'main'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!stored_state.contains("saved body"));
+        let clean_draft_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM drafts", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(clean_draft_count, 0);
+
+        let dirty_file = json!({
+            "id": "/project/dirty.md",
+            "path": "/project/dirty.md",
+            "name": "dirty.md",
+            "content": "unsaved body",
+            "savedContent": "saved body",
+            "encoding": "utf-8",
+            "savedEncoding": "utf-8",
+            "eol": "LF"
+        });
+        save_window_open_file(
+            &connection,
+            "main",
+            "ws_test",
+            "/project",
+            &dirty_file,
+            1,
+            None,
+            2,
+        )
+        .unwrap();
+
+        let dirty_state: String = connection
+            .query_row(
+                "SELECT state_json FROM window_file_view_state WHERE open_order = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let draft_content: String = connection
+            .query_row(
+                "SELECT content FROM drafts WHERE window_label = 'main'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!dirty_state.contains("saved body"));
+        assert!(!dirty_state.contains("unsaved body"));
+        assert_eq!(draft_content, "unsaved body");
+    }
+
+    #[test]
+    fn schema_v3_migrates_embedded_body_to_a_dirty_draft() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_schema(&mut connection).unwrap();
+        ensure_workspace(&connection, "ws_test", "/project").unwrap();
+        let file_id = upsert_file(
+            &connection,
+            "ws_test",
+            "/project",
+            "/project/.env",
+            ".env",
+            None,
+            1,
+        )
+        .unwrap();
+        let legacy_state = json!({
+            "id": "/project/.env",
+            "path": "/project/.env",
+            "name": ".env",
+            "content": "TOKEN=unsaved",
+            "savedContent": "TOKEN=saved",
+            "encoding": "utf-8",
+            "savedEncoding": "utf-8",
+            "eol": "LF"
+        })
+        .to_string();
+        connection
+            .execute(
+                "INSERT INTO window_file_view_state
+                   (id, window_label, workspace_id, file_id, is_open, open_order,
+                    is_active, state_json, updated_at)
+                 VALUES ('legacy-row', 'main', 'ws_test', ?1, 1, 0, 1, ?2, 2)",
+                params![file_id, legacy_state],
+            )
+            .unwrap();
+        save_metadata_value(&connection, "schema_version", "2").unwrap();
+
+        migrate_embedded_file_content(&mut connection).unwrap();
+
+        let migrated_state: String = connection
+            .query_row(
+                "SELECT state_json FROM window_file_view_state WHERE id = 'legacy-row'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let draft: Option<String> = connection
+            .query_row(
+                "SELECT content FROM drafts WHERE file_id = ?1",
+                params![file_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap();
+        let last_content_hash: String = connection
+            .query_row(
+                "SELECT last_content_hash FROM files WHERE id = ?1",
+                params![file_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!migrated_state.contains("TOKEN=saved"));
+        assert!(!migrated_state.contains("TOKEN=unsaved"));
+        assert_eq!(draft.as_deref(), Some("TOKEN=unsaved"));
+        assert_eq!(last_content_hash, stable_hash("TOKEN=saved"));
     }
 }

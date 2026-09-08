@@ -36,6 +36,7 @@ export const browserBackend: BackendAdapter = {
   metadata: {
     loadSession,
     saveSession,
+    deleteDocumentDraft,
     loadWorkspaceSession,
     loadBlockLayouts,
     saveBlockLayout,
@@ -189,9 +190,11 @@ async function loadSession<T>(): Promise<T | null> {
   return raw ? (JSON.parse(raw) as T) : null;
 }
 
-async function saveSession<T>(session: T): Promise<void> {
+async function saveSession<T>(session: T, _scope: import('../common/BackendAdapter').SessionSaveScope): Promise<void> {
   localStorage.setItem(sessionKey, JSON.stringify(session));
 }
+
+async function deleteDocumentDraft(_filePath: string): Promise<void> {}
 
 async function loadWorkspaceSession(_workspacePath: string): Promise<null> {
   return null;
