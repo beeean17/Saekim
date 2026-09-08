@@ -1,6 +1,7 @@
 import type { SaekimFeature } from './feature';
 import { appCommands } from '../features/app-commands';
 import { commandPaletteAppContribution, commandPaletteCommands } from '../features/command-palette';
+import { externalChangesAppContribution } from '../features/external-changes';
 import { htmlPreviewContribution } from '../features/html-preview';
 import { imageAssetsEditorContribution } from '../features/image-assets';
 import { katexEditorContribution } from '../features/katex';
@@ -35,6 +36,12 @@ const featureCatalog: SaekimFeature[] = [
     dependsOn: ['app-commands'],
     app: commandPaletteAppContribution,
     commands: commandPaletteCommands,
+  },
+  {
+    id: 'external-change-protection',
+    label: 'External Change Protection',
+    dependsOn: ['file-workspace'],
+    app: externalChangesAppContribution,
   },
   {
     id: 'markdown',

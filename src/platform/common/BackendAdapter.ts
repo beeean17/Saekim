@@ -4,6 +4,8 @@ import type {
   FileTreeNode,
   FolderPayload,
   OpenFilePayload,
+  FileRevision,
+  SaveFileResult,
   TextEncoding,
   WorkspaceSearchPage,
   WorkspaceSearchRequest,
@@ -22,8 +24,13 @@ export interface FileBackend {
   openFileDialog(): Promise<OpenFilePayload | null>;
   importPdf(path: string): Promise<OpenFilePayload>;
   readFile(path: string): Promise<OpenFilePayload>;
-  saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null>;
-  saveFileAs(content: string, suggestedName: string, encoding: TextEncoding): Promise<string | null>;
+  saveFile(
+    path: string | null,
+    content: string,
+    encoding: TextEncoding,
+    options?: { expectedRevision?: FileRevision; force?: boolean },
+  ): Promise<SaveFileResult>;
+  saveFileAs(content: string, suggestedName: string, encoding: TextEncoding): Promise<SaveFileResult>;
 }
 
 export interface FolderBackend {

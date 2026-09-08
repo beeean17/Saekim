@@ -1,0 +1,63 @@
+.external-change-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 310;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg-app) 42%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.external-change-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.external-change-dialog-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.external-change-dialog-copy h2 {
+  font-size: 16px;
+}
+
+.external-change-dialog-copy p {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.external-change-dialog .ui-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.external-change-dialog .ui-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.external-change-dialog .ui-button-surface {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.external-change-dialog .ui-button-primary {
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+.external-change-dialog .ui-button:hover {
+  filter: brightness(0.97);
+}

@@ -4,6 +4,8 @@ import type {
   FileTreeNode,
   FolderPayload,
   OpenFilePayload,
+  FileRevision,
+  SaveFileResult,
   TextEncoding,
   WorkspaceSearchPage,
   WorkspaceSearchRequest,
@@ -136,6 +138,7 @@ async function readFile(path: string): Promise<OpenFilePayload> {
     name: path.split('/').pop() || 'untitled.md',
     content,
     encoding: 'utf-8',
+    revision: browserFileRevision(path, content),
   };
 }
 
@@ -223,16 +226,51 @@ function isBrowserWordBoundary(character: string | undefined): boolean {
   return !character || !/[\p{L}\p{N}_]/u.test(character);
 }
 
-async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {
+async function saveFile(
+  path: string | null,
+  content: string,
+  encoding: TextEncoding,
+  options: { expectedRevision?: FileRevision; force?: boolean } = {},
+): Promise<SaveFileResult> {
   if (!path) return saveFileAs(content, 'untitled.md', encoding);
+  const currentContent = localStorage.getItem(`saekim-file:${path}`) ?? '';
+  const currentRevision = browserFileRevision(path, currentContent);
+  if (!options.force && options.expectedRevision && !sameRevision(options.expectedRevision, currentRevision)) {
+    return { status: 'conflict', path, revision: currentRevision };
+  }
   localStorage.setItem(`saekim-file:${path}`, content);
-  return path;
+  const revision = { modifiedAt: Date.now(), size: new TextEncoder().encode(content).length };
+  localStorage.setItem(browserRevisionKey(path), JSON.stringify(revision));
+  return { status: 'saved', path, revision };
 }
 
-async function saveFileAs(content: string, suggestedName: string, _encoding: TextEncoding): Promise<string | null> {
+async function saveFileAs(content: string, suggestedName: string, _encoding: TextEncoding): Promise<SaveFileResult> {
   const path = `browser://${suggestedName || 'untitled.md'}`;
   localStorage.setItem(`saekim-file:${path}`, content);
-  return path;
+  const revision = { modifiedAt: Date.now(), size: new TextEncoder().encode(content).length };
+  localStorage.setItem(browserRevisionKey(path), JSON.stringify(revision));
+  return { status: 'saved', path, revision };
+}
+
+function browserRevisionKey(path: string): string {
+  return `saekim-file-revision:${path}`;
+}
+
+function browserFileRevision(path: string, content: string): FileRevision {
+  const raw = localStorage.getItem(browserRevisionKey(path));
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as FileRevision;
+      if (Number.isFinite(parsed.modifiedAt) && Number.isFinite(parsed.size)) return parsed;
+    } catch {
+      // Legacy browser files get a stable synthetic revision below.
+    }
+  }
+  return { modifiedAt: 0, size: new TextEncoder().encode(content).length };
+}
+
+function sameRevision(left: FileRevision, right: FileRevision): boolean {
+  return left.modifiedAt === right.modifiedAt && left.size === right.size;
 }
 
 async function pickPdfExportPath(_suggestedName: string): Promise<string | null> {

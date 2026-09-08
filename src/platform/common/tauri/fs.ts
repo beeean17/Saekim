@@ -4,6 +4,8 @@ import type {
   FileTreeNode,
   FolderPayload,
   OpenFilePayload,
+  FileRevision,
+  SaveFileResult,
   TextEncoding,
   WorkspaceSearchPage,
   WorkspaceSearchRequest,
@@ -82,18 +84,30 @@ export async function trashEntry(path: string): Promise<void> {
   return invokeCommand<void>('trash_workspace_entry', { path });
 }
 
-export async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {
+export async function saveFile(
+  path: string | null,
+  content: string,
+  encoding: TextEncoding,
+  options: { expectedRevision?: FileRevision; force?: boolean } = {},
+): Promise<SaveFileResult> {
   if (!isTauriRuntime()) {
-    return path;
+    return path ? { status: 'saved', path } : { status: 'cancelled' };
   }
-  return invokeCommand<string | null>('save_file', { path, content, encoding });
+  return invokeCommand<SaveFileResult>('save_file', {
+    path,
+    content,
+    encoding,
+    expectedModifiedAt: options.expectedRevision?.modifiedAt,
+    expectedSize: options.expectedRevision?.size,
+    force: options.force ?? false,
+  });
 }
 
-export async function saveFileAs(content: string, suggestedName: string, encoding: TextEncoding): Promise<string | null> {
+export async function saveFileAs(content: string, suggestedName: string, encoding: TextEncoding): Promise<SaveFileResult> {
   if (!isTauriRuntime()) {
-    return null;
+    return { status: 'cancelled' };
   }
-  return invokeCommand<string | null>('save_file_as', { content, suggestedName, encoding });
+  return invokeCommand<SaveFileResult>('save_file_as', { content, suggestedName, encoding });
 }
 
 export async function pickPdfExportPath(suggestedName: string): Promise<string | null> {

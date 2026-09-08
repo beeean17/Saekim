@@ -27,6 +27,12 @@ export interface OpenFile {
   savedEncoding: TextEncoding;
   eol: 'LF' | 'CRLF';
   hasMixedEol?: boolean;
+  diskRevision?: FileRevision;
+}
+
+export interface FileRevision {
+  modifiedAt: number;
+  size: number;
 }
 
 export interface RecentWorkspace {
@@ -49,7 +55,13 @@ export interface OpenFilePayload {
   content: string;
   encoding: TextEncoding;
   displayPath?: string | null;
+  revision?: FileRevision;
 }
+
+export type SaveFileResult =
+  | { status: 'saved'; path: string; revision?: FileRevision }
+  | { status: 'cancelled'; path?: null }
+  | { status: 'conflict'; path: string; revision?: FileRevision };
 
 export interface FolderPayload {
   rootPath: string;

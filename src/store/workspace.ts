@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { detectLineEndings, serializeLineEndings } from '../core/document/lineEndings';
+import { requestExternalChangeDecision } from '../core/document/externalChangeDecision';
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
-import type { FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace, TextEncoding } from '../types/workspace';
+import type { FileRevision, FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace, TextEncoding } from '../types/workspace';
 
 const confirmedEncodingChanges = new Set<string>();
 
@@ -105,7 +106,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
   openFileFromPayload: async (opened) => {
-    const file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined);
+    const file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined, opened.revision);
     set((state) => upsertOpenFile(state, file));
     const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
     if (folderPatch && get().activeFileId === file.id) set((state) => applyFolderPatch(state, folderPatch));
@@ -231,20 +232,53 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const file = get().openFiles.find((candidate) => candidate.id === id);
     if (!file) return null;
     if (!confirmEncodingChange(file)) return null;
-    const savedPath = await Backend.files.saveFile(
+    let result = await Backend.files.saveFile(
       file.path.startsWith('~') ? null : file.path,
       serializeLineEndings(file.content, file.eol),
       file.encoding,
+      { expectedRevision: file.diskRevision },
     );
-    if (!savedPath) return null;
+    if (result.status === 'conflict') {
+      const decision = await requestExternalChangeDecision(file.name);
+      if (decision === 'cancel') return null;
+      if (decision === 'reload') {
+        let opened: OpenFilePayload;
+        try {
+          opened = await Backend.files.readFile(file.path);
+        } catch (error) {
+          console.error('외부 변경 파일 다시 불러오기 실패:', error);
+          window.alert(`${file.name}을(를) 다시 불러올 수 없습니다. 파일이 이동되거나 삭제되었는지 확인하세요.`);
+          return null;
+        }
+        const reloaded = toOpenFile(
+          opened.path,
+          opened.name,
+          opened.content,
+          opened.encoding,
+          opened.displayPath ?? undefined,
+          opened.revision,
+        );
+        set((state) => ({
+          openFiles: state.openFiles.map((candidate) => (candidate.id === file.id ? reloaded : candidate)),
+        }));
+        await deleteDocumentDraftSafely(file.path);
+        return reloaded.path;
+      }
+      result = decision === 'save-as'
+        ? await Backend.files.saveFileAs(serializeLineEndings(file.content, file.eol), file.name, file.encoding)
+        : await Backend.files.saveFile(
+            file.path,
+            serializeLineEndings(file.content, file.eol),
+            file.encoding,
+            { expectedRevision: file.diskRevision, force: true },
+          );
+    }
+    if (result.status !== 'saved') return null;
+    const savedPath = result.path;
     confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
-    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name));
-    try {
-      await Backend.metadata.deleteDocumentDraft(file.path);
-    } catch (error) {
-      console.error('임시 문서 정리 실패:', error);
-    }
+    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name, result.revision));
+    await deleteDocumentDraftSafely(file.path);
     const folderPatch = await workspaceFolderPatchForOpenFile(
       { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
       get().rootPath,
@@ -261,20 +295,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
     if (!confirmEncodingChange(file)) return;
-    const savedPath = await Backend.files.saveFileAs(
+    const result = await Backend.files.saveFileAs(
       serializeLineEndings(file.content, file.eol),
       file.name,
       file.encoding,
     );
-    if (!savedPath) return;
+    if (result.status !== 'saved') return;
+    const savedPath = result.path;
     confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
-    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name));
-    try {
-      await Backend.metadata.deleteDocumentDraft(file.path);
-    } catch (error) {
-      console.error('임시 문서 정리 실패:', error);
-    }
+    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name, result.revision));
+    await deleteDocumentDraftSafely(file.path);
     const folderPatch = await workspaceFolderPatchForOpenFile(
       { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
       get().rootPath,
@@ -387,7 +418,7 @@ async function navigateHistory(
   if (!file) {
     try {
       const opened = await Backend.files.readFile(targetPath);
-      file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined);
+      file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined, opened.revision);
     } catch (error) {
       console.error('히스토리 파일 다시 열기 실패:', error);
       return;
@@ -453,6 +484,7 @@ function toOpenFile(
   content: string,
   encoding: TextEncoding = 'utf-8',
   displayPath?: string,
+  diskRevision?: FileRevision,
 ): OpenFile {
   const lineEndings = detectLineEndings(content);
   return {
@@ -466,6 +498,7 @@ function toOpenFile(
     savedEncoding: encoding,
     eol: lineEndings.eol,
     hasMixedEol: lineEndings.mixed,
+    diskRevision,
   };
 }
 
@@ -531,6 +564,7 @@ function savedOpenFilePatch(
   savedFile: OpenFile,
   savedPath: string,
   savedName: string,
+  diskRevision?: FileRevision,
 ): Pick<WorkspaceState, 'openFiles' | 'activeFileId' | 'closedFiles' | 'history'> {
   const openFiles = state.openFiles.flatMap((candidate) => {
     if (candidate.id === savedFile.id) {
@@ -543,6 +577,7 @@ function savedOpenFilePatch(
         savedContent: savedFile.content,
         savedEncoding: savedFile.encoding,
         hasMixedEol: false,
+        diskRevision,
       }];
     }
     return candidate.id === savedPath || candidate.path === savedPath ? [] : [candidate];
@@ -556,6 +591,14 @@ function savedOpenFilePatch(
     closedFiles: state.closedFiles.filter((candidate) => candidate.path !== savedPath),
     history: replaceHistoryPath(state.history, savedFile.path, savedPath),
   };
+}
+
+async function deleteDocumentDraftSafely(filePath: string): Promise<void> {
+  try {
+    await Backend.metadata.deleteDocumentDraft(filePath);
+  } catch (error) {
+    console.error('임시 문서 정리 실패:', error);
+  }
 }
 
 function renameOpenFilePath(file: OpenFile, previousPath: string, nextPath: string): OpenFile {

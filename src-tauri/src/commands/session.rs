@@ -1483,7 +1483,7 @@ fn restore_file_content(
     file: &mut Value,
 ) -> Result<bool, String> {
     let disk_file = super::file::read_file_payload(app, row.absolute_path.clone());
-    let (saved_content, saved_encoding, display_path) = match disk_file {
+    let (saved_content, saved_encoding, display_path, revision) = match disk_file {
         Ok(payload) => {
             let actual_hash = stable_hash(&payload.content);
             if row.expected_content_hash.as_deref() != Some(actual_hash.as_str()) {
@@ -1509,7 +1509,12 @@ fn restore_file_content(
                     );
                 }
             }
-            (payload.content, disk_encoding, payload.display_path)
+            (
+                payload.content,
+                disk_encoding,
+                payload.display_path,
+                payload.revision,
+            )
         }
         Err(error) => {
             if draft.is_none() {
@@ -1524,7 +1529,7 @@ fn restore_file_content(
                 .and_then(Value::as_str)
                 .unwrap_or("utf-8")
                 .to_string();
-            (String::new(), saved_encoding, None)
+            (String::new(), saved_encoding, None, None)
         }
     };
 
@@ -1542,6 +1547,15 @@ fn restore_file_content(
     );
     if let Some(display_path) = display_path {
         object.insert("displayPath".to_string(), Value::String(display_path));
+    }
+    if let Some(revision) = revision {
+        object.insert(
+            "diskRevision".to_string(),
+            serde_json::to_value(revision)
+                .map_err(|error| format!("failed to serialize file revision: {error}"))?,
+        );
+    } else {
+        object.remove("diskRevision");
     }
 
     if let Some(draft) = draft {

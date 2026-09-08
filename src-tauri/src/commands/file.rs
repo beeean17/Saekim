@@ -49,6 +49,24 @@ pub struct OpenFilePayload {
     pub(super) content: String,
     pub(super) encoding: TextEncoding,
     pub(super) display_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) revision: Option<FileRevisionPayload>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct FileRevisionPayload {
+    modified_at: u64,
+    size: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveFilePayload {
+    status: &'static str,
+    path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    revision: Option<FileRevisionPayload>,
 }
 
 #[derive(Serialize)]
@@ -477,8 +495,12 @@ pub async fn save_file(
     path: Option<String>,
     content: String,
     encoding: TextEncoding,
-) -> CommandResult<Option<String>> {
+    expected_modified_at: Option<u64>,
+    expected_size: Option<u64>,
+    force: bool,
+) -> CommandResult<SaveFilePayload> {
     let selected = tauri::async_runtime::spawn_blocking(move || {
+        let checks_existing_file = path.as_ref().is_some_and(|path| !path.is_empty());
         let target_path = match path {
             Some(path) if !path.is_empty() => Some(selected_file_path_from_string(path)),
             _ => app
@@ -490,17 +512,35 @@ pub async fn save_file(
         };
 
         let Some(target_path) = target_path else {
-            return Ok(None);
+            return Ok(SaveFilePayload {
+                status: "cancelled",
+                path: None,
+                revision: None,
+            });
         };
 
+        if checks_existing_file && !force {
+            if let Some(current_revision) =
+                conflicting_file_revision(&target_path, expected_modified_at, expected_size)?
+            {
+                return Ok(SaveFilePayload {
+                    status: "conflict",
+                    path: Some(target_path.to_string()),
+                    revision: current_revision,
+                });
+            }
+        }
         write_selected_file(&app, &target_path, content, encoding)?;
-        Ok(Some(target_path.to_string()))
+        Ok(SaveFilePayload {
+            status: "saved",
+            path: Some(target_path.to_string()),
+            revision: selected_file_revision(&target_path)?,
+        })
     })
     .await;
 
     match selected {
-        Ok(Ok(Some(path))) => ok(Some(path)),
-        Ok(Ok(None)) => ok(None),
+        Ok(Ok(payload)) => ok(payload),
         Ok(Err(error)) => fail(error),
         Err(error) => fail(format!("failed to run save dialog: {error}")),
     }
@@ -512,7 +552,7 @@ pub async fn save_file_as(
     content: String,
     suggested_name: String,
     encoding: TextEncoding,
-) -> CommandResult<Option<String>> {
+) -> CommandResult<SaveFilePayload> {
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let selected = app
             .dialog()
@@ -522,17 +562,24 @@ pub async fn save_file_as(
             .blocking_save_file();
 
         let Some(path) = selected else {
-            return Ok(None);
+            return Ok(SaveFilePayload {
+                status: "cancelled",
+                path: None,
+                revision: None,
+            });
         };
 
         write_selected_file(&app, &path, content, encoding)?;
-        Ok(Some(path.to_string()))
+        Ok(SaveFilePayload {
+            status: "saved",
+            path: Some(path.to_string()),
+            revision: selected_file_revision(&path)?,
+        })
     })
     .await;
 
     match selected {
-        Ok(Ok(Some(path))) => ok(Some(path)),
-        Ok(Ok(None)) => ok(None),
+        Ok(Ok(payload)) => ok(payload),
         Ok(Err(error)) => fail(error),
         Err(error) => fail(format!("failed to run save dialog: {error}")),
     }
@@ -621,7 +668,19 @@ pub fn write_pdf_export(path: String, pdf_data: String) -> CommandResult<String>
 #[cfg(not(target_os = "android"))]
 pub(super) fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFilePayload, String> {
     let path = PathBuf::from(path);
-    let decoded = read_text_file(&path)?;
+    let mut stable_read = None;
+    for _ in 0..3 {
+        let before = local_file_revision(&path)?;
+        let decoded = read_text_file(&path)?;
+        let after = local_file_revision(&path)?;
+        if before == after {
+            stable_read = Some((decoded, after));
+            break;
+        }
+    }
+    let Some((decoded, revision)) = stable_read else {
+        return Err("file kept changing while it was being read".to_string());
+    };
     let name = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -634,6 +693,7 @@ pub(super) fn read_file_payload(_app: &AppHandle, path: String) -> Result<OpenFi
         content: decoded.content,
         encoding: decoded.encoding,
         display_path: None,
+        revision: Some(revision),
     })
 }
 
@@ -671,6 +731,7 @@ fn read_android_content_file_payload(
         name,
         content: decoded.content,
         encoding: decoded.encoding,
+        revision: None,
     })
 }
 
@@ -774,7 +835,72 @@ fn read_selected_file_payload(app: &AppHandle, path: FilePath) -> Result<OpenFil
         name,
         content: decoded.content,
         encoding: decoded.encoding,
+        revision: None,
     })
+}
+
+#[cfg(not(target_os = "android"))]
+fn local_file_revision(path: &Path) -> Result<FileRevisionPayload, String> {
+    let metadata =
+        fs::metadata(path).map_err(|error| format!("failed to read file revision: {error}"))?;
+    let modified = metadata
+        .modified()
+        .map_err(|error| format!("failed to read file modification time: {error}"))?;
+    let modified_at = modified
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX);
+    Ok(FileRevisionPayload {
+        modified_at,
+        size: metadata.len(),
+    })
+}
+
+#[cfg(not(target_os = "android"))]
+fn optional_local_file_revision(path: &Path) -> Result<Option<FileRevisionPayload>, String> {
+    match fs::metadata(path) {
+        Ok(_) => local_file_revision(path).map(Some),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!("failed to read file revision: {error}")),
+    }
+}
+
+fn selected_file_revision(
+    path: &tauri_plugin_dialog::FilePath,
+) -> Result<Option<FileRevisionPayload>, String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = path;
+        Ok(None)
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let local_path = path.clone().into_path().unwrap_or_default();
+        optional_local_file_revision(&local_path)
+    }
+}
+
+fn conflicting_file_revision(
+    path: &tauri_plugin_dialog::FilePath,
+    expected_modified_at: Option<u64>,
+    expected_size: Option<u64>,
+) -> Result<Option<Option<FileRevisionPayload>>, String> {
+    let (Some(expected_modified_at), Some(expected_size)) = (expected_modified_at, expected_size)
+    else {
+        return Ok(None);
+    };
+
+    let current = selected_file_revision(path)?;
+    let changed = match current.as_ref() {
+        Some(revision) => {
+            revision.modified_at != expected_modified_at || revision.size != expected_size
+        }
+        None => true,
+    };
+    Ok(changed.then_some(current))
 }
 
 #[cfg(target_os = "android")]
@@ -1069,6 +1195,32 @@ mod atomic_save_tests {
 
         assert!(write_file_atomically(&target, b"content").is_err());
         assert!(!directory.join(".note.md.saekim-tmp").exists());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn file_revision_detects_external_content_changes() {
+        let directory = test_directory("revision-conflict");
+        fs::create_dir_all(&directory).unwrap();
+        let target = directory.join("note.md");
+        fs::write(&target, "before").unwrap();
+        let expected = local_file_revision(&target).unwrap();
+        let selected = selected_file_path_from_string(target.to_string_lossy().into_owned());
+
+        assert!(conflicting_file_revision(
+            &selected,
+            Some(expected.modified_at),
+            Some(expected.size),
+        )
+        .unwrap()
+        .is_none());
+
+        fs::write(&target, "externally changed content").unwrap();
+        let conflict =
+            conflicting_file_revision(&selected, Some(expected.modified_at), Some(expected.size))
+                .unwrap();
+        assert!(conflict.is_some());
+
         fs::remove_dir_all(directory).unwrap();
     }
 }
