@@ -36,6 +36,9 @@ class WorkspaceSearchArgs {
   lateinit var scope: String
   var cursor: String? = null
   var limit: Int? = null
+  var useRegex: Boolean = false
+  var caseSensitive: Boolean = false
+  var wholeWord: Boolean = false
 }
 
 @InvokeArg
@@ -75,6 +78,17 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
     val name: String,
     val relativePath: String,
     val modifiedAt: Long,
+    var matchLine: Int? = null,
+    var matchColumn: Int? = null,
+    var matchPreview: String? = null,
+    var matchCount: Int? = null,
+  )
+
+  private data class WorkspaceContentMatch(
+    val line: Int,
+    val column: Int,
+    val preview: String,
+    val count: Int,
   )
 
   private val treeGrantFlags =
@@ -176,19 +190,33 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
   fun searchWorkspace(invoke: Invoke) {
     try {
       val args = invoke.parseArgs(WorkspaceSearchArgs::class.java)
-      if (args.scope != "file-name") {
+      if (args.scope != "file-name" && args.scope != "content") {
         throw IllegalArgumentException("Unsupported workspace search scope: ${args.scope}")
       }
 
-      val query = args.query.trim().lowercase(Locale.ROOT)
+      val query = args.query.trim()
       val cursor = args.cursor
       val pageSize = (args.limit ?: DEFAULT_SEARCH_PAGE_SIZE).coerceIn(1, MAX_SEARCH_PAGE_SIZE)
       val matches = mutableListOf<WorkspaceSearchItem>()
       collectWorkspaceSearchItems(Uri.parse(args.rootPath), "", false, matches)
+      val matcher = if (args.scope == "content") workspaceContentMatcher(args) else null
       val filtered =
         matches
           .asSequence()
-          .filter { it.name.lowercase(Locale.ROOT).contains(query) }
+          .filter { item ->
+            if (matcher != null) {
+              val match = workspaceContentMatch(Uri.parse(item.path), matcher, args.wholeWord) ?: return@filter false
+              item.matchLine = match.line
+              item.matchColumn = match.column
+              item.matchPreview = match.preview
+              item.matchCount = match.count
+              true
+            } else if (args.caseSensitive) {
+              item.name.contains(query)
+            } else {
+              item.name.lowercase(Locale.ROOT).contains(query.lowercase(Locale.ROOT))
+            }
+          }
           .filter { cursor == null || compareSearchPaths(it.relativePath, cursor) > 0 }
           .sortedWith { left, right -> compareSearchPaths(left.relativePath, right.relativePath) }
           .toList()
@@ -200,6 +228,10 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
         result.put("name", item.name)
         result.put("relativePath", item.relativePath)
         if (item.modifiedAt > 0) result.put("modifiedAt", item.modifiedAt)
+        item.matchLine?.let { result.put("matchLine", it) }
+        item.matchColumn?.let { result.put("matchColumn", it) }
+        item.matchPreview?.let { result.put("matchPreview", it) }
+        item.matchCount?.let { result.put("matchCount", it) }
         responseItems.put(result)
       }
       val response = JSObject()
@@ -210,6 +242,64 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
       invoke.reject(error.message ?: "Failed to search workspace")
     }
   }
+
+  private fun workspaceContentMatcher(args: WorkspaceSearchArgs): Regex {
+    val pattern = if (args.useRegex) args.query.trim() else Regex.escape(args.query.trim())
+    val options = buildSet {
+      add(RegexOption.MULTILINE)
+      if (!args.caseSensitive) add(RegexOption.IGNORE_CASE)
+    }
+    return try {
+      Regex(pattern, options)
+    } catch (error: Exception) {
+      throw IllegalArgumentException("Invalid workspace search pattern: ${error.message}")
+    }
+  }
+
+  private fun workspaceContentMatch(uri: Uri, matcher: Regex, wholeWord: Boolean): WorkspaceContentMatch? {
+    val bytes = activity.contentResolver.openInputStream(uri)?.use { input ->
+      val data = input.readBytes()
+      if (data.size > MAX_SEARCH_FILE_BYTES) return null
+      data
+    } ?: return null
+    val content = decodeSearchText(bytes) ?: return null
+    val matches = matcher.findAll(content).filter { match ->
+      !wholeWord || isWholeWordMatch(content, match.range.first, match.range.last + 1)
+    }.toList()
+    val first = matches.firstOrNull() ?: return null
+    val start = first.range.first
+    val lineStart = content.lastIndexOf('\n', (start - 1).coerceAtLeast(0)) + 1
+    val lineEnd = content.indexOf('\n', start).let { if (it < 0) content.length else it }
+    return WorkspaceContentMatch(
+      line = content.substring(0, start).count { it == '\n' } + 1,
+      column = content.substring(lineStart, start).codePointCount(0, start - lineStart) + 1,
+      preview = content.substring(lineStart, lineEnd).trim().take(180),
+      count = matches.size,
+    )
+  }
+
+  private fun decodeSearchText(bytes: ByteArray): String? {
+    if (bytes.isEmpty()) return ""
+    return when {
+      bytes.size >= 3 && bytes[0] == 0xef.toByte() && bytes[1] == 0xbb.toByte() && bytes[2] == 0xbf.toByte() ->
+        bytes.copyOfRange(3, bytes.size).toString(Charsets.UTF_8)
+      bytes.size >= 2 && bytes[0] == 0xff.toByte() && bytes[1] == 0xfe.toByte() ->
+        bytes.copyOfRange(2, bytes.size).toString(Charsets.UTF_16LE)
+      bytes.size >= 2 && bytes[0] == 0xfe.toByte() && bytes[1] == 0xff.toByte() ->
+        bytes.copyOfRange(2, bytes.size).toString(Charsets.UTF_16BE)
+      bytes.any { it == 0.toByte() } -> null
+      else -> bytes.toString(Charsets.UTF_8)
+    }
+  }
+
+  private fun isWholeWordMatch(content: String, start: Int, end: Int): Boolean {
+    val before = if (start > 0) content[start - 1] else null
+    val after = if (end < content.length) content[end] else null
+    return !isWordCharacter(before) && !isWordCharacter(after)
+  }
+
+  private fun isWordCharacter(character: Char?): Boolean =
+    character != null && (character.isLetterOrDigit() || character == '_')
 
   @Command
   fun readTextDocument(invoke: Invoke) {
@@ -657,6 +747,7 @@ class AndroidDocumentMetadataPlugin(private val activity: Activity) : Plugin(act
     private const val MAX_ENTRIES_PER_FOLDER = 80
     private const val DEFAULT_SEARCH_PAGE_SIZE = 100
     private const val MAX_SEARCH_PAGE_SIZE = 500
+    private const val MAX_SEARCH_FILE_BYTES = 20 * 1024 * 1024
 
     private val ignoredNames =
       setOf(

@@ -36,6 +36,7 @@ export function App() {
   const activeFile = useWorkspaceStore(selectActiveFile);
   const closeActiveFile = useCloseProtection();
   const openFind = useSearchStore((state) => state.openFind);
+  const openReplace = useSearchStore((state) => state.openReplace);
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const viewMode = useUIStore((state) => state.viewMode);
   const syncScroll = useUIStore((state) => state.syncScroll);
@@ -50,9 +51,9 @@ export function App() {
   const commandRegistry = useMemo(
     () =>
       createCommandRegistry(enabledFeatures, {
-        search: { openFind },
+        search: { openFind, openReplace },
       }),
-    [openFind],
+    [openFind, openReplace],
   );
 
   const shortcuts = useMemo(

@@ -150,12 +150,24 @@ async function searchWorkspace(request: WorkspaceSearchRequest): Promise<Workspa
     .filter((key): key is string => Boolean(key?.startsWith(prefix)))
     .map((key) => key.slice(prefix.length))
     .filter((path) => path.startsWith(rootPrefix))
-    .map((path) => ({
-      path,
-      name: path.split('/').pop() || path,
-      relativePath: path.slice(rootPrefix.length),
-    }))
-    .filter((item) => item.relativePath > cursor && item.name.toLocaleLowerCase().includes(query))
+    .map((path) => {
+      const name = path.split('/').pop() || path;
+      const content = localStorage.getItem(`${prefix}${path}`) ?? '';
+      const contentMatch = request.scope === 'content'
+        ? findBrowserWorkspaceContentMatch(content, request)
+        : null;
+      return {
+        path,
+        name,
+        relativePath: path.slice(rootPrefix.length),
+        ...(contentMatch ?? {}),
+      };
+    })
+    .filter((item) => {
+      if (item.relativePath <= cursor) return false;
+      if (request.scope === 'content') return item.matchLine !== undefined;
+      return request.caseSensitive ? item.name.includes(request.query.trim()) : item.name.toLocaleLowerCase().includes(query);
+    })
     .sort((left, right) => left.relativePath.localeCompare(right.relativePath));
   const items = matches.slice(0, limit);
 
@@ -163,6 +175,42 @@ async function searchWorkspace(request: WorkspaceSearchRequest): Promise<Workspa
     items,
     nextCursor: matches.length > limit ? items[items.length - 1]?.relativePath ?? null : null,
   };
+}
+
+function findBrowserWorkspaceContentMatch(
+  content: string,
+  request: WorkspaceSearchRequest,
+): Pick<import('../../types/workspace').WorkspaceSearchItem, 'matchLine' | 'matchColumn' | 'matchPreview' | 'matchCount'> | null {
+  let matcher: RegExp;
+  try {
+    matcher = new RegExp(request.useRegex ? request.query.trim() : escapeRegularExpression(request.query.trim()), `g${request.caseSensitive ? '' : 'i'}m`);
+  } catch (error) {
+    throw new Error(`Invalid workspace search pattern: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const matches = Array.from(content.matchAll(matcher)).filter((match) => {
+    if (!request.wholeWord) return true;
+    const start = match.index ?? 0;
+    return isBrowserWordBoundary(content[start - 1]) && isBrowserWordBoundary(content[start + match[0].length]);
+  });
+  const first = matches[0];
+  if (!first) return null;
+  const start = first.index ?? 0;
+  const lineStart = content.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+  const lineEnd = content.indexOf('\n', start);
+  return {
+    matchLine: content.slice(0, start).split('\n').length,
+    matchColumn: Array.from(content.slice(lineStart, start)).length + 1,
+    matchPreview: content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd).trim().slice(0, 180),
+    matchCount: matches.length,
+  };
+}
+
+function escapeRegularExpression(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isBrowserWordBoundary(character: string | undefined): boolean {
+  return !character || !/[\p{L}\p{N}_]/u.test(character);
 }
 
 async function saveFile(path: string | null, content: string, encoding: TextEncoding): Promise<string | null> {

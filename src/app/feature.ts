@@ -130,6 +130,7 @@ export type CommandContributionFactory = (ctx: CommandRuntimeContext) => Command
 export interface CommandRuntimeContext {
   search: {
     openFind(): void;
+    openReplace(): void;
   };
 }
 

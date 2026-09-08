@@ -237,26 +237,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!savedPath) return null;
     confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
-    set((current) => ({
-      openFiles: current.openFiles.map((candidate) =>
-        candidate.id === file.id
-          ? {
-              ...candidate,
-              id: savedPath,
-              path: savedPath,
-              displayPath: savedPath,
-              name: savedFile.name,
-              savedContent: candidate.content,
-              savedEncoding: candidate.encoding,
-              hasMixedEol: false,
-            }
-          : candidate,
-      ),
-      activeFileId: current.activeFileId === file.id ? savedPath : current.activeFileId,
-      history: {
-        ...replaceHistoryPath(current.history, file.path, savedPath),
-      },
-    }));
+    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name));
     try {
       await Backend.metadata.deleteDocumentDraft(file.path);
     } catch (error) {
@@ -286,26 +267,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!savedPath) return;
     confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
-    set((current) => ({
-      openFiles: current.openFiles.map((candidate) =>
-        candidate.id === file.id
-          ? {
-              ...candidate,
-              id: savedPath,
-              path: savedPath,
-              displayPath: savedPath,
-              name: savedFile.name,
-              savedContent: candidate.content,
-              savedEncoding: candidate.encoding,
-              hasMixedEol: false,
-            }
-          : candidate,
-      ),
-      activeFileId: savedPath,
-      history: {
-        ...replaceHistoryPath(current.history, file.path, savedPath),
-      },
-    }));
+    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name));
     try {
       await Backend.metadata.deleteDocumentDraft(file.path);
     } catch (error) {
@@ -520,6 +482,38 @@ function replaceHistoryPath(
     back: history.back.map(replace),
     forward: history.forward.map(replace),
     current: history.current ? replace(history.current) : null,
+  };
+}
+
+function savedOpenFilePatch(
+  state: WorkspaceState,
+  savedFile: OpenFile,
+  savedPath: string,
+  savedName: string,
+): Pick<WorkspaceState, 'openFiles' | 'activeFileId' | 'closedFiles' | 'history'> {
+  const openFiles = state.openFiles.flatMap((candidate) => {
+    if (candidate.id === savedFile.id) {
+      return [{
+        ...candidate,
+        id: savedPath,
+        path: savedPath,
+        displayPath: savedPath,
+        name: savedName,
+        savedContent: savedFile.content,
+        savedEncoding: savedFile.encoding,
+        hasMixedEol: false,
+      }];
+    }
+    return candidate.id === savedPath || candidate.path === savedPath ? [] : [candidate];
+  });
+
+  return {
+    openFiles,
+    activeFileId: state.activeFileId === savedFile.id || state.activeFileId === savedPath
+      ? savedPath
+      : state.activeFileId,
+    closedFiles: state.closedFiles.filter((candidate) => candidate.path !== savedPath),
+    history: replaceHistoryPath(state.history, savedFile.path, savedPath),
   };
 }
 

@@ -153,8 +153,9 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
   지연 로딩
 - 노드에 `modifiedAt`, `isOpen`, `isLoaded` 상태 보관
 - `.assets` 폴더를 트리에 노출
-- 파일명 검색은 `search_workspace`가 트리 로딩 상태와 무관하게 전체 루트를 순회하며,
-  경로 커서 기반 페이지 응답을 사용
+- 파일명·내용 검색은 `search_workspace`가 트리 로딩 상태와 무관하게 전체 루트를 순회하며,
+  경로 커서 기반 페이지 응답을 사용. 내용 결과에는 첫 일치의 줄·열·미리보기와 파일별
+  일치 개수가 포함됨
 - 최근 워크스페이스 목록 유지 (macOS 네이티브 메뉴의 Open Recent Workspace와 연동)
 - 앞/뒤 이동 히스토리 (`history.back` / `history.forward`)
 
@@ -179,7 +180,7 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | --- | --- |
 | `open_file_dialog` / `open_folder_dialog` | 네이티브 선택 다이얼로그 |
 | `read_file` / `read_folder` / `read_folder_children` | 읽기 |
-| `search_workspace` | 전체 워크스페이스 파일명 검색 (커서 페이지 지원) |
+| `search_workspace` | 전체 워크스페이스 파일명·내용 검색 (커서 페이지 지원) |
 | `save_file` / `save_file_as` | 저장 |
 | `take_pending_open_files` | 외부 열기 큐 소비 |
 | `pick_image_path` | 이미지 선택 |
@@ -497,12 +498,15 @@ $HOME/** $PICTURE/** $DESKTOP/** $DOCUMENT/** $DOWNLOAD/**
 ## 10. 검색
 
 - `Cmd/Ctrl+F`로 파일 내 찾기 바 열기
+- `Cmd/Ctrl+H`로 찾기와 바꾸기 바 열기
 - 전체 일치 개수 표시, 이전/다음 순환 이동
 - 일치 항목을 편집기에서 선택 상태로 표시
-- 명령 ID `search.openFind`, Edit 메뉴에 `Find`로 등록
+- 바꾸기·전체 바꾸기와 정규식 캡처 치환 지원
+- 대소문자 구분, 단어 단위, 정규식, 선택 영역 검색 옵션
+- 문서/워크스페이스 범위를 전환하며 워크스페이스 결과는 파일·줄·열·미리보기·일치 개수를 표시
+- 결과를 선택하면 파일을 열고 첫 일치 범위를 선택
+- 명령 ID `search.openFind` / `search.openReplace`, Edit 메뉴에 `Find` / `Replace`로 등록
 - 사이드바 파일명 검색은 접힌 폴더를 포함한 워크스페이스 전체에서 실행
-
-> 바꾸기, 정규식, 대소문자 구분, 워크스페이스 전체 **내용** 검색은 아직 없습니다.
 
 ---
 
@@ -678,6 +682,7 @@ Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용�
 | `Cmd/Ctrl+S` | 저장 |
 | `Cmd/Ctrl+Shift+S` | 다른 이름으로 저장 |
 | `Cmd/Ctrl+F` | 찾기 |
+| `Cmd/Ctrl+H` | 바꾸기 |
 | `Cmd/Ctrl+P` | PDF 내보내기 |
 
 ### 13.8 상태바

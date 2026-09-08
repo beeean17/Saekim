@@ -70,6 +70,8 @@ pub struct FolderPayload {
 pub enum WorkspaceSearchScope {
     #[serde(rename = "file-name")]
     FileName,
+    #[serde(rename = "content")]
+    Content,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -80,6 +82,12 @@ pub struct WorkspaceSearchRequest {
     pub(crate) scope: WorkspaceSearchScope,
     pub(crate) cursor: Option<String>,
     pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) use_regex: bool,
+    #[serde(default)]
+    pub(crate) case_sensitive: bool,
+    #[serde(default)]
+    pub(crate) whole_word: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -89,6 +97,14 @@ pub struct WorkspaceSearchItem {
     pub(crate) name: String,
     pub(crate) relative_path: String,
     pub(crate) modified_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) match_line: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) match_column: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) match_preview: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) match_count: Option<usize>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1753,12 +1769,41 @@ fn search_workspace_files(request: WorkspaceSearchRequest) -> Result<WorkspaceSe
         return Err("workspace root is not a directory".to_string());
     }
 
+    let query = request.query.trim();
+    if query.is_empty() {
+        return Ok(WorkspaceSearchPage {
+            items: Vec::new(),
+            next_cursor: None,
+        });
+    }
+
     let mut items = Vec::new();
     collect_workspace_files(&root, &root, &mut items)?;
-    let query = request.query.trim().to_lowercase();
-    items.retain(|item| match request.scope {
-        WorkspaceSearchScope::FileName => item.name.to_lowercase().contains(&query),
-    });
+    match request.scope {
+        WorkspaceSearchScope::FileName => {
+            if request.case_sensitive {
+                items.retain(|item| item.name.contains(query));
+            } else {
+                let query = query.to_lowercase();
+                items.retain(|item| item.name.to_lowercase().contains(&query));
+            }
+        }
+        WorkspaceSearchScope::Content => {
+            let matcher = workspace_content_matcher(&request)?;
+            items.retain_mut(|item| {
+                let result =
+                    workspace_content_match(Path::new(&item.path), &matcher, request.whole_word);
+                let Some(result) = result else {
+                    return false;
+                };
+                item.match_line = Some(result.line);
+                item.match_column = Some(result.column);
+                item.match_preview = Some(result.preview);
+                item.match_count = Some(result.count);
+                true
+            });
+        }
+    }
     items.sort_by(|left, right| workspace_search_item_cmp(left, right));
 
     if let Some(cursor) = request.cursor.as_deref() {
@@ -1838,10 +1883,84 @@ fn collect_workspace_files(
             name,
             relative_path,
             modified_at,
+            match_line: None,
+            match_column: None,
+            match_preview: None,
+            match_count: None,
         });
     }
 
     Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+struct WorkspaceContentMatch {
+    line: usize,
+    column: usize,
+    preview: String,
+    count: usize,
+}
+
+#[cfg(not(target_os = "android"))]
+fn workspace_content_matcher(request: &WorkspaceSearchRequest) -> Result<regex::Regex, String> {
+    let pattern = if request.use_regex {
+        request.query.trim().to_string()
+    } else {
+        regex::escape(request.query.trim())
+    };
+    regex::RegexBuilder::new(&pattern)
+        .case_insensitive(!request.case_sensitive)
+        .multi_line(true)
+        .build()
+        .map_err(|error| format!("invalid workspace search pattern: {error}"))
+}
+
+#[cfg(not(target_os = "android"))]
+fn workspace_content_match(
+    path: &Path,
+    matcher: &regex::Regex,
+    whole_word: bool,
+) -> Option<WorkspaceContentMatch> {
+    let content = match read_text_file(path) {
+        Ok(decoded) => decoded.content,
+        Err(_) => return None,
+    };
+    let matches = matcher
+        .find_iter(&content)
+        .filter(|matched| {
+            !whole_word || is_whole_word_match(&content, matched.start(), matched.end())
+        })
+        .collect::<Vec<_>>();
+    let first = matches.first()?;
+    let prefix = &content[..first.start()];
+    let line_start = prefix.rfind('\n').map(|index| index + 1).unwrap_or(0);
+    let line_end = content[first.end()..]
+        .find('\n')
+        .map(|offset| first.end() + offset)
+        .unwrap_or(content.len());
+    let preview = content[line_start..line_end]
+        .trim()
+        .chars()
+        .take(180)
+        .collect::<String>();
+    Some(WorkspaceContentMatch {
+        line: prefix.bytes().filter(|byte| *byte == b'\n').count() + 1,
+        column: content[line_start..first.start()].chars().count() + 1,
+        preview,
+        count: matches.len(),
+    })
+}
+
+#[cfg(not(target_os = "android"))]
+fn is_whole_word_match(content: &str, start: usize, end: usize) -> bool {
+    let before = content[..start].chars().next_back();
+    let after = content[end..].chars().next();
+    !before.is_some_and(is_word_character) && !after.is_some_and(is_word_character)
+}
+
+#[cfg(not(target_os = "android"))]
+fn is_word_character(character: char) -> bool {
+    character.is_alphanumeric() || character == '_'
 }
 
 #[cfg(not(target_os = "android"))]
@@ -1908,6 +2027,38 @@ mod workspace_search_tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[test]
+    fn searches_workspace_content_with_regex_and_word_boundaries() {
+        let root = workspace_search_temp_dir("content");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("match.md"), "zero\nAlpha alpha alphabet\nlast").unwrap();
+        fs::write(root.join("miss.md"), "alphabet only").unwrap();
+
+        let mut request = search_request(&root, "alpha", None, 100);
+        request.scope = WorkspaceSearchScope::Content;
+        request.case_sensitive = true;
+        request.whole_word = true;
+        let page = search_workspace_files(request).unwrap();
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].relative_path, "match.md");
+        assert_eq!(page.items[0].match_line, Some(2));
+        assert_eq!(page.items[0].match_column, Some(7));
+        assert_eq!(page.items[0].match_count, Some(1));
+        assert_eq!(
+            page.items[0].match_preview.as_deref(),
+            Some("Alpha alpha alphabet")
+        );
+
+        let mut regex_request = search_request(&root, "(?i)^last$", None, 100);
+        regex_request.scope = WorkspaceSearchScope::Content;
+        regex_request.use_regex = true;
+        let regex_page = search_workspace_files(regex_request).unwrap();
+        assert_eq!(regex_page.items.len(), 1);
+        assert_eq!(regex_page.items[0].match_line, Some(3));
+        fs::remove_dir_all(root).unwrap();
+    }
+
     fn search_request(
         root: &Path,
         query: &str,
@@ -1920,6 +2071,9 @@ mod workspace_search_tests {
             scope: WorkspaceSearchScope::FileName,
             cursor,
             limit: Some(limit),
+            use_regex: false,
+            case_sensitive: false,
+            whole_word: false,
         }
     }
 

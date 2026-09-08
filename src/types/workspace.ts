@@ -56,7 +56,7 @@ export interface FolderPayload {
   tree: FileTreeNode[];
 }
 
-export type WorkspaceSearchScope = 'file-name';
+export type WorkspaceSearchScope = 'file-name' | 'content';
 
 export interface WorkspaceSearchRequest {
   rootPath: string;
@@ -64,6 +64,9 @@ export interface WorkspaceSearchRequest {
   scope: WorkspaceSearchScope;
   cursor?: string | null;
   limit?: number;
+  useRegex?: boolean;
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
 }
 
 export interface WorkspaceSearchItem {
@@ -71,6 +74,10 @@ export interface WorkspaceSearchItem {
   name: string;
   relativePath: string;
   modifiedAt?: number;
+  matchLine?: number;
+  matchColumn?: number;
+  matchPreview?: string;
+  matchCount?: number;
 }
 
 export interface WorkspaceSearchPage {

@@ -157,6 +157,9 @@ impl<R: Runtime> AndroidDocumentMetadata<R> {
                     scope: request.scope,
                     cursor: request.cursor.clone(),
                     limit: request.limit,
+                    use_regex: request.use_regex,
+                    case_sensitive: request.case_sensitive,
+                    whole_word: request.whole_word,
                 },
             )
             .map_err(|error| error.to_string())
@@ -256,6 +259,9 @@ struct WorkspaceSearchPayload {
     scope: crate::commands::file::WorkspaceSearchScope,
     cursor: Option<String>,
     limit: Option<usize>,
+    use_regex: bool,
+    case_sensitive: bool,
+    whole_word: bool,
 }
 
 #[derive(Deserialize)]

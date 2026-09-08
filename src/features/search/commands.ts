@@ -7,4 +7,10 @@ export const searchCommands: CommandContributionFactory = (ctx) => [
     menu: { section: 'edit', label: 'Find' },
     run: () => ctx.search.openFind(),
   },
+  {
+    id: 'search.openReplace',
+    defaultShortcut: 'mod+h',
+    menu: { section: 'edit', label: 'Replace' },
+    run: () => ctx.search.openReplace(),
+  },
 ];

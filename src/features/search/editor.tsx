@@ -22,6 +22,7 @@ export const searchEditorContribution: EditorContribution = {
 
 function SearchFindOverlay({ activeFile, textareaRef }: EditorOverlayProps) {
   const findOpen = useSearchStore((state) => state.findOpen);
+  const replaceOpen = useSearchStore((state) => state.replaceOpen);
   const closeFind = useSearchStore((state) => state.closeFind);
 
   useEffect(() => {
@@ -30,5 +31,5 @@ function SearchFindOverlay({ activeFile, textareaRef }: EditorOverlayProps) {
 
   if (!activeFile || !findOpen) return null;
 
-  return <FindBar content={activeFile.content} textareaRef={textareaRef} onClose={closeFind} />;
+  return <FindBar file={activeFile} initialReplace={replaceOpen} textareaRef={textareaRef} onClose={closeFind} />;
 }

@@ -50,6 +50,9 @@ export function useShortcuts(handlers: ShortcutHandlers, commands: CommandRegist
       if (event.key.toLowerCase() === 'f') {
         if (dispatchShortcut(commands, 'mod+f')) event.preventDefault();
       }
+      if (event.key.toLowerCase() === 'h') {
+        if (dispatchShortcut(commands, 'mod+h')) event.preventDefault();
+      }
       if (event.key.toLowerCase() === 'e' && event.shiftKey) {
         if (dispatchShortcut(commands, 'mod+shift+e')) event.preventDefault();
       }
