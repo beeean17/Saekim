@@ -1,4 +1,6 @@
 import type { RefObject } from 'react';
+import { enabledFeatures } from '../../app/featureRegistry';
+import { getFileTypeLabel } from '../../core/document/fileType';
 import { countKoreanAwareWords } from '../../core/format/readingTime';
 import { pdfExportStatusText, usePdfExportStore } from '../../features/pdf-export';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
@@ -9,7 +11,7 @@ export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTM
   const pdfExportStatus = usePdfExportStore((state) => state.status);
   const dirty = isDirty(activeFile);
   const content = activeFile?.content ?? '';
-  const language = activeFile?.name.endsWith('.txt') ? 'Text' : 'Markdown';
+  const language = activeFile ? getFileTypeLabel(activeFile.name, activeFile.path, enabledFeatures) : '-';
   const pdfStatusText = pdfExportStatusText(pdfExportStatus);
   const cursor = useCursorPosition(content, textareaRef);
 
