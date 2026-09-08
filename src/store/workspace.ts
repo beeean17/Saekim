@@ -23,8 +23,8 @@ interface WorkspaceState {
   saveActive: () => Promise<void>;
   saveActiveAs: () => Promise<void>;
   refresh: () => Promise<void>;
-  historyPrev: () => void;
-  historyNext: () => void;
+  historyPrev: () => Promise<void>;
+  historyNext: () => Promise<void>;
   restoreWorkspace: (workspace: WorkspaceSession) => void;
   restoreRecentWorkspaces: (workspaces: RecentWorkspace[] | undefined) => void;
   openFileFromPayload: (opened: OpenFilePayload) => Promise<void>;
@@ -157,13 +157,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const closedPath = closedFile?.path;
       nextActivePath = nextActiveFile?.path ?? null;
 
+      if (state.activeFileId !== id) {
+        return { openFiles, activeFileId, history: state.history };
+      }
+
+      const back = nextActivePath === state.history.back[state.history.back.length - 1]
+        ? state.history.back.slice(0, -1)
+        : state.history.back;
+      const forward = closedPath
+        ? [closedPath, ...state.history.forward.filter((path) => path !== closedPath)]
+        : state.history.forward;
+
       return {
         openFiles,
         activeFileId,
         history: {
-          back: closedPath ? state.history.back.filter((path) => path !== closedPath) : state.history.back,
-          forward: closedPath ? state.history.forward.filter((path) => path !== closedPath) : state.history.forward,
-          current: nextActiveFile?.path ?? (state.history.current === closedPath ? null : state.history.current),
+          back,
+          forward,
+          current: nextActivePath,
         },
       };
     });
@@ -262,40 +273,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       console.error('폴더 새로고침 실패:', error);
     }
   },
-  historyPrev: () =>
-    set((state) => {
-      const previousPath = state.history.back[state.history.back.length - 1];
-      if (!previousPath) return {};
-
-      const file = state.openFiles.find((candidate) => candidate.path === previousPath);
-      if (!file) return {};
-
-      return {
-        activeFileId: file.id,
-        history: {
-          back: state.history.back.slice(0, -1),
-          forward: state.history.current ? [state.history.current, ...state.history.forward] : state.history.forward,
-          current: previousPath,
-        },
-      };
-    }),
-  historyNext: () =>
-    set((state) => {
-      const nextPath = state.history.forward[0];
-      if (!nextPath) return {};
-
-      const file = state.openFiles.find((candidate) => candidate.path === nextPath);
-      if (!file) return {};
-
-      return {
-        activeFileId: file.id,
-        history: {
-          back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
-          forward: state.history.forward.slice(1),
-          current: nextPath,
-        },
-      };
-    }),
+  historyPrev: async () => {
+    await navigateHistory('back', get, set);
+  },
+  historyNext: async () => {
+    await navigateHistory('forward', get, set);
+  },
   restoreWorkspace: (workspace) => {
     const normalizedWorkspace = normalizeRestoredWorkspace(workspace);
     const openFiles = normalizedWorkspace.openFiles;
@@ -328,6 +311,81 @@ export function selectActiveFile(state: WorkspaceState): OpenFile | null {
 
 export function isDirty(file: OpenFile | null): boolean {
   return Boolean(file && file.content !== file.savedContent);
+}
+
+type HistoryDirection = 'back' | 'forward';
+
+async function navigateHistory(
+  direction: HistoryDirection,
+  get: () => WorkspaceState,
+  set: (updater: (state: WorkspaceState) => Partial<WorkspaceState>) => void,
+): Promise<void> {
+  const history = get().history;
+  const targetPath = direction === 'back' ? history.back[history.back.length - 1] : history.forward[0];
+  if (!targetPath) return;
+
+  let file = get().openFiles.find((candidate) => candidate.path === targetPath);
+  if (!file) {
+    try {
+      const opened = await Backend.files.readFile(targetPath);
+      file = toOpenFile(opened.path, opened.name, opened.content, opened.displayPath ?? undefined);
+    } catch (error) {
+      console.error('히스토리 파일 다시 열기 실패:', error);
+      return;
+    }
+  }
+
+  let navigated = false;
+  set((state) => {
+    const latestTargetPath = direction === 'back'
+      ? state.history.back[state.history.back.length - 1]
+      : state.history.forward[0];
+    if (latestTargetPath !== targetPath) return {};
+
+    const latestFile = state.openFiles.find((candidate) => candidate.path === targetPath) ?? file;
+    navigated = true;
+    return navigateToHistoryFile(state, latestFile, direction);
+  });
+
+  if (!navigated) return;
+  const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
+  const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
+  if (folderPatch && activeFile?.path === targetPath) {
+    set((state) => applyFolderPatch(state, folderPatch));
+  }
+}
+
+function navigateToHistoryFile(
+  state: WorkspaceState,
+  file: OpenFile,
+  direction: HistoryDirection,
+): Pick<WorkspaceState, 'openFiles' | 'activeFileId' | 'history'> {
+  const existing = state.openFiles.some((candidate) => candidate.id === file.id);
+  const openFiles = existing
+    ? state.openFiles
+    : [...state.openFiles, file];
+
+  if (direction === 'back') {
+    return {
+      openFiles,
+      activeFileId: file.id,
+      history: {
+        back: state.history.back.slice(0, -1),
+        forward: state.history.current ? [state.history.current, ...state.history.forward] : state.history.forward,
+        current: file.path,
+      },
+    };
+  }
+
+  return {
+    openFiles,
+    activeFileId: file.id,
+    history: {
+      back: state.history.current ? [...state.history.back, state.history.current] : state.history.back,
+      forward: state.history.forward.slice(1),
+      current: file.path,
+    },
+  };
 }
 
 function toOpenFile(path: string, name: string, content: string, displayPath?: string): OpenFile {
