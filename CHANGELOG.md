@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.2.1] - 2026-09-08
+
+### Changed
+
+- 미리보기 갱신 간격과 렌더 키를 조정해 입력 중 불필요한 전체 재렌더를 줄였습니다.
+- 창 최소 폭을 사이드바 상태와 분리하고 좁은 공간은 반응형 레이아웃으로 처리하도록 조정했습니다.
+
+### Fixed
+
+- 문서 저장을 임시 파일 쓰기, 디스크 동기화, 원본 권한 보존, 원자적 교체 순서로 처리하고 실패한 임시 파일을 정리하도록 수정했습니다.
+- UTF-8 BOM과 LF, CRLF, 혼합 개행을 감지해 상태바에 표시하고 원래 개행 형식으로 왕복 저장하도록 수정했습니다.
+- 멀티 윈도우 메타데이터 연결을 WAL과 busy timeout이 적용된 단일 연결로 직렬화해 SQLite 잠금 충돌을 줄였습니다.
+- `Cmd/Ctrl+W`로 활성 파일을 닫고 열린 파일이 없을 때만 창을 닫으며, macOS 메뉴에서 파일 닫기와 창 닫기를 구분하도록 수정했습니다.
+- 워크스페이스 아래 파일을 저장하거나 다른 이름으로 저장해도 루트와 폴더 펼침 상태가 유지되도록 수정했습니다.
+- 현재 파일 형식을 실제 파일 유형 판정 결과에 따라 상태바에 표시하도록 수정했습니다.
+- Android 다크 테마에서 배경과 시스템 바 색상 및 밝은 아이콘 설정이 적용되도록 수정했습니다.
+- 변경된 파일이나 창 및 앱을 닫을 때 네이티브 대화상자에 대상 파일을 표시하고 저장, 저장 안 함, 취소를 선택할 수 있도록 수정했습니다.
+
+---
+
 ## [3.2.0] - Unreleased
 
 ### Added
@@ -285,6 +305,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 3.2.1 | 2026-09-08 | Atomic and line-ending-safe saves, serialized metadata access, dirty-close protection, stable workspace roots, responsive window constraints, Android dark system bars |
 | 3.2.0 | Unreleased | Capability-based platform architecture, Android document integration, native app menus, responsive shell, persistent preview layouts, PDF export stability |
 | 3.1.0 | 2026-06-08 | Editor tab indent, smoother dash handling, arrow/ascii diagram rendering, preview layout popup fixes, source-line preview sync, code block selection stability, recent-file close cleanup, Windows text icon handling |
 | 3.0.1 | Unreleased | Flexible text-file detection, HTML/data previews, image assets workflow, preview block layouts, Windows desktop support |
