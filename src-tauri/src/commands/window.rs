@@ -1,7 +1,4 @@
-use std::{
-    sync::atomic::Ordering,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::sync::atomic::Ordering;
 
 use tauri::Manager;
 use tauri_plugin_dialog::{
@@ -144,7 +141,7 @@ pub async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
         .first()
         .cloned()
         .ok_or_else(|| "missing base window config".to_string())?;
-    let label = format!("window{}", current_timestamp_millis());
+    let label = next_window_label(&app);
     config.label = label.clone();
 
     let window = tauri::WebviewWindowBuilder::from_config(&app, &config)
@@ -181,9 +178,16 @@ fn is_external_url(url: &str) -> bool {
     )
 }
 
-fn current_timestamp_millis() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_default()
+#[cfg(desktop)]
+fn next_window_label(app: &tauri::AppHandle) -> String {
+    let windows = app.webview_windows();
+    let mut index = 1;
+
+    loop {
+        let label = format!("window{index}");
+        if !windows.contains_key(&label) {
+            return label;
+        }
+        index += 1;
+    }
 }

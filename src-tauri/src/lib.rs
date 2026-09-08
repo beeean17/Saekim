@@ -22,9 +22,20 @@ struct CloseRequestPayload {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default()
-        .plugin(single_instance_plugin())
-        .plugin(tauri_plugin_dialog::init());
+    let builder = tauri::Builder::default().plugin(single_instance_plugin());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(
+        tauri_plugin_window_state::Builder::default()
+            .with_state_flags(
+                tauri_plugin_window_state::StateFlags::SIZE
+                    | tauri_plugin_window_state::StateFlags::POSITION
+                    | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+            )
+            .build(),
+    );
+
+    let builder = builder.plugin(tauri_plugin_dialog::init());
 
     #[cfg(target_os = "android")]
     let builder = builder
