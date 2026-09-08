@@ -39,6 +39,7 @@ function readLegacyMetadata(): LegacyMetadata {
             fontSize: settings.fontSize,
             editorFontFamily: settings.editorFontFamily,
             htmlPreviewMode: settings.htmlPreviewMode,
+            showLineNumbers: settings.showLineNumbers,
           }
         : null,
     ui:
@@ -94,6 +95,7 @@ function buildSession(): AppSession {
       fontSize: settings.fontSize,
       editorFontFamily: settings.editorFontFamily,
       htmlPreviewMode: settings.htmlPreviewMode,
+      showLineNumbers: settings.showLineNumbers,
     },
   };
 }
@@ -129,6 +131,7 @@ export function useSessionPersistence(): boolean {
   const fontSize = useSettingsStore((state) => state.fontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
+  const showLineNumbers = useSettingsStore((state) => state.showLineNumbers);
   const restoreSettings = useSettingsStore((state) => state.restoreSettings);
 
   useEffect(() => {
@@ -181,6 +184,7 @@ export function useSessionPersistence(): boolean {
     loaded,
     sidebarMode,
     sidebarWidth,
+    showLineNumbers,
     splitRatio,
     syncScroll,
     theme,

@@ -22,9 +22,11 @@ const viewModes: Array<{ id: ViewMode; label: string }> = [
 const fontFamilies = ['Pretendard Variable', 'Pretendard', 'IBM Plex Sans KR', 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'ui-monospace'];
 
 export function SettingsPanel({
+  compact,
   effectiveViewMode,
   availableViewModes,
 }: {
+  compact: boolean;
   effectiveViewMode: ViewMode;
   availableViewModes: readonly ViewMode[];
 }) {
@@ -40,6 +42,8 @@ export function SettingsPanel({
   const setFontSize = useSettingsStore((state) => state.setFontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
   const setEditorFontFamily = useSettingsStore((state) => state.setEditorFontFamily);
+  const lineNumberPreference = useSettingsStore((state) => state.showLineNumbers);
+  const setShowLineNumbers = useSettingsStore((state) => state.setShowLineNumbers);
   const fontSizeId = fontSizeOptions.find((option) => option.value === fontSize)?.id ?? fontSizeOptions[1].id;
 
   return (
@@ -117,6 +121,20 @@ export function SettingsPanel({
           <input checked={syncScroll} type="checkbox" onChange={toggleSyncScroll} />
           스크롤 동기화
         </label>
+      </section>
+
+      <section className="settings-section">
+        <label className="settings-check">
+          <input
+            checked={lineNumberPreference ?? !compact}
+            type="checkbox"
+            onChange={(event) => setShowLineNumbers(event.currentTarget.checked)}
+          />
+          줄 번호 표시
+        </label>
+        {lineNumberPreference === null ? (
+          <span className="settings-hint">작은 화면에서는 기본으로 숨깁니다.</span>
+        ) : null}
       </section>
     </Popover>
   );

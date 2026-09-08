@@ -35,6 +35,7 @@ export interface SettingsSession {
   fontSize: number;
   editorFontFamily: string;
   htmlPreviewMode?: HtmlPreviewMode;
+  showLineNumbers?: boolean | null;
 }
 
 export interface AppSession {

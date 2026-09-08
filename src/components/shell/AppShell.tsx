@@ -40,6 +40,7 @@ export function AppShell({
   const splitRatio = useUIStore((state) => state.splitRatio);
   const editorWidth = useUIStore((state) => state.editorWidth);
   const appOverlays = useMemo(() => selectAppOverlays(enabledFeatures), []);
+  const showLineNumbers = useSettingsStore((state) => state.showLineNumbers);
   const visibleSidebarWidth = sidebarMode === 'collapsed' ? COLLAPSED_SIDEBAR_WIDTH : sidebarWidth;
   const layoutStyle = {
     '--sidebar-w': `${sidebarWidth}px`,
@@ -53,6 +54,7 @@ export function AppShell({
     <div
       className="app"
       data-runtime={runtime}
+      data-line-numbers={showLineNumbers === null ? 'auto' : showLineNumbers ? 'visible' : 'hidden'}
       data-sidebar={sidebarMode}
       data-compact-sidebar={compactSidebarOpen ? 'open' : 'closed'}
       data-view={effectiveViewMode}
@@ -64,7 +66,11 @@ export function AppShell({
         effectiveViewMode={effectiveViewMode}
         availableViewModes={availableViewModes}
       />
-      <SettingsPanel effectiveViewMode={effectiveViewMode} availableViewModes={availableViewModes} />
+      <SettingsPanel
+        compact={viewportProfile.profile === 'compact'}
+        effectiveViewMode={effectiveViewMode}
+        availableViewModes={availableViewModes}
+      />
       {appOverlays.map((overlay) => {
         const Overlay = overlay.component;
         return <Overlay commandRegistry={commandRegistry} key={overlay.id} />;

@@ -18,10 +18,12 @@ interface SettingsState {
   fontSize: number;
   editorFontFamily: string;
   htmlPreviewMode: HtmlPreviewMode;
+  showLineNumbers: boolean | null;
   setTheme: (theme: ThemeName) => void;
   setFontSize: (fontSize: number) => void;
   setEditorFontFamily: (editorFontFamily: string) => void;
   setHtmlPreviewMode: (htmlPreviewMode: HtmlPreviewMode) => void;
+  setShowLineNumbers: (showLineNumbers: boolean) => void;
   restoreSettings: (settings: SettingsSession) => void;
 }
 
@@ -71,6 +73,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   fontSize: defaultFontSize,
   editorFontFamily: defaultEditorFontFamily,
   htmlPreviewMode: 'browser',
+  showLineNumbers: null,
   setTheme: (theme) => {
     set({ theme, resolvedTheme: applyTheme(theme) });
   },
@@ -88,11 +91,18 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
     });
   },
   setHtmlPreviewMode: (htmlPreviewMode) => set({ htmlPreviewMode }),
+  setShowLineNumbers: (showLineNumbers) => set({ showLineNumbers }),
   restoreSettings: (settings) => {
     const resolvedTheme = applyTheme(settings.theme);
     const fontSize = normalizeFontSize(settings.fontSize);
     applyEditorSettings(fontSize, settings.editorFontFamily);
-    set({ ...settings, resolvedTheme, fontSize, htmlPreviewMode: settings.htmlPreviewMode ?? 'browser' });
+    set({
+      ...settings,
+      resolvedTheme,
+      fontSize,
+      htmlPreviewMode: settings.htmlPreviewMode ?? 'browser',
+      showLineNumbers: settings.showLineNumbers ?? null,
+    });
   },
 }));
 
