@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.0.0] - 2026-09-08
+
+### Added
+
+- Vitest 기반 프런트엔드 회귀 테스트와 Linux 검사, macOS·Windows·Linux 데스크톱 빌드를 수행하는 GitHub Actions CI를 추가했습니다.
+- Git tag에서 서명된 설치 파일과 업데이트 매니페스트를 만드는 릴리스 워크플로우와 앱 시작 시 자동 업데이트 확인을 추가했습니다.
+- macOS 최근 문서 등록, Open Recent File, 문서 제목·수정 상태, Find, Zoom, GitHub 및 단축키 네이티브 메뉴를 추가했습니다.
+- 한국어와 영어를 즉시 전환하고 선택한 언어를 세션에 유지하는 경량 국제화 계층을 추가했습니다.
+- 편집 내용을 2초 디바운스 또는 창 blur 시점에 자동 스냅샷으로 남기고, 로컬 버전 목록·미리보기·선택 복원·5분 전 복원을 제공하도록 메타데이터 스키마를 v4로 확장했습니다.
+
+### Changed
+
+- macOS 릴리스 빌드에 hardened runtime, entitlements, 최소 시스템 버전 10.15를 명시하고 Apple notarization과 Windows 인증서 설정을 GitHub Secrets에서만 주입하도록 변경했습니다.
+- 데스크톱 PDF 내보내기는 macOS의 WKWebView와 Windows의 WebView2 네이티브 PDF API를 우선 사용해 텍스트 선택·검색과 링크를 유지하며, 지원하지 않는 환경에서는 기존 캔버스 렌더러로 폴백하도록 변경했습니다.
+- PDF 페이지 나눔 정책을 CSS `@page`와 `break-inside` 중심으로 옮겨 네이티브 벡터 출력에서도 제목과 주요 블록의 흐름을 유지하도록 변경했습니다.
+- 같은 내용·인코딩·개행·저장 상태의 연속 스냅샷은 중복 저장하지 않고 파일마다 최근 100개만 보관하도록 변경했습니다.
+
+### Breaking Changes
+
+- 데스크톱 PDF 출력 엔진이 래스터 이미지 기반 문서에서 네이티브 벡터 문서로 바뀌었습니다. 텍스트와 링크는 보존되지만 기존 PDF와 페이지 경계, 글꼴 배치, 여백이 픽셀 단위로 같지 않을 수 있습니다.
+
+---
+
 ## [3.5.0] - 2026-09-08
 
 ### Added
@@ -372,6 +395,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 4.0.0 | 2026-09-08 | Cross-platform CI and signed release pipeline, native vector PDF export, macOS document integration, Korean/English UI, autosave snapshots and local version history |
 | 3.5.0 | 2026-09-08 | Responsive device foundations, 44px touch targets, compact file drawer and view tabs, mobile editor space recovery, Android dark-mode and rotation support |
 | 3.4.0 | 2026-09-08 | Document tabs and restore, replace and workspace content search, workspace file operations, outline navigation, unified command palette, focus accessibility, external-change save protection |
 | 3.3.0 | 2026-09-08 | Secondary-window events, restored window geometry, system theme, in-memory drafts, recursive workspace search, encoding round trips, body-free session metadata |

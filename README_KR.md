@@ -1,6 +1,6 @@
 # 새김 Saekim
 
-![Version](https://img.shields.io/badge/version-3.5.0-555555.svg)
+![Version](https://img.shields.io/badge/version-4.0.0-555555.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.5.0-24C8DB.svg)
 ![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)
@@ -124,16 +124,17 @@ corepack pnpm tauri:build:android:arm64
 
 ## 릴리즈 배포
 
-새김은 GitHub Releases를 통해 macOS, Windows, Android용 배포 파일을 따로
-올리는 방식으로 배포합니다.
+새김 데스크톱 릴리스는 GitHub Releases를 통해 macOS, Windows, Linux용으로
+배포합니다. Android APK는 별도로 빌드해 업로드합니다.
 
 권장 릴리즈 흐름:
 
-1. `package.json`, `src-tauri/tauri.conf.json`, `CHANGELOG.md`의 버전을
-   릴리즈 버전에 맞게 정리합니다.
-2. 대상 OS별로 앱을 빌드하고 실행 검증합니다.
-3. `v3.5.0` 같은 Git tag를 생성합니다.
-4. 생성된 데스크톱 및 Android 번들을 GitHub Release에 업로드합니다.
+1. 모든 버전 메타데이터와 `CHANGELOG.md`를 릴리스 버전에 맞게 정리합니다.
+2. [`docs/release-signing.md`](docs/release-signing.md)에 설명된 저장소 secret을
+   설정합니다.
+3. `v4.0.0` 같은 Git tag를 push하면 GitHub Actions가 데스크톱 대상별 검증과
+   빌드를 수행하고 `latest.json`을 포함한 draft release를 만듭니다.
+4. draft를 확인해 공개한 뒤 Android APK는 별도로 빌드해 업로드합니다.
 
 macOS 배포 파일은 macOS에서 빌드합니다:
 
@@ -153,11 +154,12 @@ corepack pnpm tauri:build
 | OS | 산출물 |
 | --- | --- |
 | macOS | `.app` bundle, `.dmg` installer |
-| Windows | Tauri가 생성하는 `.msi` 또는 `.exe` installer |
+| Windows | Tauri가 생성하는 NSIS `.exe` installer |
+| Linux | `.AppImage` bundle |
 | Android | Android 7.0+용 `.apk` (API 24, target API 36) |
 
-macOS 앱을 개발 머신 밖에 공개 배포하려면 Release에 올리기 전에 code signing과
-notarization을 처리해야 합니다.
+릴리스 자동화에는 실제 Apple, Windows, updater 서명 secret이 필요하며,
+저장소에는 인증서나 비밀키를 넣지 않습니다.
 
 ---
 

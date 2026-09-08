@@ -555,25 +555,26 @@ $HOME/** $PICTURE/** $DESKTOP/** $DOCUMENT/** $DOWNLOAD/**
 
 ## 11. PDF 내보내기
 
-프리뷰 DOM을 html2canvas로 래스터화한 뒤 jsPDF로 A4 문서를 만듭니다.
+데스크톱에서는 프리뷰 DOM을 웹뷰의 네이티브 PDF API로 출력해 텍스트 선택·검색과
+링크를 유지합니다. macOS는 WKWebView `createPDF`, Windows는 WebView2
+`PrintToPdfAsync`를 사용합니다. 네이티브 출력을 지원하지 않거나 실패하면
+html2canvas + jsPDF 래스터 렌더러로 폴백합니다.
 
 ### 11.1 페이지 구성
 
-- A4 기준 794px 폭 / 595.28pt x 841.89pt
-- 페이지 경계에서 잘리면 안 되는 요소를 회피 대상으로 지정
+- A4 기준 794px 폭과 CSS `@page` 여백
+- 페이지 경계에서 잘리면 안 되는 요소에 `break-inside: avoid` 정책 적용
   (제목, 문단, 목록, 표, 이미지, `pre`, 인용, `.shiki`, `.preview-layout-block`,
   `.preview-layout-group`, `.mermaid-block`, `.math-block`, `.katex-display`)
-- 제목은 다음 블록과 붙여 유지 (`PAGE_BREAK_HEADING_KEEP_WITH_NEXT_PX = 220`)
-- 최대 유지 비율 72%를 넘으면 분리 허용
-- 분할점 역추적 140px, 반복 한도 3회
-- 페이지 하단 여백의 흰 영역을 자동으로 잘라냄
-  (휘도 임계 235, 잉크 비율 0.012 이하를 "빈 줄"로 판정)
+- 제목과 다음 블록은 가능한 한 같은 페이지에 유지
+- 캔버스 폴백에서는 기존 분할점 역추적, 반복 한도, 하단 흰 여백 트리밍 유지
 
 ### 11.2 호환 처리
 
-html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()`,
-`lab()`, `lch()`, `oklab()`, `oklch()`)를 감지해 안전한 색으로 치환합니다.
-이미지 인라인화 타임아웃은 5초입니다.
+이미지를 data URL로 인라인화하고 KaTeX, Mermaid, Shiki 결과를 출력용 DOM에
+준비합니다. 캔버스 폴백에서는 지원하지 않는 최신 CSS 색 함수(`color()`,
+`color-mix()`, `lab()`, `lch()`, `oklab()`, `oklch()`)를 안전한 색으로
+치환합니다. 이미지 인라인화 타임아웃은 5초입니다.
 
 ### 11.3 상태
 
@@ -582,8 +583,9 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 
 ### 11.4 저장
 
-`pick_pdf_export_path`로 경로를 받고 `write_pdf_export`가 base64를 디코딩해
-파일로 씁니다. 각 단계가 stderr에 로그를 남깁니다.
+`pick_pdf_export_path`로 경로를 받은 뒤 `print_webview_pdf`가 네이티브 PDF를
+직접 기록합니다. 폴백에서는 `write_pdf_export`가 base64를 디코딩해 파일로
+씁니다. 각 단계가 stderr에 로그를 남깁니다.
 
 ---
 
@@ -600,7 +602,7 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 - Linux: `~/.config/Saekim/`
 - Android: Tauri `app_config_dir()`
 
-### 12.2 스키마 (버전 3)
+### 12.2 스키마 (버전 4)
 
 | 테이블 | 내용 |
 | --- | --- |
@@ -612,6 +614,7 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 | `file_view_state` | 레거시 열린 파일 상태 |
 | `window_file_view_state` | 창별 열린 파일 뷰 상태 (`state_json`, 순서, 활성 여부, 본문 제외) |
 | `drafts` | 창별 저장되지 않은 본문 1벌, 인코딩, 기준·초안 해시 |
+| `document_snapshots` | 파일별 자동 저장·디스크 저장 스냅샷, 인코딩, 개행, 해시, 생성 시각 |
 
 `PRAGMA foreign_keys = ON`. 창별로 세션이 분리되어 창마다 다른 워크스페이스를
 띄울 수 있습니다.
@@ -623,13 +626,16 @@ html2canvas가 지원하지 않는 최신 CSS 색 함수(`color()`, `color-mix()
 | 워크스페이스 | 루트 경로, 트리, 열린 파일의 경로·이름·뷰 상태, 활성 파일 |
 | 최근 항목 | 최근 워크스페이스 (id, 경로, 이름, 열람 시각, 창 id) |
 | UI | 사이드바 모드·폭, 뷰 모드, 분할 비율, 편집기 폭, 스크롤 동기화 |
-| 설정 | 테마, 글자 크기, 글꼴, HTML 프리뷰 모드 |
+| 설정 | 언어, 테마, 글자 크기, 글꼴, HTML 프리뷰 모드, 줄번호 표시 |
 
 UI와 설정은 400ms 디바운스로 저장합니다. 열린 문서 상태는 타이핑 중 SQLite
 쓰기를 줄이기 위해 2초 디바운스 또는 창 blur 시점에 저장합니다. 저장된 문서
 본문은 DB에 넣지 않고 복원할 때 디스크에서 다시 읽으며 `last_content_hash`와
 비교합니다. 디스크가 외부에서 바뀌었어도 저장되지 않은 초안은 버리지 않고,
-현재 디스크 내용을 `savedContent`로 삼아 dirty 상태로 복원합니다.
+현재 디스크 내용을 `savedContent`로 삼아 dirty 상태로 복원합니다. 문서 세션을
+저장할 때 같은 내용의 연속 스냅샷은 건너뛰고 파일별 최근 100개를 보관합니다.
+File 메뉴나 `Cmd/Ctrl+Shift+H`에서 버전 목록을 열어 선택한 버전 또는 5분 전
+시점보다 늦지 않은 가장 가까운 버전을 현재 편집 내용으로 복원할 수 있습니다.
 
 ### 12.4 레거시 마이그레이션
 
@@ -703,13 +709,13 @@ SFMono-Regular, Menlo, Monaco, ui-monospace.
 | 메뉴 | 항목 |
 | --- | --- |
 | Saekim | About, Services, Hide, Hide Others, Quit |
-| File | New File, New Window, Open File, Open Folder, Open Recent Workspace, Save, Save As, Export PDF, Close Window |
-| Edit | Undo, Redo, Cut, Copy, Paste, Select All |
-| View | Enter Full Screen |
+| File | New File, New Window, Open File, Open Recent File, Open Folder, Open Recent Workspace, Save, Save As, Local Version History, Print, Export PDF, Close File |
+| Edit | Undo, Redo, Cut, Copy, Paste, Select All, Find, Replace |
+| View | Zoom In, Zoom Out, Actual Size, Enter Full Screen |
 | Window | Minimize, Maximize, Close Window |
-| Help | *(비어 있음)* |
+| Help | Saekim on GitHub, Keyboard Shortcuts |
 
-최근 워크스페이스가 바뀌면 `refresh_menu`가 메뉴를 다시 만듭니다.
+최근 파일이나 워크스페이스가 바뀌면 `refresh_menu`가 메뉴를 다시 만듭니다.
 
 Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용합니다
 (`appMenus.ts`가 File / Edit / View / Window / Help를 공통 정의).
@@ -726,12 +732,16 @@ Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용�
 | `Cmd/Ctrl+Shift+S` | 다른 이름으로 저장 |
 | `Cmd/Ctrl+F` | 찾기 |
 | `Cmd/Ctrl+H` | 바꾸기 |
-| `Cmd/Ctrl+P` | PDF 내보내기 |
+| `Cmd/Ctrl+K` | 명령 팔레트 |
+| `Cmd/Ctrl+P` | 인쇄 |
+| `Cmd/Ctrl+Shift+E` | PDF 내보내기 |
+| `Cmd/Ctrl+Shift+H` | 로컬 버전 히스토리 |
+| `Cmd/Ctrl+Shift+T` | 닫은 탭 다시 열기 |
 
 ### 13.8 상태바
 
-파일 형식, 커서 행·열, 인코딩·EOL, PDF 내보내기 상태, 읽기 시간
-(`core/format/readingTime.ts`), 상대 시각(`relativeTime.ts`).
+저장 상태, 파일 형식, 인코딩·EOL, PDF 내보내기 상태, 커서 행·열, 한국어를
+고려한 단어 수를 표시합니다.
 
 ---
 
