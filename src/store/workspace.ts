@@ -108,9 +108,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
       const file = toOpenFile(savedPath, fileNameFromPath(savedPath), '');
       set((state) => upsertOpenFile(state, file));
-      const folderPatch = await workspaceFolderPatchForFile(savedPath);
+      const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
       if (folderPatch) set((state) => applyFolderPatch(state, folderPatch));
-      else await get().refresh();
     } catch (error) {
       console.error('새 파일 생성 실패:', error);
     }
@@ -208,9 +207,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         current: current.history.current === file.path ? savedPath : current.history.current,
       },
     }));
-    const folderPatch = await workspaceFolderPatchForFile(savedPath);
+    const folderPatch = await workspaceFolderPatchForOpenFile(
+      { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
+      get().rootPath,
+    );
     if (folderPatch) set((state) => applyFolderPatch(state, folderPatch));
-    else await get().refresh();
   },
   saveActiveAs: async () => {
     const state = get();
@@ -239,9 +240,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         current: savedPath,
       },
     }));
-    const folderPatch = await workspaceFolderPatchForFile(savedPath);
+    const folderPatch = await workspaceFolderPatchForOpenFile(
+      { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
+      get().rootPath,
+    );
     if (folderPatch) set((state) => applyFolderPatch(state, folderPatch));
-    else await get().refresh();
   },
   refresh: async () => {
     const { rootPath } = get();
