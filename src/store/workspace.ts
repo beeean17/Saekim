@@ -19,6 +19,7 @@ interface WorkspaceState {
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
   updateContent: (id: string, text: string) => void;
+  saveFile: (id: string) => Promise<string | null>;
   saveActive: () => Promise<void>;
   saveActiveAs: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -177,15 +178,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       openFiles: state.openFiles.map((file) => (file.id === id ? { ...file, content: text } : file)),
     })),
-  saveActive: async () => {
-    const state = get();
-    const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
-    if (!file) return;
+  saveFile: async (id) => {
+    const file = get().openFiles.find((candidate) => candidate.id === id);
+    if (!file) return null;
     const savedPath = await Backend.files.saveFile(
       file.path.startsWith('~') ? null : file.path,
       serializeLineEndings(file.content, file.eol),
     );
-    if (!savedPath) return;
+    if (!savedPath) return null;
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
     set((current) => ({
       openFiles: current.openFiles.map((candidate) =>
@@ -212,6 +212,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().rootPath,
     );
     if (folderPatch) set((state) => applyFolderPatch(state, folderPatch));
+    return savedPath;
+  },
+  saveActive: async () => {
+    const { activeFileId, saveFile } = get();
+    if (activeFileId) await saveFile(activeFileId);
   },
   saveActiveAs: async () => {
     const state = get();

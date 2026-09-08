@@ -23,10 +23,19 @@ import {
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
 import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveBlockLayouts, saveSession } from '../common/tauri/session';
-import type { BackendAdapter, ImageDownloadProgressPayload, NativeMenuCommandHandlers, WindowAction } from '../common/BackendAdapter';
+import type {
+  BackendAdapter,
+  CloseDecision,
+  CloseRequest,
+  CloseRequestReason,
+  ImageDownloadProgressPayload,
+  NativeMenuCommandHandlers,
+  WindowAction,
+} from '../common/BackendAdapter';
 
 const externalOpenEvent = 'saekim-open-external-files';
 const imageDownloadProgressEvent = 'image-download-progress';
+const closeRequestedEvent = 'saekim-close-requested';
 const menuEvents = {
   newFile: 'saekim-menu-new-file',
   newWindow: 'saekim-menu-new-window',
@@ -82,6 +91,9 @@ export const tauriDesktopBackend: BackendAdapter = {
     listenExternalOpenFiles,
     listenImageDownloadProgress,
     listenNativeMenuCommands,
+    listenCloseRequests,
+    confirmUnsavedChanges,
+    respondToCloseRequest,
     setWindowMinSize,
     startWindowDrag,
     setWindowBackgroundColor,
@@ -116,6 +128,18 @@ async function listenExternalOpenFiles(handler: (paths: string[]) => void): Prom
 
 async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgressPayload) => void): Promise<() => void> {
   return listen<ImageDownloadProgressPayload>(imageDownloadProgressEvent, (event) => handler(event.payload));
+}
+
+async function listenCloseRequests(handler: (request: CloseRequest) => void): Promise<() => void> {
+  return getCurrentWindow().listen<CloseRequest>(closeRequestedEvent, (event) => handler(event.payload));
+}
+
+async function confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision> {
+  return invoke<CloseDecision>('confirm_unsaved_changes', { fileNames });
+}
+
+async function respondToCloseRequest(reason: CloseRequestReason, approved: boolean): Promise<void> {
+  await invoke('respond_to_close_request', { reason, approved });
 }
 
 async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void> {

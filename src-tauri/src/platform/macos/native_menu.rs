@@ -13,6 +13,7 @@ const MENU_OPEN_FOLDER: &str = "open-folder";
 const MENU_OPEN_RECENT_WORKSPACE_PREFIX: &str = "open-recent-workspace:";
 const MENU_CLOSE_FILE: &str = "close-file";
 const MENU_CLOSE_WINDOW: &str = "close-window";
+const MENU_QUIT: &str = "quit";
 const EVENT_SAVE: &str = "saekim-menu-save";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
@@ -91,6 +92,13 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+Shift+W"),
     )?;
+    let quit = MenuItem::with_id(
+        app,
+        MENU_QUIT,
+        format!("Quit {}", package_info.name),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
 
     let app_menu = Submenu::with_items(
         app,
@@ -104,7 +112,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::quit(app, None)?,
+            &quit,
         ],
     )?;
     let file_menu = Submenu::with_items(
@@ -183,6 +191,11 @@ pub(crate) fn refresh_menu(app: &AppHandle) {
 pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
     let menu_id = event.id().as_ref();
     eprintln!("[saekim:native-menu] selected id={menu_id}");
+
+    if menu_id == MENU_QUIT {
+        crate::request_app_exit(app);
+        return;
+    }
 
     if let Some(workspace_id) = menu_id.strip_prefix(MENU_OPEN_RECENT_WORKSPACE_PREFIX) {
         let Some(path) = crate::commands::session::recent_workspace_path(app, workspace_id) else {

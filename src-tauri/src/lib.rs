@@ -4,10 +4,21 @@ mod core;
 mod platform;
 
 use app_state::AppState;
-use std::path::{Path, PathBuf};
+use serde::Serialize;
+use std::{
+    path::{Path, PathBuf},
+    sync::atomic::Ordering,
+};
 use tauri::{DragDropEvent, Emitter, Manager, WebviewEvent, WindowEvent};
 
 const EVENT_OPEN_EXTERNAL_FILES: &str = "saekim-open-external-files";
+const EVENT_CLOSE_REQUESTED: &str = "saekim-close-requested";
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CloseRequestPayload {
+    reason: &'static str,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -67,12 +78,45 @@ pub fn run() {
             commands::window::open_external_url,
             commands::window::open_new_window,
             commands::window::set_window_min_size,
-            commands::window::start_window_drag
+            commands::window::start_window_drag,
+            commands::window::confirm_unsaved_changes,
+            commands::window::respond_to_close_request
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Saekim");
 
     app.run(|app, event| match event {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            let state = app.state::<AppState>();
+            if state.app_exit_approved.swap(false, Ordering::SeqCst) {
+                return;
+            }
+
+            api.prevent_exit();
+            request_app_exit(app);
+        }
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: WindowEvent::CloseRequested { api, .. },
+            ..
+        } => {
+            let state = app.state::<AppState>();
+            let approved = state
+                .approved_close_windows
+                .lock()
+                .map(|mut windows| windows.remove(&label))
+                .unwrap_or(false);
+
+            if !approved {
+                api.prevent_close();
+                if let Some(window) = app.get_webview_window(&label) {
+                    let _ = window.emit(
+                        EVENT_CLOSE_REQUESTED,
+                        CloseRequestPayload { reason: "window" },
+                    );
+                }
+            }
+        }
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
         tauri::RunEvent::Opened { urls } => {
             queue_open_files(app, document_paths_from_urls(urls));
@@ -98,6 +142,36 @@ pub fn run() {
         }
         _ => {}
     });
+}
+
+pub(crate) fn request_app_exit(app: &tauri::AppHandle) {
+    let windows = app.webview_windows();
+    let state = app.state::<AppState>();
+
+    if windows.is_empty() {
+        state.app_exit_approved.store(true, Ordering::SeqCst);
+        app.exit(0);
+        return;
+    }
+
+    let should_emit = state
+        .pending_exit_windows
+        .lock()
+        .map(|mut pending| {
+            if pending.is_some() {
+                false
+            } else {
+                *pending = Some(windows.keys().cloned().collect());
+                true
+            }
+        })
+        .unwrap_or(false);
+
+    if should_emit {
+        for window in windows.values() {
+            let _ = window.emit(EVENT_CLOSE_REQUESTED, CloseRequestPayload { reason: "app" });
+        }
+    }
 }
 
 fn single_instance_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {

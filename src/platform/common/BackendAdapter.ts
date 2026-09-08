@@ -63,6 +63,9 @@ export interface RuntimeBackend {
   listenExternalOpenFiles(handler: (paths: string[]) => void): Promise<() => void>;
   listenImageDownloadProgress(handler: (payload: ImageDownloadProgressPayload) => void): Promise<() => void>;
   listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Promise<() => void>;
+  listenCloseRequests(handler: (request: CloseRequest) => void): Promise<() => void>;
+  confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision>;
+  respondToCloseRequest(reason: CloseRequestReason, approved: boolean): Promise<void>;
   setWindowMinSize(width: number, height: number): Promise<void>;
   startWindowDrag(): Promise<void>;
   setWindowBackgroundColor(color: string): Promise<void>;
@@ -71,6 +74,12 @@ export interface RuntimeBackend {
 }
 
 export type WindowAction = 'minimize' | 'toggleMaximize' | 'close';
+export type CloseRequestReason = 'window' | 'app';
+export type CloseDecision = 'save' | 'discard' | 'cancel';
+
+export interface CloseRequest {
+  reason: CloseRequestReason;
+}
 
 export interface ImageDownloadProgressPayload {
   id: string;

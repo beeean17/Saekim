@@ -18,10 +18,17 @@ import {
 } from '../common/tauri/fs';
 import { isTauriRuntime } from '../common/tauri/invoke';
 import { loadBlockLayouts, loadSession, loadWorkspaceSession, saveBlockLayout, saveBlockLayouts, saveSession } from '../common/tauri/session';
-import type { BackendAdapter, ImageDownloadProgressPayload } from '../common/BackendAdapter';
+import type {
+  BackendAdapter,
+  CloseDecision,
+  CloseRequest,
+  CloseRequestReason,
+  ImageDownloadProgressPayload,
+} from '../common/BackendAdapter';
 
 const externalOpenEvent = 'saekim-open-external-files';
 const imageDownloadProgressEvent = 'image-download-progress';
+const closeRequestedEvent = 'saekim-close-requested';
 
 export const androidBackend: BackendAdapter = {
   files: {
@@ -65,6 +72,9 @@ export const androidBackend: BackendAdapter = {
     listenExternalOpenFiles,
     listenImageDownloadProgress,
     listenNativeMenuCommands: listenNoop,
+    listenCloseRequests,
+    confirmUnsavedChanges,
+    respondToCloseRequest,
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
@@ -93,6 +103,18 @@ async function listenExternalOpenFiles(handler: (paths: string[]) => void): Prom
 
 async function listenImageDownloadProgress(handler: (payload: ImageDownloadProgressPayload) => void): Promise<() => void> {
   return listen<ImageDownloadProgressPayload>(imageDownloadProgressEvent, (event) => handler(event.payload));
+}
+
+async function listenCloseRequests(handler: (request: CloseRequest) => void): Promise<() => void> {
+  return getCurrentWindow().listen<CloseRequest>(closeRequestedEvent, (event) => handler(event.payload));
+}
+
+async function confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision> {
+  return invoke<CloseDecision>('confirm_unsaved_changes', { fileNames });
+}
+
+async function respondToCloseRequest(reason: CloseRequestReason, approved: boolean): Promise<void> {
+  await invoke('respond_to_close_request', { reason, approved });
 }
 
 function unsupported<T>(capability: string): (..._args: unknown[]) => Promise<T> {

@@ -1,4 +1,4 @@
-import type { BackendAdapter, ImagePickPayload } from '../common/BackendAdapter';
+import type { BackendAdapter, CloseDecision, ImagePickPayload } from '../common/BackendAdapter';
 import type { BlockLayout } from '../../types/metadata';
 import type { FileTreeNode, FolderPayload, OpenFilePayload } from '../../types/workspace';
 
@@ -47,6 +47,9 @@ export const browserBackend: BackendAdapter = {
     listenExternalOpenFiles: listenNoop,
     listenImageDownloadProgress: listenNoop,
     listenNativeMenuCommands: listenNoop,
+    listenCloseRequests: listenNoop,
+    confirmUnsavedChanges,
+    respondToCloseRequest: noop,
     setWindowMinSize: noop,
     startWindowDrag: noop,
     setWindowBackgroundColor: noop,
@@ -64,6 +67,10 @@ async function logEvent(scope: string, message: string, details?: unknown): Prom
 
 async function listenNoop(): Promise<() => void> {
   return () => {};
+}
+
+async function confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision> {
+  return globalThis.confirm(`저장하지 않은 ${fileNames.join(', ')} 파일을 저장하고 닫을까요?`) ? 'save' : 'cancel';
 }
 
 async function openFileDialog(): Promise<OpenFilePayload | null> {
