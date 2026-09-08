@@ -1,4 +1,5 @@
 import type { KatexHelperItem } from '../../core/editor/helperTypes';
+import type { AppLanguage } from '../../i18n/messages';
 
 export const katexHelperItems: KatexHelperItem[] = [
   {
@@ -160,3 +161,29 @@ export const katexHelperItems: KatexHelperItem[] = [
   },
 ];
 
+const englishOverrides: Record<string, Partial<KatexHelperItem>> = {
+  fraction: { title: 'Fraction', category: 'Basics', syntax: '\\frac{numerator}{denominator}' },
+  power: { title: 'Power', category: 'Basics' },
+  subscript: { title: 'Subscript', category: 'Basics' },
+  sqrt: { title: 'Square root', category: 'Basics' },
+  times: { title: 'Multiply', category: 'Operators' },
+  divide: { title: 'Divide', category: 'Operators' },
+  'plus-minus': { title: 'Plus or minus', category: 'Operators' },
+  sum: { title: 'Sum', category: 'Large operators' },
+  integral: { title: 'Integral', category: 'Calculus' },
+  limit: { title: 'Limit', category: 'Calculus' },
+  alpha: { title: 'Alpha', category: 'Greek letters' },
+  theta: { title: 'Theta', category: 'Greek letters' },
+  pi: { title: 'Pi', category: 'Greek letters' },
+  matrix: { title: 'Matrix', category: 'Matrices' },
+  cases: { title: 'Cases', category: 'Structures' },
+  'arrow-right': { title: 'Right arrow', category: 'Arrows' },
+  implies: { title: 'Therefore / implies', category: 'Logic' },
+  real: { title: 'Real number set', category: 'Sets' },
+  text: { title: 'Text in a formula', category: 'Text', syntax: '\\text{text}', example: 'x = 1 \\quad \\text{when}' },
+};
+
+export function katexHelperItemsFor(language: AppLanguage): KatexHelperItem[] {
+  if (language === 'ko') return katexHelperItems;
+  return katexHelperItems.map((item) => ({ ...item, ...englishOverrides[item.id] }));
+}

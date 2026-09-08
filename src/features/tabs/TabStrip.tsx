@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import { closeFileWithProtection } from '../../hooks/useCloseProtection';
 import { isDirty, useWorkspaceStore } from '../../store/workspace';
 import type { OpenFile } from '../../types/workspace';
+import { useI18n } from '../../i18n/useI18n';
 
 export function TabStrip() {
+  const { t } = useI18n();
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const activeFileId = useWorkspaceStore((state) => state.activeFileId);
   const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
@@ -16,7 +18,7 @@ export function TabStrip() {
   if (openFiles.length === 0) return null;
 
   return (
-    <div className="document-tab-strip" role="tablist" aria-label="열린 문서">
+    <div className="document-tab-strip" role="tablist" aria-label={t('tabs.openDocuments')}>
       {openFiles.map((file, index) => {
         const active = file.id === activeFileId;
         return (
@@ -34,12 +36,12 @@ export function TabStrip() {
               onClick={() => setActiveFile(file.id)}
             >
               <span className="document-tab-name">{file.name}</span>
-              {isDirty(file) ? <span aria-label="저장되지 않은 변경사항" className="document-tab-dirty" /> : null}
+              {isDirty(file) ? <span aria-label={t('document.unsavedChanges')} className="document-tab-dirty" /> : null}
             </button>
             <button
-              aria-label={`${file.name} 닫기`}
+              aria-label={t('tabs.closeNamed', { name: file.name })}
               className="document-tab-close"
-              title="탭 닫기"
+              title={t('tabs.close')}
               type="button"
               onClick={() => void requestClose(file)}
             >

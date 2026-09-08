@@ -1,24 +1,27 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
+import type { AppLanguage } from '../i18n/messages';
 import type { HtmlPreviewMode, SettingsSession } from '../types/session';
 import type { ResolvedThemeName, ThemeName } from '../types/workspace';
 
 export const fontSizeOptions = [
-  { id: 'small', label: '작게', value: 12 },
-  { id: 'medium', label: '중간', value: 13.5 },
-  { id: 'large', label: '크게', value: 16 },
+  { id: 'small', value: 12 },
+  { id: 'medium', value: 13.5 },
+  { id: 'large', value: 16 },
 ] as const;
 
 export const defaultEditorFontSize = fontSizeOptions[1].value;
 const defaultEditorFontFamily = 'Pretendard Variable';
 
 interface SettingsState {
+  language: AppLanguage;
   theme: ThemeName;
   resolvedTheme: ResolvedThemeName;
   fontSize: number;
   editorFontFamily: string;
   htmlPreviewMode: HtmlPreviewMode;
   showLineNumbers: boolean | null;
+  setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: ThemeName) => void;
   setFontSize: (fontSize: number) => void;
   setEditorFontFamily: (editorFontFamily: string) => void;
@@ -42,6 +45,10 @@ function applyTheme(theme: ThemeName): ResolvedThemeName {
     document.documentElement.setAttribute('data-theme', resolvedTheme);
   }
   return resolvedTheme;
+}
+
+function applyLanguage(language: AppLanguage): void {
+  if (typeof document !== 'undefined') document.documentElement.lang = language;
 }
 
 function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
@@ -73,14 +80,21 @@ export function stepFontSize(fontSize: number, direction: -1 | 1): number {
 applyEditorSettings(defaultEditorFontSize, defaultEditorFontFamily);
 const defaultTheme: ThemeName = 'system';
 const defaultResolvedTheme = applyTheme(defaultTheme);
+const defaultLanguage: AppLanguage = 'ko';
+applyLanguage(defaultLanguage);
 
 export const useSettingsStore = create<SettingsState>()((set) => ({
+  language: defaultLanguage,
   theme: defaultTheme,
   resolvedTheme: defaultResolvedTheme,
   fontSize: defaultEditorFontSize,
   editorFontFamily: defaultEditorFontFamily,
   htmlPreviewMode: 'browser',
   showLineNumbers: null,
+  setLanguage: (language) => {
+    applyLanguage(language);
+    set({ language });
+  },
   setTheme: (theme) => {
     set({ theme, resolvedTheme: applyTheme(theme) });
   },
@@ -100,11 +114,14 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   setHtmlPreviewMode: (htmlPreviewMode) => set({ htmlPreviewMode }),
   setShowLineNumbers: (showLineNumbers) => set({ showLineNumbers }),
   restoreSettings: (settings) => {
+    const language: AppLanguage = settings.language === 'en' ? 'en' : defaultLanguage;
     const resolvedTheme = applyTheme(settings.theme);
     const fontSize = normalizeFontSize(settings.fontSize);
     applyEditorSettings(fontSize, settings.editorFontFamily);
+    applyLanguage(language);
     set({
       ...settings,
+      language,
       resolvedTheme,
       fontSize,
       htmlPreviewMode: settings.htmlPreviewMode ?? 'browser',

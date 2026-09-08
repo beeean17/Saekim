@@ -10,6 +10,7 @@ import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { MenuSurface } from '../ui/surface/MenuSurface';
 import { buildAppMenus, type AppMenuGroup, type AppMenuId } from './appMenus';
 import { handleTitlebarMouseDown } from './titlebarWindowControls';
+import { useI18n } from '../../i18n/useI18n';
 
 interface HeaderProps {
   commandRegistry: CommandRegistry;
@@ -18,6 +19,7 @@ interface HeaderProps {
 }
 
 export function Header({ commandRegistry, effectiveViewMode, availableViewModes }: HeaderProps) {
+  const { t } = useI18n();
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const settingsOpen = useUIStore((state) => state.settingsOpen);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -39,7 +41,7 @@ export function Header({ commandRegistry, effectiveViewMode, availableViewModes 
       ) : null}
       <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.name}>
         {activeFile ? <span className="crumb current">{activeFile.name}</span> : null}
-        {dirty ? <span className="dot" title="수정 중" /> : null}
+        {dirty ? <span className="dot" title={t('document.modified')} /> : null}
       </div>
 
       <div className="titlebar-right">
@@ -49,7 +51,7 @@ export function Header({ commandRegistry, effectiveViewMode, availableViewModes 
           aria-pressed={settingsOpen}
           className="header-btn"
           data-settings-trigger="true"
-          label="설정"
+          label={t('settings.title')}
           onClick={toggleSettings}
         >
           <Icon name="settings" />
@@ -66,15 +68,16 @@ function ViewToggle({
   availableViewModes: readonly ViewMode[];
   effectiveViewMode: ViewMode;
 }) {
+  const { t } = useI18n();
   const setViewMode = useUIStore((state) => state.setViewMode);
-  const options = viewModeOptions(availableViewModes).map((option) => ({
+  const options = viewModeOptions(availableViewModes, t).map((option) => ({
     ...option,
     label: <span className="view-toggle-label">{option.label}</span>,
   }));
 
   return (
     <SegmentedControl
-      ariaLabel="보기 모드"
+      ariaLabel={t('view.mode')}
       className="view-toggle header-view-toggle"
       size="sm"
       value={effectiveViewMode}
@@ -91,25 +94,26 @@ export function CompactViewTabs({
   availableViewModes: readonly ViewMode[];
   effectiveViewMode: ViewMode;
 }) {
+  const { t } = useI18n();
   const setViewMode = useUIStore((state) => state.setViewMode);
 
   return (
     <SegmentedControl
-      ariaLabel="모바일 보기 모드"
+      ariaLabel={t('view.mobileMode')}
       className="compact-view-tabs"
       optionRole="tab"
       value={effectiveViewMode}
-      options={viewModeOptions(availableViewModes)}
+      options={viewModeOptions(availableViewModes, t)}
       onChange={setViewMode}
     />
   );
 }
 
-function viewModeOptions(availableViewModes: readonly ViewMode[]) {
+function viewModeOptions(availableViewModes: readonly ViewMode[], t: ReturnType<typeof useI18n>['t']) {
   return [
-    { value: 'edit' as const, label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
-    { value: 'split' as const, label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
-    { value: 'preview' as const, label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
+    { value: 'edit' as const, label: t('view.edit'), icon: <Icon name="edit" />, title: t('view.editorOnly') },
+    { value: 'split' as const, label: t('view.split'), icon: <Icon name="split" />, title: t('view.splitView') },
+    { value: 'preview' as const, label: t('view.preview'), icon: <Icon name="eye" />, title: t('view.previewOnly') },
   ]
     .filter((option) => availableViewModes.includes(option.value));
 }
@@ -121,6 +125,7 @@ function AppMenu({
   commandRegistry: CommandRegistry;
   effectiveViewMode: ViewMode;
 }) {
+  const { language, t } = useI18n();
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -141,6 +146,7 @@ function AppMenu({
     [
       commandRegistry,
       effectiveViewMode,
+      language,
       syncScroll,
       toggleSyncScroll,
       viewMode,
@@ -173,7 +179,7 @@ function AppMenu({
   };
 
   return (
-    <nav className="app-menu" ref={rootRef} aria-label="Application menu">
+    <nav className="app-menu" ref={rootRef} aria-label={t('menu.application')}>
       {menus.map((menu) => (
         <div className="app-menu-group" key={menu.id}>
           <button

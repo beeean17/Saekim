@@ -1,13 +1,15 @@
 import { useUIStore } from '../../store/ui';
 import { Icon } from '../primitives/Icon';
+import { useI18n } from '../../i18n/useI18n';
 
 export function SidebarToggle({ compact }: { readonly compact: boolean }) {
+  const { t } = useI18n();
   const sidebarMode = useUIStore((state) => state.sidebarMode);
   const compactSidebarOpen = useUIStore((state) => state.compactSidebarOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const toggleCompactSidebar = useUIStore((state) => state.toggleCompactSidebar);
   const expanded = compact ? compactSidebarOpen : sidebarMode === 'expanded';
-  const sidebarToggleLabel = expanded ? '탐색기 닫기' : '탐색기 열기';
+  const sidebarToggleLabel = expanded ? t('sidebar.closeExplorer') : t('sidebar.openExplorer');
 
   return (
     <button

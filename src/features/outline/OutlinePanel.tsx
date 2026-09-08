@@ -4,8 +4,10 @@ import { getMarkdownOutline, type MarkdownOutlineItem } from '../../core/markdow
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { scrollEditorToSourceLine } from '../../hooks/useScrollSync';
 import './outline.css';
+import { useI18n } from '../../i18n/useI18n';
 
 export function OutlinePanel({ activeFile, textareaRef, editorScrollRef, previewRef }: SidebarPanelProps) {
+  const { t } = useI18n();
   const outline = useMemo(
     () => activeFile && isMarkdownDocument(activeFile.name) ? getMarkdownOutline(activeFile.content) : [],
     [activeFile],
@@ -13,19 +15,19 @@ export function OutlinePanel({ activeFile, textareaRef, editorScrollRef, preview
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef);
   const activeLine = activeOutlineLine(outline, cursor.row);
 
-  if (!activeFile) return <div className="outline-empty">문서를 열면 아웃라인이 표시됩니다.</div>;
-  if (!isMarkdownDocument(activeFile.name)) return <div className="outline-empty">Markdown 문서에서 사용할 수 있습니다.</div>;
-  if (outline.length === 0) return <div className="outline-empty">문서에 제목이 없습니다.</div>;
+  if (!activeFile) return <div className="outline-empty">{t('outline.empty')}</div>;
+  if (!isMarkdownDocument(activeFile.name)) return <div className="outline-empty">{t('outline.markdownOnly')}</div>;
+  if (outline.length === 0) return <div className="outline-empty">{t('outline.noHeadings')}</div>;
 
   return (
-    <nav className="outline-panel" aria-label="문서 아웃라인">
+    <nav className="outline-panel" aria-label={t('outline.aria')}>
       {outline.map((item, index) => (
         <button
           aria-current={item.line === activeLine ? 'location' : undefined}
           className="outline-item"
           key={`${item.line}-${index}`}
           style={{ '--outline-level': Math.max(0, item.level - 1) } as CSSProperties}
-          title={`${item.text} · ${item.line}행`}
+          title={t('outline.line', { text: item.text, line: item.line })}
           type="button"
           onClick={() => revealOutlineItem(item, textareaRef.current, editorScrollRef.current, previewRef.current)}
         >

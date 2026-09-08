@@ -2,30 +2,36 @@ import { useEffect, useState } from 'react';
 import './helper.css';
 import type { EditorContribution } from '../../app/feature';
 import type { MermaidHelperItem } from '../../core/editor/helperTypes';
-import { mermaidHelperItems } from './helperCatalog';
+import { mermaidHelperItemsFor } from './helperCatalog';
+import { translate, type TranslationKey } from '../../i18n/messages';
+import { useSettingsStore } from '../../store/settings';
 
 export const mermaidEditorContribution: EditorContribution = {
   toolbar: [
     {
       id: 'mermaid.helper',
       label: '◇ Mermaid',
-      tooltip: 'Mermaid 다이어그램 문법 찾기',
+      get tooltip() { return currentText('helper.mermaid.tooltip'); },
       helperMode: 'mermaid',
     },
   ],
   helpers: [
     {
       mode: 'mermaid',
-      title: 'Mermaid 다이어그램 찾기',
-      placeholder: '예: 순서도, 시퀀스, ERD, 간트',
-      description: '템플릿을 선택하면 Mermaid 코드블럭으로 삽입됩니다.',
-      items: mermaidHelperItems,
+      get title() { return currentText('helper.mermaid.title'); },
+      get placeholder() { return currentText('helper.mermaid.placeholder'); },
+      get description() { return currentText('helper.mermaid.description'); },
+      get items() { return mermaidHelperItemsFor(useSettingsStore.getState().language); },
       syntax: (item) => (item as MermaidHelperItem).template.split('\n')[0],
       snippet: (item) => `\n\`\`\`mermaid\n${(item as MermaidHelperItem).template}\n\`\`\`\n`,
       renderPreview: (item) => <MermaidHelperPreview item={item as MermaidHelperItem} />,
     },
   ],
 };
+
+function currentText(key: TranslationKey): string {
+  return translate(useSettingsStore.getState().language, key);
+}
 
 function MermaidHelperPreview({ item }: { item: MermaidHelperItem }) {
   const [html, setHtml] = useState('');
@@ -44,7 +50,7 @@ function MermaidHelperPreview({ item }: { item: MermaidHelperItem }) {
         if (alive) setHtml(svg);
       })
       .catch((reason) => {
-        if (alive) setError(reason instanceof Error ? reason.message : '미리보기를 렌더링하지 못했습니다.');
+        if (alive) setError(reason instanceof Error ? reason.message : currentText('helper.previewFailed'));
       });
 
     return () => {

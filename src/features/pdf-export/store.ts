@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { translate, type AppLanguage } from '../../i18n/messages';
 
 export type PdfExportStatus = 'idle' | 'exporting' | 'done' | 'error';
 
@@ -12,9 +13,9 @@ export const usePdfExportStore = create<PdfExportState>()((set) => ({
   setStatus: (status) => set({ status }),
 }));
 
-export function pdfExportStatusText(status: PdfExportStatus): string | null {
-  if (status === 'exporting') return 'PDF export 진행중';
-  if (status === 'done') return 'PDF export 완료';
-  if (status === 'error') return 'PDF export 실패';
+export function pdfExportStatusText(status: PdfExportStatus, language: AppLanguage = 'ko'): string | null {
+  if (status === 'exporting') return translate(language, 'pdf.exporting');
+  if (status === 'done') return translate(language, 'pdf.done');
+  if (status === 'error') return translate(language, 'pdf.error');
   return null;
 }

@@ -3,6 +3,7 @@ import { insertTextAtSelection, escapeRegExp, replaceTextRange } from '../../cor
 import type { ImageDownloadProgressPayload, ImagePickPayload } from '../../platform/common/BackendAdapter';
 import { Backend } from '../../platform/common/backend';
 import type { OpenFile } from '../../types/workspace';
+import { translateCurrent } from '../../i18n/current';
 
 type DroppedImage =
   | { type: 'remote'; url: string }
@@ -76,7 +77,7 @@ export async function insertSelectedImage(
     try {
       currentFilePath = requireSavedActiveFile(activeFile);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : '이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+      window.alert(error instanceof Error ? error.message : translateCurrent('image.saveFirst'));
       textarea.focus();
       return;
     }
@@ -98,7 +99,7 @@ export async function insertSelectedImage(
     insertTextAtSelection(textarea, markdownImageSnippet(assetPath, imageAltText(picked)));
   } catch (error) {
     console.error('이미지 복사 실패:', error);
-    window.alert(error instanceof Error ? error.message : '이미지 복사에 실패했습니다.');
+    window.alert(error instanceof Error ? error.message : translateCurrent('image.copyFailed'));
     textarea.focus();
   }
 }
@@ -114,7 +115,7 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
   try {
     currentFilePath = requireSavedActiveFile(activeFile);
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+    window.alert(error instanceof Error ? error.message : translateCurrent('image.saveFirst'));
     textarea.focus();
     return;
   }
@@ -135,7 +136,7 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
     const assetPath = await Backend.images.downloadImageToAssets(id, imageUrl, currentFilePath);
     replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
   } catch (error) {
-    const message = error instanceof Error ? error.message : '이미지 다운로드에 실패했습니다.';
+    const message = error instanceof Error ? error.message : translateCurrent('image.downloadFailed');
     console.error('이미지 다운로드 실패:', error);
     replacePendingImageMarker(textarea, id, failedImageSnippet(id, message));
   } finally {
@@ -177,13 +178,13 @@ async function insertImageFileFromBytes(
   try {
     currentFilePath = requireSavedActiveFile(activeFile);
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+    window.alert(error instanceof Error ? error.message : translateCurrent('image.saveFirst'));
     textarea.focus();
     return;
   }
 
   if (file.size > MAX_DROPPED_IMAGE_BYTES) {
-    window.alert('이미지는 20MB 이하만 가져올 수 있습니다.');
+    window.alert(translateCurrent('image.tooLarge'));
     textarea.focus();
     return;
   }
@@ -200,7 +201,7 @@ async function insertImageFileFromBytes(
       replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : '이미지 가져오기에 실패했습니다.';
+    const message = error instanceof Error ? error.message : translateCurrent('image.importFailed');
     console.error('이미지 가져오기 실패:', error);
     replacePendingImageMarker(textarea, id, failedImageSnippet(id, message));
   } finally {
@@ -213,14 +214,14 @@ function insertDroppedImageHelp(textarea: HTMLTextAreaElement): void {
     textarea,
     failedImageSnippet(
       `help-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      '이미지 주소를 찾지 못했습니다. 검색 결과나 게시글 링크는 이미지로 가져올 수 없습니다. 이미지 우클릭 후 이미지 주소 복사를 사용하거나, 이미지 버튼의 URL 가져오기를 사용하세요.',
+      translateCurrent('image.urlNotFound'),
     ),
   );
 }
 
 function markdownImageSnippet(path: string, altText?: string): string {
   const name = fileNameFromPath(path);
-  const alt = escapeMarkdownAlt((altText ?? name).replace(/\.[^.]+$/, '') || '이미지');
+  const alt = escapeMarkdownAlt((altText ?? name).replace(/\.[^.]+$/, '') || translateCurrent('image.defaultAlt'));
   return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
 }
 
@@ -229,20 +230,22 @@ function imageAltText(picked: ImagePickPayload): string {
 }
 
 function pendingImageSnippet(id: string, progress: number | null): string {
-  const label = progress === null ? '이미지 다운로드 중' : `이미지 다운로드 중 ${progress}%`;
+  const label = progress === null
+    ? translateCurrent('image.downloading')
+    : translateCurrent('image.downloadingProgress', { progress });
   return `![${label}](saekim-pending-image://${id})`;
 }
 
 function failedImageSnippet(id: string, message: string): string {
-  return `![이미지 다운로드 실패: ${escapeMarkdownAlt(message)}](saekim-failed-image://${id})`;
+  return `![${translateCurrent('image.downloadErrorAlt', { message: escapeMarkdownAlt(message) })}](saekim-failed-image://${id})`;
 }
 
 function requireSavedActiveFile(activeFile: OpenFile | null): string {
   if (!activeFile || activeFile.path.startsWith('~') || activeFile.path.startsWith('browser://')) {
-    throw new Error('이미지를 assets로 가져오려면 먼저 현재 문서를 저장해야 합니다.');
+    throw new Error(translateCurrent('image.saveFirst'));
   }
   if (activeFile.path.startsWith('content://')) {
-    throw new Error('Android에서 단일 문서로 연 파일은 부모 폴더 권한이 없어 옆에 .assets 폴더를 만들 수 없습니다. 문서를 앱이 접근 가능한 위치에 다시 저장한 뒤 assets 복사를 사용하세요.');
+    throw new Error(translateCurrent('image.androidAssetsUnavailable'));
   }
   return activeFile.path;
 }

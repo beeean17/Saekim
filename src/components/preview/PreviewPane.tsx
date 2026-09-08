@@ -10,6 +10,7 @@ import { Icon } from '../primitives/Icon';
 import { ToolbarButton } from '../ui/toolbar/Toolbar';
 import { PreviewContent } from './PreviewContent';
 import { PreviewInteractionModeControls } from './PreviewInteractionModeControls';
+import { useI18n } from '../../i18n/useI18n';
 
 interface PreviewPaneProps {
   readonly previewRef: MutableRefObject<HTMLDivElement | null>;
@@ -17,6 +18,7 @@ interface PreviewPaneProps {
 }
 
 export function PreviewPane({ previewRef, onPreviewElementChange }: PreviewPaneProps) {
+  const { t } = useI18n();
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -32,14 +34,14 @@ export function PreviewPane({ previewRef, onPreviewElementChange }: PreviewPaneP
   return (
     <section className="preview-pane" data-disabled={!activeFile}>
       <div className="preview-head">
-        <span className="label">미리보기</span>
+        <span className="label">{t('preview.title')}</span>
         {previewContext ? renderer?.head?.(previewContext) : null}
         <div className="preview-head-actions">
           <PreviewInteractionModeControls disabled={!activeFile} />
           <ToolbarButton
             className={`preview-action ${syncScroll ? 'active' : ''}`}
             disabled={!activeFile}
-            title={syncScroll ? '스크롤 동기화 풀기' : '스크롤 동기화'}
+            title={syncScroll ? t('preview.unsyncScroll') : t('preview.syncScroll')}
             onClick={toggleSyncScroll}
           >
             <Icon name={syncScroll ? 'link' : 'unlink'} />

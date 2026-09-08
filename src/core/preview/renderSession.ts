@@ -1,11 +1,14 @@
 import type { PreviewContribution, PreviewRenderContext, PreviewResult } from '../../app/feature';
 import { clearDomBackedPreviewScene, mountDomBackedPreviewScene } from './domBackedScene';
 import type { PreviewRendererContribution, PreviewRenderSnapshot } from './renderTypes';
+import { translateCurrent } from '../../i18n/current';
 
-const PREVIEW_ERROR_RESULT: PreviewResult = {
-  kind: 'html',
-  html: '<div class="preview-error-panel compact"><strong>Preview failed</strong><pre>미리보기를 렌더링하지 못했습니다.</pre></div>',
-};
+function previewErrorResult(): PreviewResult {
+  return {
+    kind: 'html',
+    html: `<div class="preview-error-panel compact"><strong>Preview failed</strong><pre>${translateCurrent('helper.previewFailed')}</pre></div>`,
+  };
+}
 
 interface PreviewRenderTaskOptions {
   readonly context: PreviewRenderContext;
@@ -67,7 +70,7 @@ export class PreviewRenderTask {
   private fail(controller: AbortController, error: Error): void {
     if (!this.isActive(controller)) return;
     this.options.onError(`failed to render preview contribution "${this.options.renderer.id}"`, error);
-    this.options.onComplete(this.snapshot(PREVIEW_ERROR_RESULT));
+    this.options.onComplete(this.snapshot(previewErrorResult()));
   }
 
   private snapshot(result: PreviewResult): PreviewRenderSnapshot {

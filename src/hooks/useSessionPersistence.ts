@@ -36,6 +36,7 @@ function readLegacyMetadata(): LegacyMetadata {
       settings?.theme && typeof settings.fontSize === 'number' && settings.editorFontFamily
         ? {
             theme: settings.theme,
+            language: settings.language,
             fontSize: settings.fontSize,
             editorFontFamily: settings.editorFontFamily,
             htmlPreviewMode: settings.htmlPreviewMode,
@@ -92,6 +93,7 @@ function buildSession(): AppSession {
     },
     settings: {
       theme: settings.theme,
+      language: settings.language,
       fontSize: settings.fontSize,
       editorFontFamily: settings.editorFontFamily,
       htmlPreviewMode: settings.htmlPreviewMode,
@@ -128,6 +130,7 @@ export function useSessionPersistence(): boolean {
   const restoreUI = useUIStore((state) => state.restoreUI);
 
   const theme = useSettingsStore((state) => state.theme);
+  const language = useSettingsStore((state) => state.language);
   const fontSize = useSettingsStore((state) => state.fontSize);
   const editorFontFamily = useSettingsStore((state) => state.editorFontFamily);
   const htmlPreviewMode = useSettingsStore((state) => state.htmlPreviewMode);
@@ -182,6 +185,7 @@ export function useSessionPersistence(): boolean {
     fontSize,
     htmlPreviewMode,
     loaded,
+    language,
     sidebarMode,
     sidebarWidth,
     showLineNumbers,

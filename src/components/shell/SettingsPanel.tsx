@@ -1,4 +1,6 @@
 import { fontSizeOptions, useSettingsStore } from '../../store/settings';
+import { useI18n } from '../../i18n/useI18n';
+import type { AppLanguage } from '../../i18n/messages';
 import { useUIStore } from '../../store/ui';
 import type { ThemeName, ViewMode } from '../../types/workspace';
 import { Popover } from '../ui/overlay/Popover';
@@ -6,17 +8,17 @@ import { CloseButton } from '../ui/primitives/CloseButton';
 import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { PanelHeader } from '../ui/surface/PanelHeader';
 
-const themes: Array<{ id: ThemeName; label: string }> = [
-  { id: 'system', label: '시스템' },
+const themes: Array<{ id: ThemeName; labelKey?: 'settings.theme.system'; label?: string }> = [
+  { id: 'system', labelKey: 'settings.theme.system' },
   { id: 'default', label: 'Light' },
   { id: 'dark', label: 'Dark' },
   { id: 'nord', label: 'Nord' },
 ];
 
-const viewModes: Array<{ id: ViewMode; label: string }> = [
-  { id: 'edit', label: '편집' },
-  { id: 'split', label: '분할' },
-  { id: 'preview', label: '보기' },
+const viewModes: Array<{ id: ViewMode; labelKey: 'view.edit' | 'view.split' | 'view.preview' }> = [
+  { id: 'edit', labelKey: 'view.edit' },
+  { id: 'split', labelKey: 'view.split' },
+  { id: 'preview', labelKey: 'view.preview' },
 ];
 
 const fontFamilies = ['Pretendard Variable', 'Pretendard', 'IBM Plex Sans KR', 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'ui-monospace'];
@@ -30,6 +32,7 @@ export function SettingsPanel({
   effectiveViewMode: ViewMode;
   availableViewModes: readonly ViewMode[];
 }) {
+  const { language, t } = useI18n();
   const open = useUIStore((state) => state.settingsOpen);
   const close = useUIStore((state) => state.closeSettings);
   const setViewMode = useUIStore((state) => state.setViewMode);
@@ -37,6 +40,7 @@ export function SettingsPanel({
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
 
   const theme = useSettingsStore((state) => state.theme);
+  const setLanguage = useSettingsStore((state) => state.setLanguage);
   const setTheme = useSettingsStore((state) => state.setTheme);
   const fontSize = useSettingsStore((state) => state.fontSize);
   const setFontSize = useSettingsStore((state) => state.setFontSize);
@@ -50,7 +54,7 @@ export function SettingsPanel({
     <Popover
       open={open}
       className="settings-popover"
-      ariaLabel="설정"
+      ariaLabel={t('settings.title')}
       ignoreOutsideSelector="[data-settings-trigger='true']"
       onClose={close}
     >
@@ -58,29 +62,49 @@ export function SettingsPanel({
         className="settings-head"
         titleClassName="settings-title"
         descriptionClassName="settings-subtitle"
-        title="설정"
-        description="편집 환경"
-        actions={<CloseButton onClick={close}>닫기</CloseButton>}
+        title={t('settings.title')}
+        description={t('settings.description')}
+        actions={<CloseButton label={t('common.close')} onClick={close}>{t('common.close')}</CloseButton>}
       />
 
       <section className="settings-section">
-        <label>테마</label>
+        <label>{t('settings.language')}</label>
         <SegmentedControl
-          ariaLabel="테마"
+          ariaLabel={t('settings.language')}
+          className="settings-segmented"
+          value={language}
+          options={([
+            { value: 'ko', label: t('language.ko') },
+            { value: 'en', label: t('language.en') },
+          ] satisfies Array<{ value: AppLanguage; label: string }>)}
+          onChange={setLanguage}
+        />
+      </section>
+
+      <section className="settings-section">
+        <label>{t('settings.theme')}</label>
+        <SegmentedControl
+          ariaLabel={t('settings.theme')}
           className="settings-segmented"
           value={theme}
-          options={themes.map((candidate) => ({ value: candidate.id, label: candidate.label }))}
+          options={themes.map((candidate) => ({
+            value: candidate.id,
+            label: candidate.labelKey ? t(candidate.labelKey) : candidate.label ?? candidate.id,
+          }))}
           onChange={setTheme}
         />
       </section>
 
       <section className="settings-section">
-        <label>글자 크기</label>
+        <label>{t('settings.fontSize')}</label>
         <SegmentedControl
-          ariaLabel="글자 크기"
+          ariaLabel={t('settings.fontSize')}
           className="settings-segmented"
           value={fontSizeId}
-          options={fontSizeOptions.map((option) => ({ value: option.id, label: option.label }))}
+          options={fontSizeOptions.map((option) => ({
+            value: option.id,
+            label: t(`settings.fontSize.${option.id}`),
+          }))}
           onChange={(id) => {
             const option = fontSizeOptions.find((candidate) => candidate.id === id);
             if (option) setFontSize(option.value);
@@ -89,7 +113,7 @@ export function SettingsPanel({
       </section>
 
       <section className="settings-section">
-        <label htmlFor="editor-font">에디터 폰트</label>
+        <label htmlFor="editor-font">{t('settings.editorFont')}</label>
         <select
           id="editor-font"
           value={editorFontFamily}
@@ -104,14 +128,14 @@ export function SettingsPanel({
       </section>
 
       <section className="settings-section">
-        <label>보기 모드</label>
+        <label>{t('settings.viewMode')}</label>
         <SegmentedControl
-          ariaLabel="보기 모드"
+          ariaLabel={t('settings.viewMode')}
           className="settings-segmented"
           value={effectiveViewMode}
           options={viewModes
             .filter((mode) => availableViewModes.includes(mode.id))
-            .map((mode) => ({ value: mode.id, label: mode.label }))}
+            .map((mode) => ({ value: mode.id, label: t(mode.labelKey) }))}
           onChange={setViewMode}
         />
       </section>
@@ -119,7 +143,7 @@ export function SettingsPanel({
       <section className="settings-section">
         <label className="settings-check">
           <input checked={syncScroll} type="checkbox" onChange={toggleSyncScroll} />
-          스크롤 동기화
+          {t('settings.syncScroll')}
         </label>
       </section>
 
@@ -130,10 +154,10 @@ export function SettingsPanel({
             type="checkbox"
             onChange={(event) => setShowLineNumbers(event.currentTarget.checked)}
           />
-          줄 번호 표시
+          {t('settings.lineNumbers')}
         </label>
         {lineNumberPreference === null ? (
-          <span className="settings-hint">작은 화면에서는 기본으로 숨깁니다.</span>
+          <span className="settings-hint">{t('settings.lineNumbers.hint')}</span>
         ) : null}
       </section>
     </Popover>

@@ -5,6 +5,7 @@ import type { EditorHelperItemBase } from './helperTypes';
 import { Dialog } from '../../components/ui/overlay/Dialog';
 import { CloseButton } from '../../components/ui/primitives/CloseButton';
 import { SearchField } from '../../components/ui/primitives/SearchField';
+import { useI18n } from '../../i18n/useI18n';
 
 export function EditorHelperModal({
   helper,
@@ -17,6 +18,7 @@ export function EditorHelperModal({
   onInsert: (helper: EditorHelperContribution, item: EditorHelperItemBase) => void;
   onImageInsert?: (mode: EditorImageInsertMode) => void;
 }) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState('');
   const filteredItems = useMemo(() => searchHelperItems(helper, query), [helper, query]);
@@ -38,13 +40,13 @@ export function EditorHelperModal({
           <h2>{helper.title}</h2>
           <p>{helper.description}</p>
         </div>
-        <CloseButton onClick={onClose} />
+        <CloseButton label={t('common.close')} onClick={onClose} />
       </div>
       <SearchField ref={inputRef} className="helper-search" value={query} placeholder={helper.placeholder} onChange={setQuery} />
       <div className="helper-modal-body">
-        <div className="helper-results" role="listbox" aria-label={`${helper.title} 결과`}>
+        <div className="helper-results" role="listbox" aria-label={t('helper.results', { title: helper.title })}>
           {filteredItems.length === 0 ? (
-            <div className="helper-empty">검색 결과 없음</div>
+            <div className="helper-empty">{t('helper.empty')}</div>
           ) : (
             filteredItems.map((item) => (
               <button
@@ -70,7 +72,7 @@ export function EditorHelperModal({
                   <code>{helper.syntax(selectedItem)}</code>
                 </div>
                 <button type="button" onClick={() => onInsert(helper, selectedItem)}>
-                  {helper.insertLabel?.(selectedItem) ?? '삽입'}
+                  {helper.insertLabel?.(selectedItem) ?? t('common.insert')}
                 </button>
               </div>
               {helper.renderPreview(selectedItem, { onImageInsert })}

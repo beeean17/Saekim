@@ -1,11 +1,15 @@
 import type { CommandContributionFactory } from '../../app/feature';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
+import { translate } from '../../i18n/messages';
+import { useSettingsStore } from '../../store/settings';
 
 export const appCommands: CommandContributionFactory = (ctx) => {
+  const language = useSettingsStore.getState().language;
+  const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   const commands = [
     {
       id: 'file.new',
-      label: 'New File',
+      label: t('command.newFile'),
       defaultShortcut: 'mod+n',
       menu: { section: 'file', group: 'new', order: 10 },
       keywords: ['document', 'create'],
@@ -15,7 +19,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       ? [
           {
             id: 'window.new',
-            label: 'New Window',
+            label: t('command.newWindow'),
             defaultShortcut: 'mod+shift+n',
             menu: { section: 'file', group: 'new', order: 20 },
             run: ctx.window.newWindow,
@@ -24,42 +28,42 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       : []),
     {
       id: 'file.open',
-      label: 'Open File…',
+      label: t('command.openFile'),
       defaultShortcut: 'mod+o',
       menu: { section: 'file', group: 'open', order: 30 },
       run: ctx.file.openFile,
     },
     {
       id: 'folder.open',
-      label: 'Open Folder…',
+      label: t('command.openFolder'),
       defaultShortcut: 'mod+shift+o',
       menu: { section: 'file', group: 'open', order: 40 },
       run: ctx.file.openFolder,
     },
     {
       id: 'file.save',
-      label: 'Save',
+      label: t('command.save'),
       defaultShortcut: 'mod+s',
       menu: { section: 'file', group: 'save', order: 50 },
       run: ctx.file.save,
     },
     {
       id: 'file.saveAs',
-      label: 'Save As…',
+      label: t('command.saveAs'),
       defaultShortcut: 'mod+shift+s',
       menu: { section: 'file', group: 'save', order: 60 },
       run: ctx.file.saveAs,
     },
     {
       id: 'file.print',
-      label: 'Print…',
+      label: t('command.print'),
       defaultShortcut: 'mod+p',
       menu: { section: 'file', group: 'output', order: 70 },
       run: ctx.file.print,
     },
     {
       id: 'file.close',
-      label: 'Close File',
+      label: t('command.closeFile'),
       defaultShortcut: 'mod+w',
       menu: { section: 'file', group: 'close', order: 90 },
       run: ctx.file.close,
@@ -68,7 +72,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       ? [
           {
             id: 'window.close',
-            label: 'Close Window',
+            label: t('command.closeWindow'),
             defaultShortcut: 'mod+shift+w',
             menu: { section: 'window', group: 'window', order: 30 },
             run: ctx.window.close,
@@ -77,7 +81,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       : []),
     {
       id: 'settings.open',
-      label: 'Open Settings',
+      label: t('command.openSettings'),
       defaultShortcut: 'mod+,',
       menu: { section: 'view', group: 'settings', order: 90 },
       keywords: ['preferences'],
@@ -85,7 +89,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
     },
     {
       id: 'editor.bold',
-      label: 'Toggle Bold',
+      label: t('command.bold'),
       defaultShortcut: 'mod+b',
       menu: { section: 'edit', group: 'format', order: 30 },
       isEnabled: ctx.editor.hasTarget,
@@ -93,37 +97,37 @@ export const appCommands: CommandContributionFactory = (ctx) => {
     },
     {
       id: 'editor.italic',
-      label: 'Toggle Italic',
+      label: t('command.italic'),
       defaultShortcut: 'mod+i',
       menu: { section: 'edit', group: 'format', order: 40 },
       isEnabled: ctx.editor.hasTarget,
       run: ctx.editor.toggleItalic,
     },
-    ...viewCommands(ctx),
+    ...viewCommands(ctx, t),
     {
       id: 'view.zoomIn',
-      label: 'Zoom In',
+      label: t('command.zoomIn'),
       defaultShortcut: 'mod+equal',
       menu: { section: 'view', group: 'zoom', order: 40 },
       run: ctx.view.zoomIn,
     },
     {
       id: 'view.zoomOut',
-      label: 'Zoom Out',
+      label: t('command.zoomOut'),
       defaultShortcut: 'mod+minus',
       menu: { section: 'view', group: 'zoom', order: 50 },
       run: ctx.view.zoomOut,
     },
     {
       id: 'view.zoomReset',
-      label: 'Actual Size',
+      label: t('command.actualSize'),
       defaultShortcut: 'mod+0',
       menu: { section: 'view', group: 'zoom', order: 60 },
       run: ctx.view.resetZoom,
     },
     {
       id: 'view.toggleSidebar',
-      label: 'Toggle Sidebar',
+      label: t('command.toggleSidebar'),
       defaultShortcut: 'mod+backslash',
       menu: { section: 'view', group: 'sidebar', order: 70 },
       run: ctx.view.toggleSidebar,
@@ -133,11 +137,14 @@ export const appCommands: CommandContributionFactory = (ctx) => {
   return commands;
 };
 
-function viewCommands(ctx: Parameters<CommandContributionFactory>[0]) {
+function viewCommands(
+  ctx: Parameters<CommandContributionFactory>[0],
+  t: (key: Parameters<typeof translate>[1]) => string,
+) {
   return [
-    { mode: 'edit' as const, label: 'Editor Only', shortcut: 'mod+shift+1', order: 10 },
-    { mode: 'split' as const, label: 'Split View', shortcut: 'mod+shift+2', order: 20 },
-    { mode: 'preview' as const, label: 'Preview Only', shortcut: 'mod+shift+3', order: 30 },
+    { mode: 'edit' as const, label: t('view.editorOnly'), shortcut: 'mod+shift+1', order: 10 },
+    { mode: 'split' as const, label: t('view.splitView'), shortcut: 'mod+shift+2', order: 20 },
+    { mode: 'preview' as const, label: t('view.previewOnly'), shortcut: 'mod+shift+3', order: 30 },
   ].map(({ mode, label, shortcut, order }) => ({
     id: `view.${mode}`,
     label,

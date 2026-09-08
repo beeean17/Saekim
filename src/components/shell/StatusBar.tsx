@@ -5,32 +5,34 @@ import { countKoreanAwareWords } from '../../core/format/readingTime';
 import { pdfExportStatusText, usePdfExportStore } from '../../features/pdf-export';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import { useI18n } from '../../i18n/useI18n';
 
 export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTMLTextAreaElement> }) {
+  const { language, t } = useI18n();
   const activeFile = useWorkspaceStore(selectActiveFile);
   const setEncoding = useWorkspaceStore((state) => state.setEncoding);
   const pdfExportStatus = usePdfExportStore((state) => state.status);
   const dirty = isDirty(activeFile);
   const content = activeFile?.content ?? '';
-  const language = activeFile ? getFileTypeLabel(activeFile.name, activeFile.path, enabledFeatures) : '-';
-  const pdfStatusText = pdfExportStatusText(pdfExportStatus);
+  const fileTypeLabel = activeFile ? getFileTypeLabel(activeFile.name, activeFile.path, enabledFeatures) : '-';
+  const pdfStatusText = pdfExportStatusText(pdfExportStatus, language);
   const cursor = useCursorPosition(content, textareaRef);
 
   return (
     <footer className="statusbar">
       <span className="item">
         <span className="dot" style={{ background: dirty ? 'var(--warning)' : 'var(--success)' }} />
-        {dirty ? '저장 안 됨' : '저장됨'}
+        {dirty ? t('document.unsaved') : t('document.saved')}
       </span>
       <span className="sep" />
-      <span className="item">{language}</span>
+      <span className="item">{fileTypeLabel}</span>
       <span className="sep" />
       <span className="item statusbar-document-format">
         <select
-          aria-label="문서 인코딩"
+          aria-label={t('document.encoding')}
           className="statusbar-encoding"
           disabled={!activeFile}
-          title="저장 인코딩 변경"
+          title={t('document.changeEncoding')}
           value={activeFile?.encoding ?? 'utf-8'}
           onChange={(event) => {
             if (activeFile) setEncoding(activeFile.id, event.currentTarget.value as typeof activeFile.encoding);
@@ -55,7 +57,7 @@ export function StatusBar({ textareaRef }: { readonly textareaRef: RefObject<HTM
           Ln {cursor.row}, Col {cursor.column}
         </span>
         <span className="sep" />
-        <span className="item">{countKoreanAwareWords(content)} 단어</span>
+        <span className="item">{t('document.words', { count: countKoreanAwareWords(content) })}</span>
       </div>
     </footer>
   );

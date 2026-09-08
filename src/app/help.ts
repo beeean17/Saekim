@@ -1,4 +1,5 @@
 import { Backend } from '../platform/common/backend';
+import { translateCurrent } from '../i18n/current';
 
 const repositoryUrl = 'https://github.com/beeean17/Saekim';
 
@@ -8,16 +9,16 @@ export function openProjectWebsite(): void {
 
 export function showKeyboardShortcuts(): void {
   window.alert([
-    'Saekim Keyboard Shortcuts',
+    translateCurrent('shortcuts.title'),
     '',
-    '⌘N  New File',
-    '⌘O  Open File',
-    '⌘S  Save',
-    '⌘F  Find',
-    '⌘H  Replace',
-    '⌘K  Command Palette',
-    '⌘+ / ⌘− / ⌘0  Zoom',
-    '⌘P  Print',
-    '⌘⇧E  Export PDF',
+    `⌘N  ${translateCurrent('command.newFile')}`,
+    `⌘O  ${translateCurrent('command.openFile').replace(/…$/, '')}`,
+    `⌘S  ${translateCurrent('command.save')}`,
+    `⌘F  ${translateCurrent('command.find')}`,
+    `⌘H  ${translateCurrent('command.replace')}`,
+    `⌘K  ${translateCurrent('command.palette')}`,
+    `⌘+ / ⌘− / ⌘0  ${translateCurrent('shortcuts.zoom')}`,
+    `⌘P  ${translateCurrent('command.print').replace(/…$/, '')}`,
+    `⌘⇧E  ${translateCurrent('command.exportPdf')}`,
   ].join('\n'));
 }

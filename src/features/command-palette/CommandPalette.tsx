@@ -4,10 +4,12 @@ import type { AppOverlayProps, CommandContribution } from '../../app/feature';
 import { Dialog } from '../../components/ui/overlay/Dialog';
 import { SearchField } from '../../components/ui/primitives/SearchField';
 import { useCommandPaletteStore } from './store';
+import { useI18n } from '../../i18n/useI18n';
 
 const MAX_RESULTS = 50;
 
 export function CommandPalette({ commandRegistry }: AppOverlayProps) {
+  const { t } = useI18n();
   const isOpen = useCommandPaletteStore((state) => state.isOpen);
   const close = useCommandPaletteStore((state) => state.close);
   const [query, setQuery] = useState('');
@@ -40,13 +42,13 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
       backdropClassName="command-palette-backdrop"
       className="command-palette"
       open={isOpen}
-      title="명령 팔레트"
+      title={t('commandPalette.title')}
       onClose={close}
     >
       <SearchField
         autoFocus
         className="command-palette-search"
-        placeholder="명령 검색…"
+        placeholder={t('commandPalette.placeholder')}
         value={query}
         onChange={setQuery}
         onEscape={close}
@@ -64,7 +66,7 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
           }
         }}
       />
-      <div className="command-palette-list" ref={listRef} role="listbox" aria-label="명령">
+      <div className="command-palette-list" ref={listRef} role="listbox" aria-label={t('commandPalette.commands')}>
         {commands.length > 0 ? (
           commands.map((command, index) => {
             const disabled = command.isEnabled?.() === false;
@@ -90,7 +92,7 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
             );
           })
         ) : (
-          <p className="command-palette-empty">일치하는 명령이 없습니다.</p>
+          <p className="command-palette-empty">{t('commandPalette.empty')}</p>
         )}
       </div>
     </Dialog>

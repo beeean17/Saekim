@@ -14,6 +14,7 @@ import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../ui/feedback/EmptyState';
 import { Toolbar as UiToolbar, ToolbarButton, ToolbarGroup } from '../ui/toolbar/Toolbar';
+import { useI18n } from '../../i18n/useI18n';
 
 type IconName = Parameters<typeof Icon>[0]['name'];
 
@@ -26,11 +27,12 @@ export function EditorPane({
   textareaRef: RefObject<HTMLTextAreaElement>;
   commandRegistry: CommandRegistry;
 }) {
+  const { language, t } = useI18n();
   const activeFile = useWorkspaceStore(selectActiveFile);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const cursor = useCursorPosition(activeFile?.content ?? '', textareaRef.current);
-  const editorContributions = useMemo(() => selectEditorContributions(enabledFeatures), []);
+  const editorContributions = useMemo(() => selectEditorContributions(enabledFeatures), [language]);
   const handlerContext = useMemo<EditorHandlerContext>(
     () => ({
       activeFile,
@@ -86,8 +88,8 @@ export function EditorPane({
       ) : (
         <EmptyState
           className="empty-document-state"
-          title="아무것도 열려 있지 않습니다"
-          description="파일을 열어 시작하세요."
+          title={t('empty.title')}
+          description={t('empty.description')}
         />
       )}
     </section>
@@ -122,6 +124,7 @@ function EditorToolbar({
   contributions: ReturnType<typeof selectEditorContributions>;
   textareaRef: RefObject<HTMLTextAreaElement>;
 }) {
+  const { t } = useI18n();
   const activeFile = useWorkspaceStore(selectActiveFile);
   const refresh = useWorkspaceStore((state) => state.refresh);
   const [helperMode, setHelperMode] = useState<string | null>(null);
@@ -137,7 +140,7 @@ function EditorToolbar({
   return (
     <>
       <UiToolbar className="toolbar">
-        <div className="toolbar-line-indicator" title={`현재 파일 형식: ${fileType}`} aria-label={`현재 파일 형식: ${fileType}`}>
+        <div className="toolbar-line-indicator" title={t('document.fileType', { type: fileType })} aria-label={t('document.fileType', { type: fileType })}>
           {fileType}
         </div>
         <ToolbarGroup className="tool-group">

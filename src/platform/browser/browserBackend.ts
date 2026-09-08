@@ -10,6 +10,7 @@ import type {
   WorkspaceSearchPage,
   WorkspaceSearchRequest,
 } from '../../types/workspace';
+import { translateCurrent } from '../../i18n/current';
 
 const sessionKey = 'saekim-browser-session';
 const blockLayoutPrefix = 'saekim-block-layouts:';
@@ -93,7 +94,7 @@ async function listenNoop(): Promise<() => void> {
 }
 
 async function confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision> {
-  return globalThis.confirm(`저장하지 않은 ${fileNames.join(', ')} 파일을 저장하고 닫을까요?`) ? 'save' : 'cancel';
+  return globalThis.confirm(translateCurrent('document.closeUnsaved', { files: fileNames.join(', ') })) ? 'save' : 'cancel';
 }
 
 async function openFileDialog(): Promise<OpenFilePayload | null> {

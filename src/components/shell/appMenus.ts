@@ -4,6 +4,8 @@ import { currentPlatformCapabilities } from '../../platform/common/capabilities'
 import type { CommandContribution } from '../../app/feature';
 import type { ViewMode } from '../../types/workspace';
 import { openProjectWebsite, showKeyboardShortcuts } from '../../app/help';
+import { translate } from '../../i18n/messages';
+import { useSettingsStore } from '../../store/settings';
 
 export type AppMenuId = 'file' | 'edit' | 'view' | 'window' | 'help';
 
@@ -41,6 +43,8 @@ export function buildAppMenus({
   getDocumentCommandTarget,
   includeWindowMenu = currentPlatformCapabilities().has('window.chrome'),
 }: BuildAppMenusOptions): AppMenuGroup[] {
+  const language = useSettingsStore.getState().language;
+  const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   const fileItems = registeredMenuItems(commandRegistry, 'file');
   const editItems = registeredMenuItems(commandRegistry, 'edit');
   const viewItems = registeredMenuItems(commandRegistry, 'view').map((item) => ({
@@ -50,31 +54,31 @@ export function buildAppMenus({
   const menus: AppMenuGroup[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('menu.file'),
       items: includeWindowMenu ? fileItems : fileItems.filter((item) => item.commandId !== 'window.new'),
     },
     {
       id: 'edit',
-      label: 'Edit',
+      label: t('menu.edit'),
       items: [
-        { label: 'Undo', shortcut: 'Ctrl+Z', action: () => runDocumentCommand('undo', getDocumentCommandTarget()) },
-        { label: 'Redo', shortcut: 'Ctrl+Y', action: () => runDocumentCommand('redo', getDocumentCommandTarget()) },
+        { label: t('menu.undo'), shortcut: 'Ctrl+Z', action: () => runDocumentCommand('undo', getDocumentCommandTarget()) },
+        { label: t('menu.redo'), shortcut: 'Ctrl+Y', action: () => runDocumentCommand('redo', getDocumentCommandTarget()) },
         { separator: true },
-        { label: 'Cut', shortcut: 'Ctrl+X', action: () => runDocumentCommand('cut', getDocumentCommandTarget()) },
-        { label: 'Copy', shortcut: 'Ctrl+C', action: () => runDocumentCommand('copy', getDocumentCommandTarget()) },
-        { label: 'Paste', shortcut: 'Ctrl+V', action: () => void runPasteCommand(getDocumentCommandTarget()) },
+        { label: t('menu.cut'), shortcut: 'Ctrl+X', action: () => runDocumentCommand('cut', getDocumentCommandTarget()) },
+        { label: t('menu.copy'), shortcut: 'Ctrl+C', action: () => runDocumentCommand('copy', getDocumentCommandTarget()) },
+        { label: t('menu.paste'), shortcut: 'Ctrl+V', action: () => void runPasteCommand(getDocumentCommandTarget()) },
         { separator: true },
         ...editItems,
-        { label: 'Select All', shortcut: 'Ctrl+A', action: () => runDocumentCommand('selectAll', getDocumentCommandTarget()) },
+        { label: t('menu.selectAll'), shortcut: 'Ctrl+A', action: () => runDocumentCommand('selectAll', getDocumentCommandTarget()) },
       ],
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('menu.view'),
       items: [
         ...viewItems,
         ...(viewMode === 'split' && effectiveViewMode === 'split'
-          ? [{ separator: true }, { label: 'Sync Scroll', checked: syncScroll, action: toggleSyncScroll }]
+          ? [{ separator: true }, { label: t('menu.syncScroll'), checked: syncScroll, action: toggleSyncScroll }]
           : []),
       ],
     },
@@ -83,10 +87,10 @@ export function buildAppMenus({
   if (includeWindowMenu) {
     menus.push({
       id: 'window',
-      label: 'Window',
+      label: t('menu.window'),
       items: [
-        { label: 'Minimize', action: () => void runWindowAction('minimize') },
-        { label: 'Maximize / Restore', action: () => void runWindowAction('toggleMaximize') },
+        { label: t('menu.minimize'), action: () => void runWindowAction('minimize') },
+        { label: t('menu.maximizeRestore'), action: () => void runWindowAction('toggleMaximize') },
         ...withLeadingSeparator(registeredMenuItems(commandRegistry, 'window')),
       ],
     });
@@ -94,12 +98,12 @@ export function buildAppMenus({
 
   menus.push({
     id: 'help',
-    label: 'Help',
+    label: t('menu.help'),
     items: [
-      { label: 'Saekim on GitHub', action: openProjectWebsite },
-      { label: 'Keyboard Shortcuts', action: showKeyboardShortcuts },
+      { label: t('menu.github'), action: openProjectWebsite },
+      { label: t('menu.shortcuts'), action: showKeyboardShortcuts },
       { separator: true },
-      { label: 'About Saekim', action: () => window.alert(`Saekim ${__APP_VERSION__}`) },
+      { label: t('menu.about'), action: () => window.alert(`Saekim ${__APP_VERSION__}`) },
     ],
   });
 

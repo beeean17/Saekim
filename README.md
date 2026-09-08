@@ -28,6 +28,7 @@ that stay next to the source file.
 - Native file/folder open, save, save as, drag and drop, and OS file association
   handling through Tauri
 - Markdown/text default-app support for macOS and Windows packaging
+- Instant Korean/English UI switching with the language saved between sessions
 - PDF export from the rendered preview
 - Local `.assets/` image workflow:
   - insert images by original path

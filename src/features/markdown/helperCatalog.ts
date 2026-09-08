@@ -1,4 +1,5 @@
 import type { MarkdownHelperItem } from '../../core/editor/helperTypes';
+import type { AppLanguage } from '../../i18n/messages';
 
 export const markdownHelperItems: MarkdownHelperItem[] = [
   {
@@ -194,3 +195,31 @@ export const markdownHelperItems: MarkdownHelperItem[] = [
   },
 ];
 
+const englishOverrides: Record<string, Partial<MarkdownHelperItem>> = {
+  'heading-1': { title: 'Heading 1', category: 'Headings', syntax: '# Heading', snippet: '# Heading', example: '# Heading 1' },
+  'heading-2': { title: 'Heading 2', category: 'Headings', syntax: '## Heading', snippet: '## Heading', example: '## Heading 2' },
+  'heading-3': { title: 'Heading 3', category: 'Headings', syntax: '### Heading', snippet: '### Heading', example: '### Heading 3' },
+  bold: { title: 'Bold', category: 'Emphasis', syntax: '**text**', snippet: '**text**', example: '**bold text**' },
+  italic: { title: 'Italic', category: 'Emphasis', syntax: '*text*', snippet: '*text*', example: '*italic text*' },
+  strike: { title: 'Strikethrough', category: 'Emphasis', syntax: '~~text~~', snippet: '~~text~~', example: '~~struck text~~' },
+  highlight: { title: 'Highlight', category: 'Emphasis', syntax: '==text==', snippet: '==text==', example: '==highlighted text==' },
+  'inline-code': { title: 'Inline code', category: 'Code' },
+  'code-block': { title: 'Code block', category: 'Code', snippet: '```text\ncode\n```' },
+  quote: { title: 'Quote', category: 'Paragraph', syntax: '> quote', snippet: '> quote', example: '> Important sentence' },
+  'hard-break': { title: 'Line break', category: 'Paragraph', syntax: '2 spaces at end of line', example: 'First line  \nSecond line' },
+  indent: { title: 'Indent', category: 'Paragraph', example: 'Paragraph\n    Indented line' },
+  outdent: { title: 'Outdent', category: 'Paragraph', example: 'Paragraph\n    Indented line' },
+  'horizontal-rule': { title: 'Horizontal rule', category: 'Paragraph' },
+  'bullet-list': { title: 'Bulleted list', category: 'Lists', syntax: '- Item', snippet: '- Item', example: '- First\n- Second' },
+  'numbered-list': { title: 'Numbered list', category: 'Lists', syntax: '1. Item', snippet: '1. Item', example: '1. First\n2. Second' },
+  'task-list': { title: 'Checklist', category: 'Lists', syntax: '- [ ] To do', snippet: '- [ ] To do', example: '- [ ] To do\n- [x] Done' },
+  link: { title: 'Link', category: 'Links', syntax: '[text](URL)', snippet: '[text](https://example.com)' },
+  image: { title: 'Image', category: 'Links', syntax: '![alt text](path)', snippet: '![image](image.png)', example: '![image](image.png)' },
+  table: { title: 'Table', category: 'Tables', syntax: '| Heading | Value |', snippet: '| Heading | Value |\n| --- | --- |\n| Item | Content |', example: '| Heading | Value |\n| --- | --- |\n| Item | Content |' },
+  footnote: { title: 'Footnote', category: 'References', snippet: '[^1]\n\n[^1]: Footnote text', example: 'Sentence end[^1]\n\n[^1]: Footnote text' },
+};
+
+export function markdownHelperItemsFor(language: AppLanguage): MarkdownHelperItem[] {
+  if (language === 'ko') return markdownHelperItems;
+  return markdownHelperItems.map((item) => ({ ...item, ...englishOverrides[item.id] }));
+}

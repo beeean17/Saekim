@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { isTauriRuntime } from '../platform/common/tauri/invoke';
+import { translateCurrent } from '../i18n/current';
 
 let updateCheckStarted = false;
 
@@ -23,9 +24,7 @@ async function checkForUpdate(): Promise<void> {
     const update = await check();
     if (!update) return;
 
-    const accepted = window.confirm(
-      `Saekim ${update.version} 버전을 설치할 수 있습니다. 지금 다운로드하고 다시 시작할까요?`,
-    );
+    const accepted = window.confirm(translateCurrent('update.available', { version: update.version }));
     if (!accepted) {
       await update.close();
       return;

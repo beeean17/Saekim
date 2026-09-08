@@ -16,6 +16,7 @@ import { SearchField } from '../ui/primitives/SearchField';
 import { SidebarMenu } from './SidebarMenu';
 import { SidebarToggle } from './SidebarToggle';
 import { TreeContextMenu, type TreeMenuPosition } from './TreeContextMenu';
+import { useI18n } from '../../i18n/useI18n';
 
 interface SidebarProps {
   compact: boolean;
@@ -34,6 +35,7 @@ export function Sidebar({
   commandRegistry,
   effectiveViewMode,
 }: SidebarProps) {
+  const { t } = useI18n();
   const sidebarRef = useRef<HTMLElement | null>(null);
   const swipeStartXRef = useRef<number | null>(null);
   const compactSidebarOpen = useUIStore((state) => state.compactSidebarOpen);
@@ -115,28 +117,28 @@ export function Sidebar({
     try {
       await refresh();
     } catch (error) {
-      reportFileOperationError(error);
+      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
   const renameEntry = async (node: FileTreeNode) => {
-    const nextName = window.prompt('새 이름', node.name);
+    const nextName = window.prompt(t('sidebar.renamePrompt'), node.name);
     if (!nextName || nextName === node.name) return;
     try {
       const nextPath = await Backend.folders.renameEntry(node.path, nextName);
       renameWorkspaceEntry(node.path, nextPath);
       await refreshAfterOperation();
     } catch (error) {
-      reportFileOperationError(error);
+      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
   const createFolder = async (parentPath: string) => {
-    const name = window.prompt('새 폴더 이름', '새 폴더');
+    const name = window.prompt(t('sidebar.folderNamePrompt'), t('sidebar.defaultFolderName'));
     if (!name) return;
     try {
       await Backend.folders.createFolder(parentPath, name);
       await refreshAfterOperation();
     } catch (error) {
-      reportFileOperationError(error);
+      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
   const duplicateFile = async (node: FileTreeNode) => {
@@ -144,11 +146,11 @@ export function Sidebar({
       await Backend.folders.duplicateFile(node.path);
       await refreshAfterOperation();
     } catch (error) {
-      reportFileOperationError(error);
+      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
   const trashEntry = async (node: FileTreeNode) => {
-    if (!window.confirm(`“${node.name}”을(를) 휴지통으로 이동할까요?`)) return;
+    if (!window.confirm(t('sidebar.trashConfirm', { name: node.name }))) return;
     const affectedFiles = openFiles.filter((file) => isPathInsideWorkspaceEntry(file.path, node.path));
     const dirtyFiles = affectedFiles.filter((file) => isDirty(file));
     if (dirtyFiles.length > 0) {
@@ -166,7 +168,7 @@ export function Sidebar({
       removeWorkspaceEntry(node.path);
       await refreshAfterOperation();
     } catch (error) {
-      reportFileOperationError(error);
+      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
 
@@ -225,12 +227,12 @@ export function Sidebar({
   }, [rootPath, searchNeedle]);
   const addImageToDocument = (image: { path: string; name: string }) => {
     if (!activeFile) {
-      window.alert('이미지를 추가할 문서를 먼저 열어주세요.');
+      window.alert(t('sidebar.addImageFirst'));
       return;
     }
 
     const imagePath = markdownImagePathForDocument(image.path, activeFile.path);
-    insertImageSnippetIntoDocument(textareaRef.current, activeFile, updateContent, markdownImageSnippet(imagePath, image.name));
+    insertImageSnippetIntoDocument(textareaRef.current, activeFile, updateContent, markdownImageSnippet(imagePath, image.name, t('image.defaultAlt')));
     setImagePreview(null);
   };
 
@@ -238,7 +240,7 @@ export function Sidebar({
     <>
       {compact && compactSidebarOpen ? (
         <button
-          aria-label="탐색기 닫기"
+          aria-label={t('sidebar.closeExplorer')}
           className="sidebar-drawer-backdrop"
           tabIndex={-1}
           type="button"
@@ -246,7 +248,7 @@ export function Sidebar({
         />
       ) : null}
     <aside
-      aria-label="파일 탐색기"
+      aria-label={t('sidebar.fileExplorer')}
       aria-modal={compactSidebarOpen && compact ? true : undefined}
       className="sidebar"
       id="saekim-sidebar"
@@ -286,7 +288,7 @@ export function Sidebar({
               autoFocus
               className="sidebar-search"
               value={workspaceSearchQuery}
-              placeholder="워크스페이스에서 찾기"
+              placeholder={t('sidebar.searchPlaceholder')}
               onChange={setWorkspaceSearchQuery}
               onEscape={closeSearch}
             />
@@ -371,10 +373,11 @@ function SidebarPanelTabs({
   contributions: ReturnType<typeof selectSidebarContributions>;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <div className="sidebar-panel-tabs" role="tablist" aria-label="사이드바 패널">
+    <div className="sidebar-panel-tabs" role="tablist" aria-label={t('sidebar.panels')}>
       <button aria-selected={activeId === 'explorer'} role="tab" type="button" onClick={() => onSelect('explorer')}>
-        탐색기
+        {t('sidebar.explorer')}
       </button>
       {contributions.map((contribution) => (
         <button
@@ -384,7 +387,7 @@ function SidebarPanelTabs({
           type="button"
           onClick={() => onSelect(contribution.id)}
         >
-          {contribution.label}
+          {contribution.id === 'outline.document' ? t('outline.label') : contribution.label}
         </button>
       ))}
     </div>
@@ -404,21 +407,22 @@ function FolderPath({
   readonly onSearch: () => void;
   readonly onRefresh: () => void;
 }) {
-  const label = path ? displayWorkspacePath(path) : '열린 폴더 없음';
+  const { t } = useI18n();
+  const label = path ? displayWorkspacePath(path) : t('sidebar.noFolder');
 
   return (
     <div className="sidebar-folder-path" title={label}>
       <span className="sidebar-folder-path-text"><span className="sidebar-folder-path-value">{label}</span></span>
       <div className="sidebar-folder-actions">
         {canCreateFolder ? (
-          <IconButton label="새 폴더" onClick={onCreateFolder}>
+          <IconButton label={t('sidebar.newFolder')} onClick={onCreateFolder}>
             <Icon name="folder" />
           </IconButton>
         ) : null}
-        <IconButton label="파일 검색" onClick={onSearch}>
+        <IconButton label={t('sidebar.searchFiles')} onClick={onSearch}>
           <Icon name="search" />
         </IconButton>
-        <IconButton label="새로고침" onClick={onRefresh}>
+        <IconButton label={t('sidebar.refresh')} onClick={onRefresh}>
           <Icon name="refresh" />
         </IconButton>
       </div>
@@ -476,9 +480,10 @@ function WorkspaceSearchResults({
   onOpen: (path: string) => void;
   onPreviewImage: (item: WorkspaceSearchItem) => void;
 }) {
-  if (error) return <div className="workspace-search-message" title={error}>검색할 수 없습니다.</div>;
-  if (!items) return <div className="workspace-search-message">검색 중…</div>;
-  if (items.length === 0) return <div className="workspace-search-message">일치하는 파일이 없습니다.</div>;
+  const { t } = useI18n();
+  if (error) return <div className="workspace-search-message" title={error}>{t('sidebar.searchUnavailable')}</div>;
+  if (!items) return <div className="workspace-search-message">{t('sidebar.searching')}</div>;
+  if (items.length === 0) return <div className="workspace-search-message">{t('sidebar.noMatches')}</div>;
 
   return items.map((item) => {
     const imageAsset = isWorkspaceImageAsset(item.path);
@@ -496,7 +501,7 @@ function WorkspaceSearchResults({
           <span className="name">{item.name}</span>
           <span className="workspace-search-result-path">{item.relativePath}</span>
         </span>
-        {dirty ? <span className="dirty" title="저장 안 됨" /> : null}
+        {dirty ? <span className="dirty" title={t('document.unsaved')} /> : null}
       </button>
     );
   });
@@ -519,6 +524,7 @@ function FileTreeNodeView({
   onPreviewImage: (node: FileTreeNode) => void;
   onContextMenu?: (node: FileTreeNode, position: TreeMenuPosition) => void;
 }) {
+  const { language, t } = useI18n();
   if (node.type === 'folder') {
     return (
       <div>
@@ -573,7 +579,7 @@ function FileTreeNodeView({
     >
       <Icon name={imageAsset ? 'image' : 'file'} />
       <span className="name">{node.name}</span>
-      {dirty ? <span className="dirty" title="저장 안 됨" /> : <span className="meta">{relativeTime(node.modifiedAt)}</span>}
+      {dirty ? <span className="dirty" title={t('document.unsaved')} /> : <span className="meta">{relativeTime(node.modifiedAt, language)}</span>}
     </button>
   );
 }
@@ -617,6 +623,7 @@ function ImagePreviewModal({
   onAddToDocument: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [src, setSrc] = useState(() => localImagePreviewSrc(image.path));
 
   useEffect(() => {
@@ -638,7 +645,7 @@ function ImagePreviewModal({
   return (
     <Dialog
       open
-      title={`${image.name} 미리보기`}
+      title={t('sidebar.imagePreview', { name: image.name })}
       className="image-preview-modal"
       backdropClassName="image-preview-backdrop"
       onClose={onClose}
@@ -653,10 +660,10 @@ function ImagePreviewModal({
               className="image-preview-add"
               disabled={!canAddToDocument}
               type="button"
-              title={canAddToDocument ? '현재 문서에 이미지 추가' : '이미지를 추가할 문서를 먼저 열어주세요'}
+              title={canAddToDocument ? t('sidebar.addImage') : t('sidebar.addImageFirst')}
               onClick={onAddToDocument}
             >
-              문서에 추가
+              {t('sidebar.addImage')}
             </button>
             <CloseButton className="image-preview-close" onClick={onClose}>
               x
@@ -711,8 +718,8 @@ function appendBlockSnippet(value: string, snippet: string): string {
   return `${value.endsWith('\n') ? '' : '\n'}${snippet}`;
 }
 
-function markdownImageSnippet(path: string, altText: string): string {
-  const alt = escapeMarkdownAlt(altText.replace(/\.[^.]+$/, '') || '이미지');
+function markdownImageSnippet(path: string, altText: string, defaultAlt = 'image'): string {
+  const alt = escapeMarkdownAlt(altText.replace(/\.[^.]+$/, '') || defaultAlt);
   return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
 }
 
@@ -791,9 +798,12 @@ function isPathInsideWorkspaceEntry(path: string, entryPath: string): boolean {
   return path === entryPath || path.startsWith(`${entryPath}/`) || path.startsWith(`${entryPath}\\`);
 }
 
-function reportFileOperationError(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  window.alert(`파일 작업을 완료하지 못했습니다.\n${message}`);
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function reportFileOperationError(_error: unknown, message: string): void {
+  window.alert(message);
 }
 
 function isContentUriPath(path: string): boolean {

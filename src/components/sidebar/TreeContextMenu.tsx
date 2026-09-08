@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import type { FileTreeNode } from '../../types/workspace';
 import { MenuSurface } from '../ui/surface/MenuSurface';
+import { useI18n } from '../../i18n/useI18n';
 
 export interface TreeMenuPosition {
   x: number;
@@ -24,6 +25,7 @@ export function TreeContextMenu({
   onTrash: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -50,21 +52,21 @@ export function TreeContextMenu({
 
   return (
     <MenuSurface
-      aria-label={`${node.name} 파일 작업`}
+      aria-label={t('sidebar.fileActions', { name: node.name })}
       className="tree-context-menu"
       onKeyDown={handleMenuKeyDown}
       ref={menuRef}
       role="menu"
       style={{ left: position.x, top: position.y }}
     >
-      <button role="menuitem" type="button" onClick={() => run(onRename)}>이름 변경…</button>
+      <button role="menuitem" type="button" onClick={() => run(onRename)}>{t('sidebar.rename')}</button>
       {node.type === 'folder' ? (
-        <button role="menuitem" type="button" onClick={() => run(onCreateFolder)}>새 폴더…</button>
+        <button role="menuitem" type="button" onClick={() => run(onCreateFolder)}>{t('sidebar.createFolder')}</button>
       ) : (
-        <button role="menuitem" type="button" onClick={() => run(onDuplicate)}>복제</button>
+        <button role="menuitem" type="button" onClick={() => run(onDuplicate)}>{t('sidebar.duplicate')}</button>
       )}
       <div role="separator" />
-      <button className="danger" role="menuitem" type="button" onClick={() => run(onTrash)}>휴지통으로 이동</button>
+      <button className="danger" role="menuitem" type="button" onClick={() => run(onTrash)}>{t('sidebar.moveToTrash')}</button>
     </MenuSurface>
   );
 }

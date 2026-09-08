@@ -4,6 +4,7 @@ import { requestExternalChangeDecision } from '../core/document/externalChangeDe
 import { Backend } from '../platform/common/backend';
 import type { WorkspaceSession } from '../types/session';
 import type { FileRevision, FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace, TextEncoding } from '../types/workspace';
+import { translateCurrent } from '../i18n/current';
 
 const confirmedEncodingChanges = new Set<string>();
 
@@ -247,7 +248,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           opened = await Backend.files.readFile(file.path);
         } catch (error) {
           console.error('외부 변경 파일 다시 불러오기 실패:', error);
-          window.alert(`${file.name}을(를) 다시 불러올 수 없습니다. 파일이 이동되거나 삭제되었는지 확인하세요.`);
+          window.alert(translateCurrent('document.reloadFailed', { name: file.name }));
           return null;
         }
         const reloaded = toOpenFile(
@@ -789,15 +790,17 @@ function isLegacyStarterWorkspace(workspace: WorkspaceSession): boolean {
 function confirmDiscardDirtyWorkspace(openFiles: OpenFile[]): boolean {
   const dirtyFiles = openFiles.filter((file) => isDirty(file));
   if (dirtyFiles.length === 0) return true;
-  return window.confirm(`${dirtyFiles.length}개 파일의 저장되지 않은 변경사항을 버리고 워크스페이스를 전환할까요?`);
+  return window.confirm(translateCurrent('document.discardWorkspaceChanges', { count: dirtyFiles.length }));
 }
 
 function confirmEncodingChange(file: OpenFile): boolean {
   if (file.encoding === file.savedEncoding || confirmedEncodingChanges.has(file.id)) return true;
 
-  const confirmed = window.confirm(
-    `${file.name}의 인코딩을 ${encodingLabel(file.savedEncoding)}에서 ${encodingLabel(file.encoding)}(으)로 변경해 저장할까요?`,
-  );
+  const confirmed = window.confirm(translateCurrent('document.encodingConfirm', {
+    name: file.name,
+    from: encodingLabel(file.savedEncoding),
+    to: encodingLabel(file.encoding),
+  }));
   if (confirmed) confirmedEncodingChanges.add(file.id);
   return confirmed;
 }

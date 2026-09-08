@@ -7,6 +7,7 @@ import { SearchField } from '../../components/ui/primitives/SearchField';
 import { Backend } from '../../platform/common/backend';
 import { useWorkspaceStore } from '../../store/workspace';
 import type { OpenFile, WorkspaceSearchItem } from '../../types/workspace';
+import { useI18n } from '../../i18n/useI18n';
 
 interface SearchOptions {
   caseSensitive: boolean;
@@ -33,6 +34,7 @@ export function FindBar({
   textareaRef: RefObject<HTMLTextAreaElement>;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const initialSelection = useRef(selectionRange(textareaRef.current, file.content.length));
   const rootPath = useWorkspaceStore((state) => state.rootPath);
@@ -164,7 +166,7 @@ export function FindBar({
         <button
           aria-pressed={replaceOpen}
           className="find-expand"
-          title="바꾸기 열기"
+          title={t('search.openReplace')}
           type="button"
           onClick={() => setReplaceOpen((open) => !open)}
         >
@@ -175,7 +177,7 @@ export function FindBar({
             ref={inputRef}
             className="find-search-field"
             value={query}
-            placeholder={scope === 'document' ? '현재 문서 찾기' : '워크스페이스 내용 찾기'}
+            placeholder={scope === 'document' ? t('search.findDocument') : t('search.findWorkspace')}
             onChange={setQuery}
             onEscape={() => {
               onClose();
@@ -190,9 +192,9 @@ export function FindBar({
           />
           {replaceOpen && scope === 'document' ? (
             <input
-              aria-label="바꿀 내용"
+              aria-label={t('search.replaceWith')}
               className="find-replace-field"
-              placeholder="바꿀 내용"
+              placeholder={t('search.replaceWith')}
               value={replacement}
               onChange={(event) => setReplacement(event.target.value)}
               onKeyDown={(event) => {
@@ -204,14 +206,14 @@ export function FindBar({
             />
           ) : null}
         </div>
-        <div className="find-options" aria-label="검색 옵션">
-          <OptionButton active={options.caseSensitive} label="대소문자 구분" onClick={() => toggleOption('caseSensitive', setOptions)}>Aa</OptionButton>
-          <OptionButton active={options.wholeWord} label="단어 단위" onClick={() => toggleOption('wholeWord', setOptions)}>W</OptionButton>
-          <OptionButton active={options.useRegex} label="정규식" onClick={() => toggleOption('useRegex', setOptions)}>.*</OptionButton>
+        <div className="find-options" aria-label={t('search.options')}>
+          <OptionButton active={options.caseSensitive} label={t('search.caseSensitive')} onClick={() => toggleOption('caseSensitive', setOptions)}>Aa</OptionButton>
+          <OptionButton active={options.wholeWord} label={t('search.wholeWord')} onClick={() => toggleOption('wholeWord', setOptions)}>W</OptionButton>
+          <OptionButton active={options.useRegex} label={t('search.regex')} onClick={() => toggleOption('useRegex', setOptions)}>.*</OptionButton>
           <OptionButton
             active={selectionOnly}
             disabled={!hasSelection || scope === 'workspace'}
-            label="선택 영역에서 찾기"
+            label={t('search.inSelection')}
             onClick={() => setSelectionOnly((value) => !value)}
           >
             Sel
@@ -224,20 +226,20 @@ export function FindBar({
           type="button"
           onClick={() => setScope((value) => (value === 'document' ? 'workspace' : 'document'))}
         >
-          {scope === 'document' ? '문서' : '전체'}
+          {scope === 'document' ? t('search.document') : t('search.workspace')}
         </button>
         {scope === 'document' ? (
           <>
             <span className="find-count">
-              {matchResult.error ? '오류' : matches.length > 0 ? `${(activeIndex % matches.length) + 1}/${matches.length}` : query ? '0/0' : '-'}
+              {matchResult.error ? t('common.error') : matches.length > 0 ? `${(activeIndex % matches.length) + 1}/${matches.length}` : query ? '0/0' : '-'}
             </span>
-            <IconButton label="이전 결과" onClick={() => go(-1)}><Icon name="chevronUp" /></IconButton>
-            <IconButton label="다음 결과" onClick={() => go(1)}><Icon name="chevronDown" /></IconButton>
-            {replaceOpen ? <button className="find-action" type="button" onClick={replaceCurrent}>바꾸기</button> : null}
-            {replaceOpen ? <button className="find-action" type="button" onClick={replaceAll}>전체</button> : null}
+            <IconButton label={t('search.previous')} onClick={() => go(-1)}><Icon name="chevronUp" /></IconButton>
+            <IconButton label={t('search.next')} onClick={() => go(1)}><Icon name="chevronDown" /></IconButton>
+            {replaceOpen ? <button className="find-action" type="button" onClick={replaceCurrent}>{t('search.replace')}</button> : null}
+            {replaceOpen ? <button className="find-action" type="button" onClick={replaceAll}>{t('search.replaceAll')}</button> : null}
           </>
         ) : null}
-        <CloseButton className="find-close" onClick={onClose}>닫기</CloseButton>
+        <CloseButton className="find-close" onClick={onClose}>{t('common.close')}</CloseButton>
       </div>
       {matchResult.error && scope === 'document' ? <div className="find-error">{matchResult.error}</div> : null}
       {scope === 'workspace' ? (
@@ -288,16 +290,17 @@ function WorkspaceContentResults({
   query: string;
   onOpen: (item: WorkspaceSearchItem) => void;
 }) {
+  const { t } = useI18n();
   if (!query.trim()) return null;
-  if (error) return <div className="find-workspace-message" title={error}>검색할 수 없습니다.</div>;
-  if (!items) return <div className="find-workspace-message">검색 중…</div>;
-  if (items.length === 0) return <div className="find-workspace-message">일치하는 파일이 없습니다.</div>;
+  if (error) return <div className="find-workspace-message" title={error}>{t('sidebar.searchUnavailable')}</div>;
+  if (!items) return <div className="find-workspace-message">{t('sidebar.searching')}</div>;
+  if (items.length === 0) return <div className="find-workspace-message">{t('sidebar.noMatches')}</div>;
   return (
-    <div className="find-workspace-results" role="listbox" aria-label="워크스페이스 검색 결과">
+    <div className="find-workspace-results" role="listbox" aria-label={t('search.results')}>
       {items.map((item) => (
         <button key={item.path} role="option" type="button" onClick={() => onOpen(item)}>
           <span className="find-workspace-file">{item.relativePath}</span>
-          <span className="find-workspace-location">{item.matchLine}:{item.matchColumn} · {item.matchCount}개</span>
+          <span className="find-workspace-location">{t('search.matchCount', { line: item.matchLine ?? '-', column: item.matchColumn ?? '-', count: item.matchCount ?? 0 })}</span>
           <span className="find-workspace-preview">{item.matchPreview}</span>
         </button>
       ))}

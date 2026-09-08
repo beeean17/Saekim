@@ -4,6 +4,7 @@ import { blockKindFromDataset } from './layoutDom';
 import { getKatexEquationAlignments, withKatexEquationAlign } from './layoutModel';
 import { clearSelectedKatexEquations, clearSelectedLayoutBlocks } from './layoutSelection';
 import type { LayoutChangeHandler } from './layoutTypes';
+import { translateCurrent } from '../../i18n/current';
 
 const equationAligns: readonly LayoutAlign[] = ['left', 'center', 'right'];
 
@@ -40,7 +41,7 @@ export function renderKatexEquationControls(
 
     const tools = document.createElement('div');
     tools.className = 'math-equation-tools';
-    tools.setAttribute('aria-label', '수식 정렬');
+    tools.setAttribute('aria-label', translateCurrent('layout.formulaAlign'));
     tools.addEventListener('mousedown', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -50,7 +51,7 @@ export function renderKatexEquationControls(
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
-      button.title = align === 'left' ? '수식 왼쪽 정렬' : align === 'center' ? '수식 가운데 정렬' : '수식 오른쪽 정렬';
+      button.title = translateCurrent(align === 'left' ? 'layout.formulaLeft' : align === 'center' ? 'layout.formulaCenter' : 'layout.formulaRight');
       button.className = currentAlign === align ? 'active' : '';
       button.addEventListener('click', (event) => {
         event.preventDefault();

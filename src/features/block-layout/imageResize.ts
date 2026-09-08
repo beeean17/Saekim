@@ -19,6 +19,7 @@ import {
 import { clearSelectedLayoutBlocks } from './layoutSelection';
 import { blockKindFromDataset } from './layoutDom';
 import type { LayoutByKey, LayoutChangeHandler } from './layoutTypes';
+import { translateCurrent } from '../../i18n/current';
 
 type ImageGroupResizeContext = {
   readonly group: HTMLElement;
@@ -45,8 +46,8 @@ export function renderImageResizeHandles(
     handle.tabIndex = 0;
     handle.setAttribute('role', 'separator');
     handle.setAttribute('aria-orientation', 'vertical');
-    handle.setAttribute('aria-label', side === 'left' ? '이미지 왼쪽 크기 조절' : '이미지 오른쪽 크기 조절');
-    handle.title = '이미지 크기 조절';
+    handle.setAttribute('aria-label', translateCurrent(side === 'left' ? 'layout.imageResizeLeft' : 'layout.imageResizeRight'));
+    handle.title = translateCurrent('layout.imageResize');
     handle.addEventListener('pointerdown', (event) => {
       startImageResize(event, side, wrapper, root, filePath, layoutByKey, onChange);
     });

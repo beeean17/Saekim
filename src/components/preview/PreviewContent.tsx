@@ -14,6 +14,7 @@ import { EmptyState } from '../ui/feedback/EmptyState';
 import { bindHtmlPreviewFrame, notifyPreviewRendered, previewDomEnhancements } from './domLifecycle';
 import { replacePreviewHtml } from './htmlReplacement';
 import { PreviewSurfaceRoot } from './PreviewSurfaceRoot';
+import { useI18n } from '../../i18n/useI18n';
 
 interface PreviewContentProps {
   readonly previewRef: MutableRefObject<HTMLDivElement | null>;
@@ -21,6 +22,7 @@ interface PreviewContentProps {
 }
 
 export function PreviewContent({ previewRef, onPreviewElementChange }: PreviewContentProps) {
+  const { t } = useI18n();
   const localRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const frameCleanupRef = useRef<(() => void) | null>(null);
@@ -143,8 +145,8 @@ export function PreviewContent({ previewRef, onPreviewElementChange }: PreviewCo
       >
         <EmptyState
           className="empty-document-state"
-          title="아무것도 열려 있지 않습니다"
-          description="파일을 열어 시작하세요."
+          title={t('empty.title')}
+          description={t('empty.description')}
         />
       </PreviewSurfaceRoot>
     );
@@ -174,7 +176,7 @@ export function PreviewContent({ previewRef, onPreviewElementChange }: PreviewCo
           className="html-preview-frame"
           sandbox="allow-same-origin"
           srcDoc={previewResult.html}
-          title="HTML 미리보기"
+          title={t('preview.html')}
           onLoad={() => bindHtmlPreviewFrame(frameRef.current, localRef.current, frameCleanupRef)}
         />
       </PreviewSurfaceRoot>

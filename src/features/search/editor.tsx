@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 import type { EditorContribution, EditorOverlayProps } from '../../app/feature';
 import { FindBar } from './FindBar';
 import { useSearchStore } from './store';
+import { translateCurrent } from '../../i18n/current';
 
 export const searchEditorContribution: EditorContribution = {
   toolbar: [
     {
       id: 'search.find',
       icon: 'search',
-      tooltip: '문서 내 탐색',
+      get tooltip() { return translateCurrent('search.open'); },
       commandId: 'search.openFind',
     },
   ],

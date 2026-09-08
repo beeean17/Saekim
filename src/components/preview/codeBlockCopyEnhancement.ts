@@ -1,4 +1,5 @@
 import type { PreviewContribution } from '../../app/feature';
+import { translateCurrent } from '../../i18n/current';
 
 const codeBlockCopyCleanups = new WeakMap<HTMLElement, () => void>();
 
@@ -53,8 +54,8 @@ function bindCodeBlockTypeButton(block: HTMLElement): CodeBlockCopyBinding {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'code-type-button';
-  button.setAttribute('aria-label', `${label} 코드 복사`);
-  button.title = `${label} 코드 복사`;
+  button.setAttribute('aria-label', translateCurrent('preview.copyCode', { label }));
+  button.title = translateCurrent('preview.copyCode', { label });
   button.dataset.state = 'idle';
   button.textContent = label;
 
@@ -137,10 +138,10 @@ function fallbackCopyTextToClipboard(text: string): void {
 function setCopyButtonState(binding: CodeBlockCopyBinding, state: 'copied' | 'failed'): void {
   if (binding.resetTimer !== null) window.clearTimeout(binding.resetTimer);
   binding.button.dataset.state = state;
-  binding.button.title = state === 'copied' ? '복사됨' : '복사 실패';
+  binding.button.title = translateCurrent(state === 'copied' ? 'preview.copyDone' : 'preview.copyFailed');
   binding.resetTimer = window.setTimeout(() => {
     binding.button.dataset.state = 'idle';
-    binding.button.title = binding.button.getAttribute('aria-label') ?? '코드 복사';
+    binding.button.title = binding.button.getAttribute('aria-label') ?? translateCurrent('preview.copy');
     binding.resetTimer = null;
   }, 1400);
 }

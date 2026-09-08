@@ -1,4 +1,5 @@
 import type { MermaidHelperItem } from '../../core/editor/helperTypes';
+import type { AppLanguage } from '../../i18n/messages';
 
 export const mermaidHelperItems: MermaidHelperItem[] = [
   {
@@ -123,3 +124,55 @@ export const mermaidHelperItems: MermaidHelperItem[] = [
   2026-03 : 배포`,
   },
 ];
+
+const englishOverrides: Record<string, Partial<MermaidHelperItem>> = {
+  'flowchart-td': { title: 'Basic flowchart', template: `flowchart TD
+  A[Start] --> B{Check condition}
+  B -->|True| C[Task 1]
+  B -->|False| D[Task 2]
+  C --> E[End]
+  D --> E` },
+  'flowchart-lr': { title: 'Horizontal flowchart', template: `flowchart LR
+  A[Request] --> B[Process]
+  B --> C[Response]` },
+  'sequence-basic': { title: 'Sequence diagram', template: `sequenceDiagram
+  participant User
+  participant App
+  User->>App: Request
+  App-->>User: Response` },
+  'sequence-alt': { title: 'Conditional sequence', template: `sequenceDiagram
+  User->>Server: Sign in
+  alt Success
+    Server-->>User: Return token
+  else Failure
+    Server-->>User: Return error
+  end` },
+  'class-basic': { title: 'Class diagram' },
+  'state-basic': { title: 'State diagram', template: `stateDiagram-v2
+  [*] --> Idle
+  Idle --> Running
+  Running --> Complete
+  Complete --> [*]` },
+  'er-basic': { title: 'ER diagram' },
+  'gantt-basic': { title: 'Gantt chart', template: `gantt
+  title Project schedule
+  dateFormat  YYYY-MM-DD
+  section Development
+  Design :a1, 2026-01-01, 5d
+  Implementation :after a1, 10d` },
+  'pie-basic': { title: 'Pie chart', template: `pie showData
+  title Share
+  "A" : 40
+  "B" : 35
+  "C" : 25` },
+  'timeline-basic': { title: 'Timeline', template: `timeline
+  title Release plan
+  2026-01 : Planning
+  2026-02 : Development
+  2026-03 : Release` },
+};
+
+export function mermaidHelperItemsFor(language: AppLanguage): MermaidHelperItem[] {
+  if (language === 'ko') return mermaidHelperItems;
+  return mermaidHelperItems.map((item) => ({ ...item, ...englishOverrides[item.id] }));
+}

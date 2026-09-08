@@ -4,6 +4,7 @@ import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import type Token from 'markdown-it/lib/token.mjs';
 import { escapeHtml } from './escape';
 import { getMarkdownFenceRenderers, getMarkdownItPlugins, getMarkdownMathRenderer } from './extensions';
+import { translateCurrent } from '../../i18n/current';
 
 interface FootnoteDefinition {
   id: string;
@@ -198,7 +199,7 @@ export function getMarkdownOutline(text: string): MarkdownOutlineItem[] {
       level,
       line: token.map[0] + 1,
       endLine: token.map[1],
-      text: title || `제목 ${token.map[0] + 1}`,
+      text: title || translateCurrent('markdown.untitledHeading', { line: token.map[0] + 1 }),
     }];
   });
 }
@@ -639,7 +640,7 @@ function createFootnoteSection(doc: Document, definitions: FootnoteDefinition[],
 
   const title = doc.createElement('h2');
   title.className = 'sr-only';
-  title.textContent = '각주';
+  title.textContent = translateCurrent('markdown.footnotes');
   section.append(title);
 
   const list = doc.createElement('ol');
@@ -666,7 +667,7 @@ function createFootnoteBacklink(doc: Document, slug: string): HTMLElement {
   const link = doc.createElement('a');
   link.className = 'footnote-backref';
   link.href = `#fnref-${slug}-1`;
-  link.setAttribute('aria-label', '본문으로 돌아가기');
+  link.setAttribute('aria-label', translateCurrent('markdown.backToContent'));
   link.textContent = '↩';
   return link;
 }
@@ -730,7 +731,9 @@ function createPendingImageBlock(doc: Document, alt: string): HTMLElement {
   wrapper.className = 'pending-image-block';
 
   const label = doc.createElement('span');
-  label.textContent = Number.isFinite(progress) ? `이미지 다운로드 중 ${progress}%` : '이미지 다운로드 중';
+  label.textContent = Number.isFinite(progress)
+    ? translateCurrent('image.downloadingProgress', { progress })
+    : translateCurrent('image.downloading');
 
   const track = doc.createElement('div');
   track.className = 'pending-image-progress';
@@ -747,9 +750,9 @@ function createFailedImageBlock(doc: Document, alt: string): HTMLElement {
   const wrapper = doc.createElement('div');
   wrapper.className = 'failed-image-block';
   const title = doc.createElement('strong');
-  title.textContent = '이미지 다운로드 실패';
+  title.textContent = translateCurrent('image.downloadFailed');
   const message = doc.createElement('span');
-  message.textContent = alt.replace(/^이미지 다운로드 실패:\s*/, '');
+  message.textContent = alt.replace(/^[^:]+:\s*/, '');
   wrapper.append(title, message);
   return wrapper;
 }

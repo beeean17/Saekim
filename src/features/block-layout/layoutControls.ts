@@ -6,6 +6,7 @@ import type { LayoutInteractionPolicy } from './layoutInteractionPolicy';
 import { getLayoutGroupId } from './layoutModel';
 import { bindLayoutSelection } from './layoutSelection';
 import type { LayoutByKey, LayoutChangeHandler } from './layoutTypes';
+import { translateCurrent } from '../../i18n/current';
 
 export function renderLayoutControls(
   wrapper: HTMLElement,
@@ -20,7 +21,7 @@ export function renderLayoutControls(
 
   const tools = document.createElement('div');
   tools.className = 'preview-layout-tools';
-  tools.setAttribute('aria-label', '블록 레이아웃');
+  tools.setAttribute('aria-label', translateCurrent('layout.block'));
   tools.addEventListener('click', (event) => {
     event.stopPropagation();
   });
@@ -32,8 +33,8 @@ export function renderLayoutControls(
   dragHandle.draggable = false;
   dragHandle.tabIndex = 0;
   dragHandle.setAttribute('role', 'button');
-  dragHandle.setAttribute('aria-label', '블록 배치 이동');
-  dragHandle.title = getLayoutGroupId(layout) ? '드래그해서 1열로 풀거나 다른 블록 오른쪽에 배치' : '오른쪽 끝으로 드래그해서 2열 배치';
+  dragHandle.setAttribute('aria-label', translateCurrent('layout.move'));
+  dragHandle.title = translateCurrent(getLayoutGroupId(layout) ? 'layout.ungroupHint' : 'layout.groupHint');
   dragHandle.addEventListener('pointerdown', (event) => {
     startLayoutPointerDrag(event, dragHandle, wrapper, root, filePath, layoutByKey, onChange, interactionPolicy);
   });

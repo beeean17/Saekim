@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FileTypeInfo } from '../../core/document/fileType';
 import { isRecord, parseStructuredData, parseTabularData } from './parse';
+import { useI18n } from '../../i18n/useI18n';
+import { translateCurrent } from '../../i18n/current';
 
 type StructuredMode = 'tree' | 'api' | 'raw';
 type TabularMode = 'table' | 'raw';
@@ -12,6 +14,7 @@ interface StructuredDataPreviewProps {
 }
 
 export function StructuredDataPreview({ content, fileType, fileKey }: StructuredDataPreviewProps) {
+  const { t } = useI18n();
   const parsed = useMemo(() => parseStructuredData(content, fileType.language), [content, fileType.language]);
   const defaultMode: StructuredMode = parsed.ok && parsed.isOpenApi ? 'api' : 'tree';
   const [mode, setMode] = useState<StructuredMode>(defaultMode);
@@ -28,15 +31,15 @@ export function StructuredDataPreview({ content, fileType, fileKey }: Structured
       <PreviewModeTabs
         options={[
           ...(parsed.ok && parsed.isOpenApi ? [{ id: 'api', label: 'API' }] : []),
-          { id: 'tree', label: 'Tree' },
-          { id: 'raw', label: 'Raw' },
+          { id: 'tree', label: t('structured.tree') },
+          { id: 'raw', label: t('structured.raw') },
         ]}
         value={activeMode}
         onChange={(value) => setMode(value as StructuredMode)}
       />
       {!parsed.ok ? (
         <>
-          <PreviewErrorPanel title={`${fileType.label.toUpperCase()} parse failed`} message={parsed.error} />
+          <PreviewErrorPanel title={t('structured.parseFailed', { type: fileType.label.toUpperCase() })} message={parsed.error} />
           <RawPreview content={content} compact />
         </>
       ) : activeMode === 'api' ? (
@@ -49,6 +52,7 @@ export function StructuredDataPreview({ content, fileType, fileKey }: Structured
 }
 
 export function TabularDataPreview({ content, fileType }: StructuredDataPreviewProps) {
+  const { t } = useI18n();
   const parsed = useMemo(() => parseTabularData(content, fileType.language), [content, fileType.language]);
   const [mode, setMode] = useState<TabularMode>('table');
 
@@ -58,15 +62,15 @@ export function TabularDataPreview({ content, fileType }: StructuredDataPreviewP
     <div className="structured-preview tabular-preview">
       <PreviewModeTabs
         options={[
-          { id: 'table', label: 'Table' },
-          { id: 'raw', label: 'Raw' },
+          { id: 'table', label: t('structured.table') },
+          { id: 'raw', label: t('structured.raw') },
         ]}
         value={mode}
         onChange={(value) => setMode(value as TabularMode)}
       />
       {!parsed.ok ? (
         <>
-          <PreviewErrorPanel title={`${fileType.label.toUpperCase()} parse failed`} message={parsed.error} />
+          <PreviewErrorPanel title={t('structured.parseFailed', { type: fileType.label.toUpperCase() })} message={parsed.error} />
           <RawPreview content={content} compact />
         </>
       ) : (
@@ -85,8 +89,9 @@ function PreviewModeTabs({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <div className="preview-mode-tabs" aria-label="미리보기 모드">
+    <div className="preview-mode-tabs" aria-label={t('preview.mode')}>
       {options.map((option) => (
         <button className={option.id === value ? 'active' : ''} type="button" key={option.id} onClick={() => onChange(option.id)}>
           {option.label}
@@ -117,6 +122,7 @@ function TreeNode({
   depth: number;
   defaultOpen?: boolean;
 }) {
+  const { t } = useI18n();
   const expandable = isRecord(value) || Array.isArray(value);
   const [open, setOpen] = useState(defaultOpen || depth < 2);
   const entries = getTreeEntries(value);
@@ -125,7 +131,7 @@ function TreeNode({
     <div className="tree-node">
       <div className="tree-row" style={{ paddingLeft: depth * 16 }}>
         {expandable ? (
-          <button className="tree-toggle" type="button" aria-label={open ? '접기' : '펼치기'} onClick={() => setOpen((state) => !state)}>
+          <button className="tree-toggle" type="button" aria-label={open ? t('structured.collapse') : t('structured.expand')} onClick={() => setOpen((state) => !state)}>
             {open ? '▾' : '▸'}
           </button>
         ) : (
@@ -149,7 +155,8 @@ function TreeNode({
 }
 
 function OpenApiPreview({ data }: { data: unknown }) {
-  if (!isRecord(data)) return <PreviewErrorPanel title="OpenAPI preview failed" message="Document root is not an object." />;
+  const { t } = useI18n();
+  if (!isRecord(data)) return <PreviewErrorPanel title={t('structured.openapiFailed')} message={t('structured.rootObject')} />;
 
   const info = isRecord(data.info) ? data.info : {};
   const paths = isRecord(data.paths) ? data.paths : {};
@@ -159,14 +166,14 @@ function OpenApiPreview({ data }: { data: unknown }) {
     <div className="openapi-preview">
       <header className="openapi-hero">
         <span className="openapi-version">{String(data.openapi ?? 'OpenAPI 3')}</span>
-        <h1>{String(info.title ?? 'Untitled API')}</h1>
-        {info.version ? <p>Version {String(info.version)}</p> : null}
+        <h1>{String(info.title ?? t('structured.untitledApi'))}</h1>
+        {info.version ? <p>{t('structured.version', { version: String(info.version) })}</p> : null}
         {info.description ? <p>{String(info.description)}</p> : null}
       </header>
 
       {tags.length > 0 ? (
         <section className="openapi-section">
-          <h2>Tags</h2>
+          <h2>{t('structured.tags')}</h2>
           <div className="openapi-tags">
             {tags.map((tag) => (
               <span key={String(tag.name)}>{String(tag.name)}</span>
@@ -176,7 +183,7 @@ function OpenApiPreview({ data }: { data: unknown }) {
       ) : null}
 
       <section className="openapi-section">
-        <h2>Endpoints</h2>
+        <h2>{t('structured.endpoints')}</h2>
         <div className="openapi-endpoints">
           {Object.entries(paths).map(([path, operations]) => (
             <OpenApiPath key={path} path={path} operations={operations} />
@@ -213,18 +220,19 @@ function OpenApiPath({ path, operations }: { path: string; operations: unknown }
 }
 
 function OpenApiParameters({ value }: { value: unknown }) {
+  const { t } = useI18n();
   if (!Array.isArray(value) || value.length === 0) return null;
 
   return (
     <div className="openapi-subsection">
-      <h3>Parameters</h3>
+      <h3>{t('structured.parameters')}</h3>
       <table>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>In</th>
-            <th>Required</th>
-            <th>Description</th>
+            <th>{t('structured.name')}</th>
+            <th>{t('structured.in')}</th>
+            <th>{t('structured.required')}</th>
+            <th>{t('structured.description')}</th>
           </tr>
         </thead>
         <tbody>
@@ -232,7 +240,7 @@ function OpenApiParameters({ value }: { value: unknown }) {
             <tr key={`${String(parameter.name)}-${String(parameter.in)}`}>
               <td>{String(parameter.name ?? '')}</td>
               <td>{String(parameter.in ?? '')}</td>
-              <td>{parameter.required ? 'yes' : 'no'}</td>
+              <td>{parameter.required ? t('structured.yes') : t('structured.no')}</td>
               <td>{String(parameter.description ?? '')}</td>
             </tr>
           ))}
@@ -243,11 +251,12 @@ function OpenApiParameters({ value }: { value: unknown }) {
 }
 
 function OpenApiResponses({ value }: { value: unknown }) {
+  const { t } = useI18n();
   if (!isRecord(value)) return null;
 
   return (
     <div className="openapi-subsection">
-      <h3>Responses</h3>
+      <h3>{t('structured.responses')}</h3>
       <div className="openapi-responses">
         {Object.entries(value).map(([status, response]) => {
           const description = isRecord(response) ? response.description : '';
@@ -264,23 +273,24 @@ function OpenApiResponses({ value }: { value: unknown }) {
 }
 
 function DataTablePreview({ parsed }: { parsed: Extract<ReturnType<typeof parseTabularData>, { ok: true }> }) {
-  const columns = parsed.fields.length > 0 ? parsed.fields : parsed.rows[0]?.map((_, index) => `Column ${index + 1}`) ?? [];
+  const { t } = useI18n();
+  const columns = parsed.fields.length > 0 ? parsed.fields : parsed.rows[0]?.map((_, index) => t('structured.column', { number: index + 1 })) ?? [];
 
   return (
     <div className="data-table-preview">
       <div className="table-meta">
-        <span>{parsed.rowCount} rows</span>
-        <span>{columns.length} columns</span>
-        {parsed.truncated ? <span>showing first {parsed.rows.length}</span> : null}
+        <span>{t('structured.rows', { count: parsed.rowCount })}</span>
+        <span>{t('structured.columns', { count: columns.length })}</span>
+        {parsed.truncated ? <span>{t('structured.showing', { count: parsed.rows.length })}</span> : null}
       </div>
-      {parsed.errors.length > 0 ? <PreviewErrorPanel title="CSV warnings" message={parsed.errors.join('\n')} compact /> : null}
+      {parsed.errors.length > 0 ? <PreviewErrorPanel title={t('structured.csvWarnings')} message={parsed.errors.join('\n')} compact /> : null}
       <div className="data-table-scroll">
         <table>
           <thead>
             <tr>
               <th className="row-index">#</th>
               {columns.map((field, index) => (
-                <th key={`${field}-${index}`}>{field || `Column ${index + 1}`}</th>
+                <th key={`${field}-${index}`}>{field || t('structured.column', { number: index + 1 })}</th>
               ))}
             </tr>
           </thead>
@@ -326,14 +336,19 @@ function typeOfValue(value: unknown): string {
 }
 
 function typeLabel(value: unknown): string {
-  if (Array.isArray(value)) return 'array';
+  if (Array.isArray(value)) return translateCurrent('structured.type.array');
   if (value === null) return 'null';
-  return typeof value;
+  const type = typeof value;
+  if (type === 'object') return translateCurrent('structured.type.object');
+  if (type === 'string') return translateCurrent('structured.type.string');
+  if (type === 'number') return translateCurrent('structured.type.number');
+  if (type === 'boolean') return translateCurrent('structured.type.boolean');
+  return type;
 }
 
 function summaryLabel(value: unknown): string {
-  if (Array.isArray(value)) return `${value.length} items`;
-  if (isRecord(value)) return `${Object.keys(value).length} keys`;
+  if (Array.isArray(value)) return translateCurrent('structured.items', { count: value.length });
+  if (isRecord(value)) return translateCurrent('structured.keys', { count: Object.keys(value).length });
   return '';
 }
 

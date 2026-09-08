@@ -2,13 +2,14 @@ import type { CommandContributionFactory, PdfContribution } from '../../app/feat
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { exportPreviewToPdf, logPdfExport, pdfExportErrorDetails } from './export';
 import { usePdfExportStore } from './store';
+import { translateCurrent } from '../../i18n/current';
 
 export const pdfExportCommands: CommandContributionFactory = () => [
   {
     id: 'pdf.exportCurrent',
-    label: 'Export PDF',
+    label: translateCurrent('command.exportPdf'),
     defaultShortcut: 'mod+shift+e',
-    menu: { section: 'file', label: 'Export PDF', group: 'output', order: 80 },
+    menu: { section: 'file', label: translateCurrent('command.exportPdf'), group: 'output', order: 80 },
     run: exportCurrentPdf,
   },
 ];

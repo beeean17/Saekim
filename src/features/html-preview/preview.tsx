@@ -2,6 +2,8 @@ import type { PreviewContribution } from '../../app/feature';
 import { renderBrowserHtmlDocument, renderSafeHtmlDocument } from './renderHtml';
 import { Backend } from '../../platform/common/backend';
 import { SegmentedControl } from '../../components/ui/primitives/SegmentedControl';
+import { useI18n } from '../../i18n/useI18n';
+import type { HtmlPreviewMode } from '../../types/session';
 
 export const htmlPreviewContribution: PreviewContribution = {
   id: 'html-preview.preview',
@@ -18,18 +20,24 @@ export const htmlPreviewContribution: PreviewContribution = {
     };
   },
   head({ htmlPreviewMode, setHtmlPreviewMode }) {
-    return (
-      <SegmentedControl
-        ariaLabel="HTML 미리보기 모드"
-        className="html-preview-mode"
-        size="sm"
-        value={htmlPreviewMode}
-        options={[
-          { value: 'browser', label: '브라우저', title: '브라우저처럼 보기' },
-          { value: 'safe', label: '안전', title: '안전하게 보기' },
-        ]}
-        onChange={setHtmlPreviewMode}
-      />
-    );
+    return <HtmlPreviewModeControl value={htmlPreviewMode} onChange={setHtmlPreviewMode} />;
   },
 };
+
+function HtmlPreviewModeControl({ value, onChange }: { value: HtmlPreviewMode; onChange(value: HtmlPreviewMode): void }) {
+  const { t } = useI18n();
+
+  return (
+    <SegmentedControl
+      ariaLabel={t('preview.htmlMode')}
+      className="html-preview-mode"
+      size="sm"
+      value={value}
+      options={[
+        { value: 'browser', label: t('preview.browser'), title: t('preview.browserTitle') },
+        { value: 'safe', label: t('preview.safe'), title: t('preview.safeTitle') },
+      ]}
+      onChange={onChange}
+    />
+  );
+}

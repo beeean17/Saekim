@@ -5,6 +5,7 @@ import type { ViewMode } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { MenuSurface } from '../ui/surface/MenuSurface';
 import { buildAppMenus, type AppMenuGroup, type AppMenuId } from '../shell/appMenus';
+import { useI18n } from '../../i18n/useI18n';
 
 interface SidebarMenuProps {
   readonly className?: string;
@@ -19,6 +20,7 @@ export function SidebarMenu({
   commandRegistry,
   effectiveViewMode,
 }: SidebarMenuProps) {
+  const { language, t } = useI18n();
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -40,6 +42,7 @@ export function SidebarMenu({
     [
       commandRegistry,
       effectiveViewMode,
+      language,
       syncScroll,
       textareaRef,
       toggleSyncScroll,
@@ -76,7 +79,7 @@ export function SidebarMenu({
   const rootClassName = className ? `sidebar-menu ${className}` : 'sidebar-menu';
 
   return (
-    <nav className={rootClassName} ref={rootRef} aria-label="Application menu">
+    <nav className={rootClassName} ref={rootRef} aria-label={t('menu.application')}>
       {menus.map((menu) => (
         <SidebarMenuGroup
           key={menu.id}

@@ -26,8 +26,10 @@ import { useUIStore } from './store/ui';
 import { defaultEditorFontSize, stepFontSize, useSettingsStore } from './store/settings';
 import { selectActiveFile, useWorkspaceStore } from './store/workspace';
 import type { ViewMode } from './types/workspace';
+import { useI18n } from './i18n/useI18n';
 
 export function App() {
+  const { language, t } = useI18n();
   const bodyRef = useRef<HTMLElement | null>(null);
   const editorScrollRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -116,6 +118,7 @@ export function App() {
       zoomIn,
       zoomOut,
       resetZoom,
+      language,
     ],
   );
 
@@ -189,11 +192,11 @@ export function App() {
         <PaneResizer
           hidden={viewportProfile.profile === 'compact'}
           kind="sidebar"
-          label={sidebarMode === 'collapsed' ? '사이드바 열기' : '사이드바 크기 조절'}
+          label={sidebarMode === 'collapsed' ? t('sidebar.open') : t('sidebar.resize')}
           onPointerDown={startSidebarResize}
         />
         <EditorPane editorScrollRef={editorScrollRef} textareaRef={editorRef} commandRegistry={commandRegistry} />
-        <PaneResizer hidden={false} kind="pane" label={paneResizerLabel(effectiveViewMode)} onPointerDown={startPaneResize} />
+        <PaneResizer hidden={false} kind="pane" label={paneResizerLabel(effectiveViewMode, t)} onPointerDown={startPaneResize} />
         <PreviewPane previewRef={previewRef} onPreviewElementChange={handlePreviewElementChange} />
       </main>
     </AppShell>
@@ -222,13 +225,13 @@ function PaneResizer({
   );
 }
 
-function paneResizerLabel(viewMode: ViewMode): string {
+function paneResizerLabel(viewMode: ViewMode, t: ReturnType<typeof useI18n>['t']): string {
   switch (viewMode) {
     case 'edit':
-      return '미리보기 열기';
+      return t('view.openPreview');
     case 'preview':
-      return '편집기 열기';
+      return t('view.openEditor');
     case 'split':
-      return '편집 구역 크기 조절';
+      return t('view.resizeEditor');
   }
 }

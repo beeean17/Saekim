@@ -6,6 +6,7 @@ import type {
   ThemeName,
   ViewMode,
 } from './workspace';
+import type { AppLanguage } from '../i18n/messages';
 
 export type HtmlPreviewMode = 'browser' | 'safe';
 
@@ -31,6 +32,7 @@ export interface UISession {
 }
 
 export interface SettingsSession {
+  language?: AppLanguage;
   theme: ThemeName;
   fontSize: number;
   editorFontFamily: string;
