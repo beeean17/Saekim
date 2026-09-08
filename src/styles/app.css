@@ -116,6 +116,38 @@
   display: none;
 }
 
+.compact-view-tabs {
+  display: none;
+}
+
+.app[data-viewport-profile="compact"] {
+  grid-template-rows:
+    calc(var(--titlebar-height) + var(--safe-area-top))
+    minmax(0, 1fr)
+    48px
+    calc(var(--statusbar-height) + var(--safe-area-bottom));
+}
+
+.app[data-viewport-profile="compact"] .compact-view-tabs {
+  z-index: 110;
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-surface);
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.app[data-viewport-profile="compact"] .compact-view-tabs button {
+  height: 40px;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .app[data-viewport-profile="compact"] .app-menu-button {
   padding: 0 7px;
   font-size: 11px;

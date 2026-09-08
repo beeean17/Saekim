@@ -67,16 +67,10 @@ function ViewToggle({
   effectiveViewMode: ViewMode;
 }) {
   const setViewMode = useUIStore((state) => state.setViewMode);
-  const options = [
-    { value: 'edit' as const, label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
-    { value: 'split' as const, label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
-    { value: 'preview' as const, label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
-  ]
-    .filter((option) => availableViewModes.includes(option.value))
-    .map((option) => ({
-      ...option,
-      label: <span className="view-toggle-label">{option.label}</span>,
-    }));
+  const options = viewModeOptions(availableViewModes).map((option) => ({
+    ...option,
+    label: <span className="view-toggle-label">{option.label}</span>,
+  }));
 
   return (
     <SegmentedControl
@@ -88,6 +82,36 @@ function ViewToggle({
       onChange={setViewMode}
     />
   );
+}
+
+export function CompactViewTabs({
+  availableViewModes,
+  effectiveViewMode,
+}: {
+  availableViewModes: readonly ViewMode[];
+  effectiveViewMode: ViewMode;
+}) {
+  const setViewMode = useUIStore((state) => state.setViewMode);
+
+  return (
+    <SegmentedControl
+      ariaLabel="모바일 보기 모드"
+      className="compact-view-tabs"
+      optionRole="tab"
+      value={effectiveViewMode}
+      options={viewModeOptions(availableViewModes)}
+      onChange={setViewMode}
+    />
+  );
+}
+
+function viewModeOptions(availableViewModes: readonly ViewMode[]) {
+  return [
+    { value: 'edit' as const, label: '편집', icon: <Icon name="edit" />, title: '편집기만' },
+    { value: 'split' as const, label: '분할', icon: <Icon name="split" />, title: '분할 보기' },
+    { value: 'preview' as const, label: '보기', icon: <Icon name="eye" />, title: '미리보기만' },
+  ]
+    .filter((option) => availableViewModes.includes(option.value));
 }
 
 function AppMenu({

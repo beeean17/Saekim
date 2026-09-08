@@ -8,7 +8,7 @@ import { Platform } from '../../platform/common/platform';
 import { useSettingsStore, useSystemTheme } from '../../store/settings';
 import { useUIStore } from '../../store/ui';
 import type { ViewMode } from '../../types/workspace';
-import { Header } from './Header';
+import { CompactViewTabs, Header } from './Header';
 import { SettingsPanel } from './SettingsPanel';
 import { StatusBar } from './StatusBar';
 
@@ -76,6 +76,7 @@ export function AppShell({
         return <Overlay commandRegistry={commandRegistry} key={overlay.id} />;
       })}
       {children}
+      <CompactViewTabs availableViewModes={availableViewModes} effectiveViewMode={effectiveViewMode} />
       <StatusBar textareaRef={textareaRef} />
     </div>
   );
