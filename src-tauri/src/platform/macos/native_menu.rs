@@ -4,6 +4,8 @@ use tauri::{
 };
 
 const MENU_SAVE: &str = "save";
+const MENU_UNDO: &str = "undo";
+const MENU_REDO: &str = "redo";
 const MENU_SAVE_AS: &str = "save-as";
 const MENU_PRINT: &str = "print";
 const MENU_EXPORT_PDF: &str = "export-pdf";
@@ -25,6 +27,8 @@ const MENU_ZOOM_RESET: &str = "zoom-reset";
 const MENU_GITHUB: &str = "help-github";
 const MENU_SHORTCUTS: &str = "help-shortcuts";
 const EVENT_SAVE: &str = "saekim-menu-save";
+const EVENT_UNDO: &str = "saekim-menu-undo";
+const EVENT_REDO: &str = "saekim-menu-redo";
 const EVENT_SAVE_AS: &str = "saekim-menu-save-as";
 const EVENT_PRINT: &str = "saekim-menu-print";
 const EVENT_EXPORT_PDF: &str = "saekim-menu-export-pdf";
@@ -61,6 +65,10 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     };
 
     let save = MenuItem::with_id(app, MENU_SAVE, "Save", true, Some("CmdOrCtrl+S"))?;
+    let undo = MenuItem::with_id(app, MENU_UNDO, "Undo", true, Some("CmdOrCtrl+Z"))?;
+    // The webview's built-in redo cannot see the editor's own history, so this
+    // is a custom item routed back to the app like Undo.
+    let redo = MenuItem::with_id(app, MENU_REDO, "Redo", true, Some("CmdOrCtrl+Shift+Z"))?;
     let new_file = MenuItem::with_id(app, MENU_NEW_FILE, "New File", true, Some("CmdOrCtrl+N"))?;
     let new_window = MenuItem::with_id(
         app,
@@ -191,8 +199,8 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         "Edit",
         true,
         &[
-            &PredefinedMenuItem::undo(app, None)?,
-            &PredefinedMenuItem::redo(app, None)?,
+            &undo,
+            &redo,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::cut(app, None)?,
             &PredefinedMenuItem::copy(app, None)?,
@@ -406,6 +414,8 @@ fn target_window_label(app: &AppHandle) -> Option<String> {
 
 fn menu_event_name(menu_id: &str) -> Option<&'static str> {
     match menu_id {
+        MENU_UNDO => Some(EVENT_UNDO),
+        MENU_REDO => Some(EVENT_REDO),
         MENU_SAVE => Some(EVENT_SAVE),
         MENU_SAVE_AS => Some(EVENT_SAVE_AS),
         MENU_PRINT => Some(EVENT_PRINT),

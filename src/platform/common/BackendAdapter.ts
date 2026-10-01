@@ -39,6 +39,7 @@ export interface FolderBackend {
   readFolderChildren(path: string): Promise<FileTreeNode[]>;
   searchWorkspace(request: WorkspaceSearchRequest): Promise<WorkspaceSearchPage>;
   renameEntry(path: string, newName: string): Promise<string>;
+  createFile(parentPath: string, name: string): Promise<OpenFilePayload>;
   createFolder(parentPath: string, name: string): Promise<string>;
   duplicateFile(path: string): Promise<string>;
   trashEntry(path: string): Promise<void>;
@@ -97,11 +98,16 @@ export interface RuntimeBackend {
   confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision>;
   respondToCloseRequest(reason: CloseRequestReason, approved: boolean): Promise<void>;
   setWindowMinSize(width: number, height: number): Promise<void>;
-  startWindowDrag(): Promise<void>;
   setWindowBackgroundColor(color: string): Promise<void>;
   setWindowDocumentState(title: string, edited: boolean, documentPath?: string): Promise<void>;
   openNewWindow(): Promise<void>;
   runWindowAction(action: WindowAction): Promise<void>;
+  /**
+   * Fills the screen with the window. Returns the state it settled into, so
+   * callers can report it without a second round trip.
+   */
+  toggleFullscreen(): Promise<boolean>;
+  isFullscreen(): Promise<boolean>;
 }
 
 export type WindowAction = 'minimize' | 'toggleMaximize' | 'close';
@@ -120,6 +126,8 @@ export interface ImageDownloadProgressPayload {
 }
 
 export interface NativeMenuCommandHandlers {
+  onUndo(): void;
+  onRedo(): void;
   onNewFile(): void;
   onNewWindow(): void;
   onOpen(): void;

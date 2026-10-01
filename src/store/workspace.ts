@@ -2,12 +2,60 @@ import { create } from 'zustand';
 import { detectLineEndings, serializeLineEndings } from '../core/document/lineEndings';
 import { requestExternalChangeDecision } from '../core/document/externalChangeDecision';
 import { Backend } from '../platform/common/backend';
+import { currentPlatformCapabilities } from '../platform/common/capabilities';
 import type { WorkspaceSession } from '../types/session';
 import type { DocumentSnapshot } from '../types/metadata';
 import type { FileRevision, FileTreeNode, OpenFile, OpenFilePayload, RecentWorkspace, TextEncoding } from '../types/workspace';
 import { translateCurrent } from '../i18n/current';
+import { notifyError } from '../core/notifications';
+import { requestConfirmation } from '../core/dialogs/confirm';
+import {
+  canRedoEdit,
+  canUndoEdit,
+  classifyEdit,
+  forgetEditHistory,
+  recordEdit,
+  redoEdit,
+  renameEditHistory,
+  resetEditHistory,
+  undoEdit,
+  type EditSnapshot,
+} from '../core/editor/editHistory';
+import {
+  compareTreeNodes,
+  fileNameFromPath,
+  findTreeNode,
+  folderChildrenAreLoaded,
+  isPlaceholderPath,
+  isWorkspaceEntryPath,
+  mapWorkspaceEntryPath,
+  mergeTreeNodes,
+  nextWorkspaceFileName,
+  nextWorkspaceFolderName,
+  removeTreeEntry,
+  renameTreeEntryPaths,
+  updateTreeFolder,
+} from './workspaceTree';
 
 const confirmedEncodingChanges = new Set<string>();
+let pendingFileCreationSequence = 0;
+
+export interface PendingFileCreation {
+  id: number;
+  parentPath: string;
+  name: string;
+}
+
+export interface PendingFolderCreation {
+  id: number;
+  parentPath: string;
+  name: string;
+}
+
+interface UndoableFileCreation {
+  path: string;
+  rootPath: string;
+}
 
 interface WorkspaceState {
   rootPath: string | null;
@@ -16,24 +64,40 @@ interface WorkspaceState {
   recentWorkspaces: RecentWorkspace[];
   activeFileId: string | null;
   closedFiles: OpenFile[];
+  selectedFolderPath: string | null;
+  pendingFileCreation: PendingFileCreation | null;
+  pendingFolderCreation: PendingFolderCreation | null;
+  lastCreatedFile: UndoableFileCreation | null;
   history: { back: string[]; forward: string[]; current: string | null };
   openFolder: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
   openFile: (path?: string) => Promise<void>;
-  createFile: () => Promise<void>;
+  createFile: (parentPath?: string) => Promise<void>;
+  createFolder: (parentPath?: string) => Promise<void>;
+  commitFileCreation: (name: string) => Promise<string | null>;
+  cancelFileCreation: () => void;
+  cancelFolderCreation: () => void;
+  canUndoFileCreation: () => boolean;
+  undoFileCreation: () => Promise<boolean>;
+  selectFolder: (path: string) => void;
   toggleFolder: (path: string) => Promise<void>;
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
   reopenClosedFile: () => Promise<void>;
-  updateContent: (id: string, text: string) => void;
+  updateContent: (id: string, text: string, selection?: { start: number; end: number }) => void;
   setEncoding: (id: string, encoding: TextEncoding) => void;
   restoreDocumentSnapshot: (id: string, snapshot: DocumentSnapshot) => void;
+  canUndoEdit: () => boolean;
+  canRedoEdit: () => boolean;
+  undoEdit: () => EditSnapshot | null;
+  redoEdit: () => EditSnapshot | null;
   saveFile: (id: string) => Promise<string | null>;
   saveActive: () => Promise<void>;
   saveActiveAs: () => Promise<void>;
   renameWorkspaceEntry: (previousPath: string, nextPath: string) => void;
-  removeWorkspaceEntry: (path: string) => void;
+  removeWorkspaceEntry: (path: string, openFileIds?: readonly string[]) => void;
   refresh: () => Promise<void>;
+  refreshFolder: (path: string) => Promise<void>;
   historyPrev: () => Promise<void>;
   historyNext: () => Promise<void>;
   restoreWorkspace: (workspace: WorkspaceSession) => void;
@@ -48,6 +112,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   recentWorkspaces: [],
   activeFileId: null,
   closedFiles: [],
+  selectedFolderPath: null,
+  pendingFileCreation: null,
+  pendingFolderCreation: null,
+  lastCreatedFile: null,
   history: { back: [], forward: [], current: null },
   openFolder: async () => {
     try {
@@ -56,17 +124,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await get().openWorkspace(rootPath);
     } catch (error) {
       console.error('폴더 열기 실패:', error);
+      notifyError(translateCurrent('workspace.openFolderFailed'), error);
     }
   },
   openWorkspace: async (path) => {
     if (!path) return;
-    if (!confirmDiscardDirtyWorkspace(get().openFiles)) return;
+    if (!(await confirmDiscardDirtyWorkspace(get().openFiles))) return;
 
     try {
       const savedWorkspace = await Backend.metadata.loadWorkspaceSession(path);
       if (savedWorkspace) {
         let workspace = savedWorkspace;
-        if (!workspace.tree.length && workspace.rootPath && !isPlaceholderPath(workspace.rootPath)) {
+        if (workspace.rootPath && !isPlaceholderPath(workspace.rootPath)) {
           const folder = await Backend.folders.readFolder(workspace.rootPath);
           workspace = { ...workspace, rootPath: folder.rootPath, tree: folder.tree };
         }
@@ -78,6 +147,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set((state) => workspaceFolderPatch(state, folder.rootPath, folder.tree));
     } catch (error) {
       console.error('워크스페이스 열기 실패:', error);
+      notifyError(translateCurrent('workspace.openFolderFailed'), error);
     }
   },
   openFile: async (path) => {
@@ -89,13 +159,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         }
       } catch (error) {
         console.error('파일 열기 실패:', error);
+        notifyError(translateCurrent('workspace.openFileFailed'), error);
       }
       return;
     }
 
     const existing = get().openFiles.find((file) => file.path === path);
     if (existing) {
-      set((state) => activateOpenFile(state, existing));
+      set((state) => ({
+        ...activateOpenFile(state, existing),
+        lastCreatedFile: state.lastCreatedFile?.path === existing.path ? state.lastCreatedFile : null,
+      }));
       const folderPatch = await workspaceFolderPatchForOpenFile(existing, get().rootPath);
       if (folderPatch && get().activeFileId === existing.id) set((state) => applyFolderPatch(state, folderPatch));
       return;
@@ -106,22 +180,154 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await get().openFileFromPayload(opened);
     } catch (error) {
       console.error('파일 읽기 실패:', error);
+      notifyError(translateCurrent('workspace.openFileFailed'), error);
     }
   },
   openFileFromPayload: async (opened) => {
     const file = toOpenFile(opened.path, opened.name, opened.content, opened.encoding, opened.displayPath ?? undefined, opened.revision);
-    set((state) => upsertOpenFile(state, file));
+    resetEditHistory(file.id, { content: file.content, selectionStart: 0, selectionEnd: 0 });
+    set((state) => ({
+      ...upsertOpenFile(state, file),
+      lastCreatedFile: state.lastCreatedFile?.path === file.path ? state.lastCreatedFile : null,
+    }));
     const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
     if (folderPatch && get().activeFileId === file.id) set((state) => applyFolderPatch(state, folderPatch));
   },
-  createFile: async () => {
+  createFile: async (requestedParentPath) => {
+    const state = get();
+    if (
+      state.rootPath &&
+      !isPlaceholderPath(state.rootPath) &&
+      currentPlatformCapabilities().has('folder.operations')
+    ) {
+      if (state.pendingFileCreation) return;
+      const parentPath = workspaceFolderForCreation(state, requestedParentPath);
+      let children = workspaceFolderChildren(state, parentPath);
+      if (parentPath !== state.rootPath && !folderChildrenAreLoaded(state.tree, parentPath)) {
+        try {
+          children = await Backend.folders.readFolderChildren(parentPath);
+        } catch (error) {
+          console.error('새 파일을 만들 폴더를 불러오지 못했습니다:', error);
+        }
+      }
+      set({
+        tree: parentPath === state.rootPath
+          ? state.tree
+          : updateTreeFolder(state.tree, parentPath, {
+              children,
+              isOpen: true,
+              isLoaded: true,
+            }),
+        selectedFolderPath: parentPath,
+        pendingFileCreation: {
+          id: ++pendingFileCreationSequence,
+          parentPath,
+          name: nextWorkspaceFileName(children),
+        },
+        pendingFolderCreation: null,
+        lastCreatedFile: null,
+      });
+      return;
+    }
+
     const untitledNumber = nextUntitledNumber(get().openFiles);
     const file = toOpenFile(`~untitled-${untitledNumber}`, `untitled-${untitledNumber}.md`, '');
-    set((state) => upsertOpenFile(state, file));
+    set((current) => ({ ...upsertOpenFile(current, file), lastCreatedFile: null }));
+  },
+  createFolder: async (requestedParentPath) => {
+    const state = get();
+    if (
+      !state.rootPath
+      || isPlaceholderPath(state.rootPath)
+      || !currentPlatformCapabilities().has('folder.operations')
+      || state.pendingFolderCreation
+    ) return;
+
+    const parentPath = workspaceFolderForCreation(state, requestedParentPath);
+    let children = workspaceFolderChildren(state, parentPath);
+    if (parentPath !== state.rootPath && !folderChildrenAreLoaded(state.tree, parentPath)) {
+      try {
+        children = await Backend.folders.readFolderChildren(parentPath);
+      } catch (error) {
+        console.error('새 폴더를 만들 위치를 불러오지 못했습니다:', error);
+      }
+    }
+    set({
+      selectedFolderPath: parentPath,
+      pendingFileCreation: null,
+      pendingFolderCreation: {
+        id: ++pendingFileCreationSequence,
+        parentPath,
+        name: nextWorkspaceFolderName(children),
+      },
+      lastCreatedFile: null,
+    });
+  },
+  commitFileCreation: async (name) => {
+    const pending = get().pendingFileCreation;
+    if (!pending) return null;
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error(translateCurrent('sidebar.fileNameRequired'));
+
+    const opened = await Backend.folders.createFile(pending.parentPath, normalizedName);
+    const file = toOpenFile(
+      opened.path,
+      opened.name,
+      opened.content,
+      opened.encoding,
+      opened.displayPath ?? undefined,
+      opened.revision,
+    );
+    let refreshedChildren: FileTreeNode[] | null = null;
+    try {
+      refreshedChildren = await Backend.folders.readFolderChildren(pending.parentPath);
+    } catch (error) {
+      console.error('새 파일 생성 후 탐색기 새로고침 실패:', error);
+    }
+
+    set((state) => {
+      if (state.pendingFileCreation?.id !== pending.id) return {};
+      return {
+        ...upsertOpenFile(state, file),
+        tree: refreshedChildren
+          ? replaceWorkspaceFolderChildren(state, pending.parentPath, refreshedChildren)
+          : insertFileNodeUnderFolder(state, pending.parentPath, file),
+        selectedFolderPath: pending.parentPath,
+        pendingFileCreation: null,
+        lastCreatedFile: { path: file.path, rootPath: state.rootPath ?? pending.parentPath },
+      };
+    });
+    return file.path;
+  },
+  cancelFileCreation: () => set({ pendingFileCreation: null }),
+  cancelFolderCreation: () => set({ pendingFolderCreation: null }),
+  canUndoFileCreation: () => canUndoFileCreation(get()),
+  undoFileCreation: async () => {
+    const state = get();
+    const creation = state.lastCreatedFile;
+    if (!creation || !canUndoFileCreation(state)) return false;
+
+    try {
+      await Backend.folders.trashEntry(creation.path);
+      get().removeWorkspaceEntry(creation.path, [creation.path]);
+      set({ lastCreatedFile: null });
+      if (get().rootPath === creation.rootPath) await get().refresh();
+      return true;
+    } catch (error) {
+      console.error('새 파일 생성 실행 취소 실패:', error);
+      notifyError(translateCurrent('sidebar.fileActionFailed', { message: errorMessage(error) }), error);
+      return false;
+    }
+  },
+  selectFolder: (path) => {
+    const state = get();
+    if (isWorkspaceFolderPath(state, path)) set({ selectedFolderPath: path });
   },
   toggleFolder: async (path) => {
     const node = findTreeNode(get().tree, path);
     if (!node || node.type !== 'folder') return;
+
+    set({ selectedFolderPath: path });
 
     if (!node.isOpen && !node.isLoaded && !isPlaceholderPath(path)) {
       try {
@@ -143,15 +349,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const file = get().openFiles.find((candidate) => candidate.id === id);
     if (!file) return;
 
-    set((state) => activateOpenFile(state, file));
-    void workspaceFolderPatchForOpenFile(file, get().rootPath).then((folderPatch) => {
-      const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
-      if (folderPatch && activeFile?.path === file.path) set((state) => applyFolderPatch(state, folderPatch));
-    });
+    set((state) => ({
+      ...activateOpenFile(state, file),
+      lastCreatedFile: state.lastCreatedFile?.path === file.path ? state.lastCreatedFile : null,
+    }));
   },
   closeFile: (id) => {
     confirmedEncodingChanges.delete(id);
-    let nextActivePath: string | null = null;
+    forgetEditHistory(id);
     set((state) => {
       const closedIndex = state.openFiles.findIndex((file) => file.id === id);
       const closedFile = state.openFiles[closedIndex];
@@ -170,10 +375,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const closedFiles = closedSnapshot
         ? [closedSnapshot, ...state.closedFiles.filter((file) => file.path !== closedSnapshot.path)].slice(0, 20)
         : state.closedFiles;
-      nextActivePath = nextActiveFile?.path ?? null;
+      const nextActivePath = nextActiveFile?.path ?? null;
 
       if (state.activeFileId !== id) {
-        return { openFiles, activeFileId, closedFiles, history: state.history };
+        return {
+          openFiles,
+          activeFileId,
+          closedFiles,
+          history: state.history,
+          lastCreatedFile: state.lastCreatedFile?.path === closedPath ? null : state.lastCreatedFile,
+        };
       }
 
       const back = nextActivePath === state.history.back[state.history.back.length - 1]
@@ -187,6 +398,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         openFiles,
         activeFileId,
         closedFiles,
+        lastCreatedFile: state.lastCreatedFile?.path === closedPath ? null : state.lastCreatedFile,
         history: {
           back,
           forward,
@@ -194,12 +406,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         },
       };
     });
-
-    nextActivePath &&
-      void workspaceFolderPatchForFile(nextActivePath).then((folderPatch) => {
-        const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
-        if (folderPatch && activeFile?.path === nextActivePath) set((state) => applyFolderPatch(state, folderPatch));
-      });
   },
   reopenClosedFile: async () => {
     const closedFile = get().closedFiles[0];
@@ -221,10 +427,39 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }));
     }
   },
-  updateContent: (id, text) =>
+  updateContent: (id, text, selection) => {
+    const previous = get().openFiles.find((file) => file.id === id);
+    if (previous && previous.content !== text) {
+      /* Every content change goes through here, so this is the one place that
+         can keep an undo stack the browser cannot destroy. Keystrokes coalesce;
+         anything larger (paste, replace all, snippet insert) is its own step. */
+      const caret = selection ?? caretAfterChange(previous.content, text);
+      recordEdit(
+        id,
+        { content: text, selectionStart: caret.start, selectionEnd: caret.end },
+        selection ? classifyEdit(previous.content, text) : 'commit',
+      );
+    }
     set((state) => ({
       openFiles: state.openFiles.map((file) => (file.id === id ? { ...file, content: text } : file)),
-    })),
+    }));
+  },
+  canUndoEdit: () => canUndoEdit(get().activeFileId),
+  canRedoEdit: () => canRedoEdit(get().activeFileId),
+  undoEdit: () => {
+    const id = get().activeFileId;
+    if (!id) return null;
+    const snapshot = undoEdit(id);
+    if (snapshot) applyEditSnapshot(set, id, snapshot);
+    return snapshot;
+  },
+  redoEdit: () => {
+    const id = get().activeFileId;
+    if (!id) return null;
+    const snapshot = redoEdit(id);
+    if (snapshot) applyEditSnapshot(set, id, snapshot);
+    return snapshot;
+  },
   setEncoding: (id, encoding) => {
     confirmedEncodingChanges.delete(id);
     set((state) => ({
@@ -233,6 +468,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   restoreDocumentSnapshot: (id, snapshot) => {
     confirmedEncodingChanges.delete(id);
+    /* Restoring an old version is undoable like any other edit, so a mistaken
+       restore no longer costs the user their in-progress text. */
+    recordEdit(id, { content: snapshot.content, selectionStart: 0, selectionEnd: 0 }, 'commit');
     set((state) => ({
       openFiles: state.openFiles.map((file) =>
         file.id === id
@@ -244,7 +482,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   saveFile: async (id) => {
     const file = get().openFiles.find((candidate) => candidate.id === id);
     if (!file) return null;
-    if (!confirmEncodingChange(file)) return null;
+    if (!(await confirmEncodingChange(file))) return null;
     let result = await Backend.files.saveFile(
       file.path.startsWith('~') ? null : file.path,
       serializeLineEndings(file.content, file.eol),
@@ -260,7 +498,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           opened = await Backend.files.readFile(file.path);
         } catch (error) {
           console.error('외부 변경 파일 다시 불러오기 실패:', error);
-          window.alert(translateCurrent('document.reloadFailed', { name: file.name }));
+          notifyError(translateCurrent('document.reloadFailed', { name: file.name }), error);
           return null;
         }
         const reloaded = toOpenFile(
@@ -273,6 +511,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         );
         set((state) => ({
           openFiles: state.openFiles.map((candidate) => (candidate.id === file.id ? reloaded : candidate)),
+          lastCreatedFile: state.lastCreatedFile?.path === file.path ? null : state.lastCreatedFile,
         }));
         await deleteDocumentDraftSafely(file.path);
         return reloaded.path;
@@ -290,7 +529,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const savedPath = result.path;
     confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
-    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name, result.revision));
+    set((current) => ({
+      ...savedOpenFilePatch(current, file, savedPath, savedFile.name, result.revision),
+      lastCreatedFile:
+        current.lastCreatedFile?.path === file.path && (file.content !== '' || savedPath !== file.path)
+          ? null
+          : current.lastCreatedFile,
+    }));
     await deleteDocumentDraftSafely(file.path);
     const folderPatch = await workspaceFolderPatchForOpenFile(
       { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
@@ -307,7 +552,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const file = state.openFiles.find((candidate) => candidate.id === state.activeFileId);
     if (!file) return;
-    if (!confirmEncodingChange(file)) return;
+    if (!(await confirmEncodingChange(file))) return;
     const result = await Backend.files.saveFileAs(
       serializeLineEndings(file.content, file.eol),
       file.name,
@@ -317,7 +562,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const savedPath = result.path;
     confirmedEncodingChanges.delete(file.id);
     const savedFile = { path: savedPath, name: fileNameFromPath(savedPath) };
-    set((current) => savedOpenFilePatch(current, file, savedPath, savedFile.name, result.revision));
+    set((current) => ({
+      ...savedOpenFilePatch(current, file, savedPath, savedFile.name, result.revision),
+      lastCreatedFile: current.lastCreatedFile?.path === file.path ? null : current.lastCreatedFile,
+    }));
     await deleteDocumentDraftSafely(file.path);
     const folderPatch = await workspaceFolderPatchForOpenFile(
       { ...file, id: savedPath, path: savedPath, displayPath: savedPath, name: savedFile.name },
@@ -338,14 +586,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           ? mapWorkspaceEntryPath(state.history.current, previousPath, nextPath)
           : null,
       },
+      selectedFolderPath: state.selectedFolderPath
+        ? mapWorkspaceEntryPath(state.selectedFolderPath, previousPath, nextPath)
+        : null,
+      lastCreatedFile: null,
     }));
   },
-  removeWorkspaceEntry: (path) => {
+  removeWorkspaceEntry: (path, openFileIds = []) => {
     set((state) => {
+      const removedIds = new Set(openFileIds);
+      const isRemovedFile = (file: OpenFile) =>
+        removedIds.has(file.id) || isWorkspaceEntryPath(file.path, path);
       const removedActiveIndex = state.openFiles.findIndex((file) => file.id === state.activeFileId);
-      const openFiles = state.openFiles.filter((file) => !isWorkspaceEntryPath(file.path, path));
+      const openFiles = state.openFiles.filter((file) => !isRemovedFile(file));
       const activeRemoved = state.activeFileId
-        ? isWorkspaceEntryPath(state.activeFileId, path)
+        ? removedIds.has(state.activeFileId)
+          || state.openFiles.some((file) => file.id === state.activeFileId && isRemovedFile(file))
         : false;
       const activeFileId = activeRemoved
         ? openFiles[Math.max(0, Math.min(removedActiveIndex, openFiles.length - 1))]?.id ?? null
@@ -355,7 +611,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         tree: removeTreeEntry(state.tree, path),
         openFiles,
         activeFileId,
-        closedFiles: state.closedFiles.filter((file) => !isWorkspaceEntryPath(file.path, path)),
+        closedFiles: state.closedFiles.filter((file) => !isRemovedFile(file)),
+        selectedFolderPath:
+          state.selectedFolderPath && isWorkspaceEntryPath(state.selectedFolderPath, path)
+            ? state.rootPath
+            : state.selectedFolderPath,
+        pendingFileCreation:
+          state.pendingFileCreation && isWorkspaceEntryPath(state.pendingFileCreation.parentPath, path)
+            ? null
+            : state.pendingFileCreation,
+        pendingFolderCreation:
+          state.pendingFolderCreation && isWorkspaceEntryPath(state.pendingFolderCreation.parentPath, path)
+            ? null
+            : state.pendingFolderCreation,
+        lastCreatedFile: state.lastCreatedFile && isWorkspaceEntryPath(state.lastCreatedFile.path, path)
+          ? null
+          : state.lastCreatedFile,
         history: {
           back: state.history.back.filter((candidate) => !isWorkspaceEntryPath(candidate, path)),
           forward: state.history.forward.filter((candidate) => !isWorkspaceEntryPath(candidate, path)),
@@ -370,7 +641,29 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     try {
       const folder = await Backend.folders.readFolder(rootPath);
-      set({ rootPath: folder.rootPath, tree: folder.tree });
+      set((state) => {
+        const tree = mergeTreeNodes(folder.tree, state.tree);
+        return {
+          rootPath: folder.rootPath,
+          tree,
+          selectedFolderPath: isWorkspaceFolderPath({ ...state, rootPath: folder.rootPath, tree }, state.selectedFolderPath)
+            ? state.selectedFolderPath
+            : folder.rootPath,
+        };
+      });
+    } catch (error) {
+      console.error('폴더 새로고침 실패:', error);
+    }
+  },
+  refreshFolder: async (path) => {
+    const state = get();
+    if (!isWorkspaceFolderPath(state, path) || isPlaceholderPath(path)) return;
+
+    try {
+      const children = await Backend.folders.readFolderChildren(path);
+      set((current) => ({
+        tree: replaceWorkspaceFolderChildren(current, path, children),
+      }));
     } catch (error) {
       console.error('폴더 새로고침 실패:', error);
     }
@@ -383,7 +676,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   restoreWorkspace: (workspace) => {
     const normalizedWorkspace = normalizeRestoredWorkspace(workspace);
+    const restoredRootPath = normalizedWorkspace.rootPath;
     const openFiles = normalizedWorkspace.openFiles;
+    seedEditHistories(openFiles);
     const activeFileId =
       normalizedWorkspace.activeFileId && openFiles.some((file) => file.id === normalizedWorkspace.activeFileId)
         ? normalizedWorkspace.activeFileId
@@ -395,11 +690,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       openFiles,
       activeFileId,
       closedFiles: [],
+      selectedFolderPath: normalizedWorkspace.rootPath,
+      pendingFileCreation: null,
+      pendingFolderCreation: null,
+      lastCreatedFile: null,
       recentWorkspaces: normalizedWorkspace.rootPath
         ? upsertRecentWorkspace(get().recentWorkspaces, normalizedWorkspace.rootPath)
         : get().recentWorkspaces,
       history: { back: [], forward: [], current: activeFile?.path ?? null },
     });
+
+    if (restoredRootPath && !isPlaceholderPath(restoredRootPath)) {
+      void Backend.folders
+        .readFolder(restoredRootPath)
+        .then((folder) => {
+          if (get().rootPath === restoredRootPath) {
+            set((state) => ({
+              rootPath: folder.rootPath,
+              tree: mergeTreeNodes(folder.tree, state.tree),
+              selectedFolderPath: state.selectedFolderPath ?? folder.rootPath,
+            }));
+          }
+        })
+        .catch((error) => console.error('복원한 워크스페이스 경로 동기화 실패:', error));
+    }
   },
   restoreRecentWorkspaces: (workspaces) => {
     set((state) => ({
@@ -438,7 +752,6 @@ async function navigateHistory(
     }
   }
 
-  let navigated = false;
   set((state) => {
     const latestTargetPath = direction === 'back'
       ? state.history.back[state.history.back.length - 1]
@@ -446,16 +759,11 @@ async function navigateHistory(
     if (latestTargetPath !== targetPath) return {};
 
     const latestFile = state.openFiles.find((candidate) => candidate.path === targetPath) ?? file;
-    navigated = true;
-    return navigateToHistoryFile(state, latestFile, direction);
+    return {
+      ...navigateToHistoryFile(state, latestFile, direction),
+      lastCreatedFile: state.lastCreatedFile?.path === latestFile.path ? state.lastCreatedFile : null,
+    };
   });
-
-  if (!navigated) return;
-  const folderPatch = await workspaceFolderPatchForOpenFile(file, get().rootPath);
-  const activeFile = get().openFiles.find((candidate) => candidate.id === get().activeFileId);
-  if (folderPatch && activeFile?.path === targetPath) {
-    set((state) => applyFolderPatch(state, folderPatch));
-  }
 }
 
 function navigateToHistoryFile(
@@ -543,10 +851,6 @@ function toRecentWorkspace(path: string, openedAt = Date.now()): RecentWorkspace
   };
 }
 
-function fileNameFromPath(path: string): string {
-  return path.split('/').pop() || 'untitled.md';
-}
-
 function nextUntitledNumber(openFiles: readonly OpenFile[]): number {
   const used = new Set(
     openFiles.flatMap((file) => {
@@ -557,6 +861,60 @@ function nextUntitledNumber(openFiles: readonly OpenFile[]): number {
   let candidate = 1;
   while (used.has(candidate)) candidate += 1;
   return candidate;
+}
+
+function workspaceFolderForCreation(state: WorkspaceState, requestedParentPath?: string): string {
+  if (requestedParentPath && isWorkspaceFolderPath(state, requestedParentPath)) return requestedParentPath;
+  if (state.selectedFolderPath && isWorkspaceFolderPath(state, state.selectedFolderPath)) return state.selectedFolderPath;
+  return state.rootPath ?? '';
+}
+
+function workspaceFolderChildren(state: WorkspaceState, parentPath: string): FileTreeNode[] {
+  if (parentPath === state.rootPath) return state.tree;
+  const folder = findTreeNode(state.tree, parentPath);
+  return folder?.type === 'folder' ? folder.children ?? [] : [];
+}
+
+function isWorkspaceFolderPath(state: WorkspaceState, path: string | null): path is string {
+  if (!path || !state.rootPath) return false;
+  if (path === state.rootPath) return true;
+  const node = findTreeNode(state.tree, path);
+  return node?.type === 'folder';
+}
+
+function replaceWorkspaceFolderChildren(
+  state: WorkspaceState,
+  parentPath: string,
+  children: FileTreeNode[],
+): FileTreeNode[] {
+  if (parentPath === state.rootPath) return mergeTreeNodes(children, state.tree);
+  const previousChildren = workspaceFolderChildren(state, parentPath);
+  return updateTreeFolder(state.tree, parentPath, {
+    children: mergeTreeNodes(children, previousChildren),
+    isLoaded: true,
+    isOpen: true,
+  });
+}
+
+function insertFileNodeUnderFolder(state: WorkspaceState, parentPath: string, file: OpenFile): FileTreeNode[] {
+  const node: FileTreeNode = {
+    id: file.path,
+    name: file.name,
+    path: file.path,
+    type: 'file',
+    modifiedAt: file.diskRevision?.modifiedAt,
+  };
+  const children = workspaceFolderChildren(state, parentPath);
+  const nextChildren = [...children.filter((candidate) => candidate.path !== file.path), node].sort(compareTreeNodes);
+  if (parentPath === state.rootPath) return nextChildren;
+  return updateTreeFolder(state.tree, parentPath, { children: nextChildren, isLoaded: true, isOpen: true });
+}
+
+function canUndoFileCreation(state: WorkspaceState): boolean {
+  const creation = state.lastCreatedFile;
+  if (!creation || state.activeFileId !== creation.path) return false;
+  const file = state.openFiles.find((candidate) => candidate.path === creation.path);
+  return Boolean(file && file.content === '' && file.savedContent === '' && !isDirty(file));
 }
 
 function replaceHistoryPath(
@@ -579,6 +937,9 @@ function savedOpenFilePatch(
   savedName: string,
   diskRevision?: FileRevision,
 ): Pick<WorkspaceState, 'openFiles' | 'activeFileId' | 'closedFiles' | 'history'> {
+  /* Save As changes the document id; carry the undo stack across so the user
+     does not silently lose their history by saving. */
+  renameEditHistory(savedFile.id, savedPath);
   const openFiles = state.openFiles.flatMap((candidate) => {
     if (candidate.id === savedFile.id) {
       return [{
@@ -624,42 +985,6 @@ function renameOpenFilePath(file: OpenFile, previousPath: string, nextPath: stri
     displayPath: path,
     name: fileNameFromPath(path),
   };
-}
-
-function renameTreeEntryPaths(
-  nodes: readonly FileTreeNode[],
-  previousPath: string,
-  nextPath: string,
-): FileTreeNode[] {
-  return nodes.map((node) => {
-    const path = mapWorkspaceEntryPath(node.path, previousPath, nextPath);
-    return {
-      ...node,
-      id: mapWorkspaceEntryPath(node.id, previousPath, nextPath),
-      path,
-      name: node.path === previousPath ? fileNameFromPath(path) : node.name,
-      children: node.children ? renameTreeEntryPaths(node.children, previousPath, nextPath) : undefined,
-    };
-  });
-}
-
-function removeTreeEntry(nodes: readonly FileTreeNode[], removedPath: string): FileTreeNode[] {
-  return nodes
-    .filter((node) => !isWorkspaceEntryPath(node.path, removedPath))
-    .map((node) => ({
-      ...node,
-      children: node.children ? removeTreeEntry(node.children, removedPath) : undefined,
-    }));
-}
-
-function mapWorkspaceEntryPath(path: string, previousPath: string, nextPath: string): string {
-  if (path === previousPath) return nextPath;
-  if (!isWorkspaceEntryPath(path, previousPath)) return path;
-  return `${nextPath}${path.slice(previousPath.length)}`;
-}
-
-function isWorkspaceEntryPath(path: string, parentPath: string): boolean {
-  return path === parentPath || path.startsWith(`${parentPath}/`) || path.startsWith(`${parentPath}\\`);
 }
 
 async function workspaceFolderPatchForFile(path: string): Promise<Pick<WorkspaceState, 'rootPath' | 'tree'> | null> {
@@ -711,9 +1036,13 @@ function androidContentWorkspaceRoot(file: OpenFile): string {
 function applyFolderPatch(
   state: WorkspaceState,
   patch: Pick<WorkspaceState, 'rootPath' | 'tree'>,
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'recentWorkspaces' | 'selectedFolderPath' | 'pendingFileCreation' | 'pendingFolderCreation' | 'lastCreatedFile'> {
   return {
     ...patch,
+    selectedFolderPath: patch.rootPath,
+    pendingFileCreation: null,
+    pendingFolderCreation: null,
+    lastCreatedFile: null,
     recentWorkspaces: patch.rootPath ? upsertRecentWorkspace(state.recentWorkspaces, patch.rootPath) : state.recentWorkspaces,
   };
 }
@@ -722,13 +1051,17 @@ function workspaceFolderPatch(
   state: WorkspaceState,
   rootPath: string,
   tree: FileTreeNode[],
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'closedFiles' | 'history' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'closedFiles' | 'selectedFolderPath' | 'pendingFileCreation' | 'pendingFolderCreation' | 'lastCreatedFile' | 'history' | 'recentWorkspaces'> {
   return {
     rootPath,
     tree,
     openFiles: [],
     activeFileId: null,
     closedFiles: [],
+    selectedFolderPath: rootPath,
+    pendingFileCreation: null,
+    pendingFolderCreation: null,
+    lastCreatedFile: null,
     history: { back: [], forward: [], current: null },
     recentWorkspaces: upsertRecentWorkspace(state.recentWorkspaces, rootPath),
   };
@@ -737,9 +1070,10 @@ function workspaceFolderPatch(
 function workspaceSessionPatch(
   state: WorkspaceState,
   workspace: WorkspaceSession,
-): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'closedFiles' | 'history' | 'recentWorkspaces'> {
+): Pick<WorkspaceState, 'rootPath' | 'tree' | 'openFiles' | 'activeFileId' | 'closedFiles' | 'selectedFolderPath' | 'pendingFileCreation' | 'pendingFolderCreation' | 'lastCreatedFile' | 'history' | 'recentWorkspaces'> {
   const normalizedWorkspace = normalizeRestoredWorkspace(workspace);
   const openFiles = normalizedWorkspace.openFiles;
+  seedEditHistories(openFiles);
   const activeFileId =
     normalizedWorkspace.activeFileId && openFiles.some((file) => file.id === normalizedWorkspace.activeFileId)
       ? normalizedWorkspace.activeFileId
@@ -752,11 +1086,21 @@ function workspaceSessionPatch(
     openFiles,
     activeFileId,
     closedFiles: [],
+    selectedFolderPath: normalizedWorkspace.rootPath,
+    pendingFileCreation: null,
+    pendingFolderCreation: null,
+    lastCreatedFile: null,
     history: { back: [], forward: [], current: activeFile?.path ?? null },
     recentWorkspaces: normalizedWorkspace.rootPath
       ? upsertRecentWorkspace(state.recentWorkspaces, normalizedWorkspace.rootPath)
       : state.recentWorkspaces,
   };
+}
+
+function seedEditHistories(openFiles: OpenFile[]): void {
+  for (const file of openFiles) {
+    resetEditHistory(file.id, { content: file.content, selectionStart: 0, selectionEnd: 0 });
+  }
 }
 
 function normalizeRestoredWorkspace(workspace: WorkspaceSession): WorkspaceSession {
@@ -799,20 +1143,31 @@ function isLegacyStarterWorkspace(workspace: WorkspaceSession): boolean {
   );
 }
 
-function confirmDiscardDirtyWorkspace(openFiles: OpenFile[]): boolean {
+async function confirmDiscardDirtyWorkspace(openFiles: OpenFile[]): Promise<boolean> {
   const dirtyFiles = openFiles.filter((file) => isDirty(file));
   if (dirtyFiles.length === 0) return true;
-  return window.confirm(translateCurrent('document.discardWorkspaceChanges', { count: dirtyFiles.length }));
+  return requestConfirmation({
+    title: translateCurrent('document.unsavedChanges'),
+    message: translateCurrent('document.discardWorkspaceChanges', { count: dirtyFiles.length }),
+    confirmLabel: translateCurrent('common.confirm'),
+    cancelLabel: translateCurrent('common.cancel'),
+    tone: 'danger',
+  });
 }
 
-function confirmEncodingChange(file: OpenFile): boolean {
+async function confirmEncodingChange(file: OpenFile): Promise<boolean> {
   if (file.encoding === file.savedEncoding || confirmedEncodingChanges.has(file.id)) return true;
 
-  const confirmed = window.confirm(translateCurrent('document.encodingConfirm', {
-    name: file.name,
-    from: encodingLabel(file.savedEncoding),
-    to: encodingLabel(file.encoding),
-  }));
+  const confirmed = await requestConfirmation({
+    title: translateCurrent('document.changeEncoding'),
+    message: translateCurrent('document.encodingConfirm', {
+      name: file.name,
+      from: encodingLabel(file.savedEncoding),
+      to: encodingLabel(file.encoding),
+    }),
+    confirmLabel: translateCurrent('common.confirm'),
+    cancelLabel: translateCurrent('common.cancel'),
+  });
   if (confirmed) confirmedEncodingChanges.add(file.id);
   return confirmed;
 }
@@ -853,10 +1208,6 @@ function parentFolderFromFilePath(path: string): string | null {
   return normalized.slice(0, index);
 }
 
-function isPlaceholderPath(path: string): boolean {
-  return path.startsWith('~');
-}
-
 function shouldRetainWorkspaceRootForFile(rootPath: string | null, filePath: string): boolean {
   if (!rootPath || isPlaceholderPath(rootPath)) return false;
   if (rootPath.startsWith('~android/')) return isAndroidContentPath(filePath);
@@ -870,30 +1221,28 @@ function isPathWithinWorkspaceRoot(rootPath: string, filePath: string): boolean 
   return normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`);
 }
 
-function findTreeNode(nodes: FileTreeNode[], path: string): FileTreeNode | null {
-  for (const node of nodes) {
-    if (node.path === path) return node;
-    if (node.children) {
-      const child = findTreeNode(node.children, path);
-      if (child) return child;
-    }
-  }
-
-  return null;
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
-function updateTreeFolder(nodes: FileTreeNode[], path: string, patch: Partial<FileTreeNode>): FileTreeNode[] {
-  return nodes.map((node) => {
-    if (node.path === path && node.type === 'folder') {
-      return { ...node, ...patch };
-    }
+function caretAfterChange(before: string, after: string): { start: number; end: number } {
+  let common = 0;
+  const limit = Math.min(before.length, after.length);
+  while (common < limit && before[common] === after[common]) common += 1;
+  const caret = common + Math.max(0, after.length - before.length);
+  return { start: caret, end: caret };
+}
 
-    if (node.children) {
-      return { ...node, children: updateTreeFolder(node.children, path, patch) };
-    }
-
-    return node;
-  });
+function applyEditSnapshot(
+  set: (updater: (state: WorkspaceState) => Partial<WorkspaceState>) => void,
+  id: string,
+  snapshot: EditSnapshot,
+): void {
+  set((state) => ({
+    openFiles: state.openFiles.map((file) =>
+      file.id === id ? { ...file, content: snapshot.content } : file,
+    ),
+  }));
 }
 
 function upsertOpenFile(

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/preview/PreviewPane';
 import { AppShell } from './components/shell/AppShell';
-import { createCommandRegistry, dispatchCommand } from './app/commands';
+import { createCommandRegistry, dispatchCommand, formatShortcut } from './app/commands';
 import { openProjectWebsite, showKeyboardShortcuts } from './app/help';
 import { enabledFeatures } from './app/featureRegistry';
 import { Sidebar } from './components/sidebar/Sidebar';
@@ -16,18 +16,25 @@ import { usePaneResizers } from './hooks/usePaneResizers';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useScrollSync } from './hooks/useScrollSync';
 import { useWindowSizeConstraints } from './hooks/useWindowSizeConstraints';
+import { useSplitAvailabilityNotice } from './hooks/useSplitAvailabilityNotice';
 import { useAutoUpdater } from './hooks/useAutoUpdater';
 import { useWindowDocumentState } from './hooks/useWindowDocumentState';
 import { useSearchStore } from './features/search';
 import { useCommandPaletteStore } from './features/command-palette';
 import { useVersionHistoryStore } from './features/version-history';
 import { toggleInlineMarker } from './core/editor/textEditing';
+import type { EditSnapshot } from './core/editor/editHistory';
+import { isTextFieldOutsideEditor } from './core/editor/textFieldFocus';
 import { Backend } from './platform/common/backend';
+import { currentPlatformCapabilities } from './platform/common/capabilities';
+import { Platform } from './platform/common/platform';
 import { useUIStore } from './store/ui';
 import { defaultEditorFontSize, stepFontSize, useSettingsStore } from './store/settings';
 import { selectActiveFile, useWorkspaceStore } from './store/workspace';
 import type { ViewMode } from './types/workspace';
 import { useI18n } from './i18n/useI18n';
+import { translateCurrent } from './i18n/current';
+import { notify, notifyError } from './core/notifications';
 
 export function App() {
   const { language, t } = useI18n();
@@ -40,6 +47,12 @@ export function App() {
   const openFolder = useWorkspaceStore((state) => state.openFolder);
   const openWorkspace = useWorkspaceStore((state) => state.openWorkspace);
   const createFile = useWorkspaceStore((state) => state.createFile);
+  const createFolder = useWorkspaceStore((state) => state.createFolder);
+  const canUndoFileCreation = useWorkspaceStore((state) => state.canUndoFileCreation);
+  const undoFileCreation = useWorkspaceStore((state) => state.undoFileCreation);
+  const rootPath = useWorkspaceStore((state) => state.rootPath);
+  const selectedFolderPath = useWorkspaceStore((state) => state.selectedFolderPath);
+  const refreshWorkspace = useWorkspaceStore((state) => state.refresh);
   const saveActive = useWorkspaceStore((state) => state.saveActive);
   const saveActiveAs = useWorkspaceStore((state) => state.saveActiveAs);
   const activeFile = useWorkspaceStore(selectActiveFile);
@@ -68,19 +81,77 @@ export function App() {
     settings.setFontSize(stepFontSize(settings.fontSize, -1));
   }, []);
   const resetZoom = useCallback(() => useSettingsStore.getState().setFontSize(defaultEditorFontSize), []);
+  /*
+   * Real full screen, separate from the title bar's double-click-to-maximise.
+   * Entering it hides every affordance that would say how to get out, so the
+   * confirmation doubles as the way back.
+   */
+  const toggleFullscreen = useCallback(() => {
+    void Backend.runtime
+      .toggleFullscreen()
+      .then((entered) => {
+        if (!entered) return;
+        /* Full screen hides the title bar, the menu and every other hint about
+           how to get back, so say it once on the way in. */
+        notify(
+          translateCurrent('view.enteredFullscreen', { shortcut: fullscreenShortcutLabel() }),
+          { key: 'fullscreen', tone: 'info' },
+        );
+      })
+      .catch((error) => notifyError(translateCurrent('view.fullscreenFailed'), error, { key: 'fullscreen' }));
+  }, []);
+  /*
+   * Undo/redo run against the document's own history rather than the browser's,
+   * which any programmatic edit would have wiped. Restoring the caret is part
+   * of the step, so the user lands where the text changed.
+   */
+  const applyEditSnapshot = useCallback((snapshot: EditSnapshot | null) => {
+    if (!snapshot) return;
+    window.requestAnimationFrame(() => {
+      const textarea = editorRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+    });
+  }, []);
+  const runUndo = useCallback(() => {
+    const workspace = useWorkspaceStore.getState();
+    /* A brand-new, still-empty file has nothing in its text history; undoing
+       there should take back the file creation itself. */
+    if (!workspace.canUndoEdit() && workspace.canUndoFileCreation()) {
+      void workspace.undoFileCreation();
+      return;
+    }
+    applyEditSnapshot(workspace.undoEdit());
+  }, [applyEditSnapshot]);
+  const runRedo = useCallback(() => {
+    applyEditSnapshot(useWorkspaceStore.getState().redoEdit());
+  }, [applyEditSnapshot]);
   const { viewportProfile, availableViewModes, effectiveViewMode } = useResponsiveViewMode(viewMode);
 
   const commandRegistry = useMemo(
     () =>
       createCommandRegistry(enabledFeatures, {
         file: {
-          newFile: () => void createFile(),
+          newFile: () => {
+            if (rootPath && currentPlatformCapabilities().has('folder.operations')) setSidebarMode('expanded');
+            void createFile(selectedFolderPath ?? undefined);
+          },
+          newFolder: () => {
+            if (rootPath && currentPlatformCapabilities().has('folder.operations')) setSidebarMode('expanded');
+            void createFolder(selectedFolderPath ?? undefined);
+          },
+          canCreateFolder: () => Boolean(rootPath) && currentPlatformCapabilities().has('folder.operations'),
+          canUndoFileCreation,
+          undoFileCreation: () => void undoFileCreation(),
           openFile: () => void openFile(),
           openFolder: () => void openFolder(),
+          refreshWorkspace: () => void refreshWorkspace(),
           save: () => void saveActive(),
           saveAs: () => void saveActiveAs(),
           print: () => window.print(),
           close: () => void closeActiveFile(),
+          hasDocument: () => Boolean(useWorkspaceStore.getState().activeFileId),
         },
         window: {
           newWindow: () => void Backend.runtime.openNewWindow(),
@@ -90,6 +161,10 @@ export function App() {
           hasTarget: () => Boolean(editorRef.current),
           toggleBold: () => toggleInlineMarker(editorRef.current, '**'),
           toggleItalic: () => toggleInlineMarker(editorRef.current, '*'),
+          undo: runUndo,
+          redo: runRedo,
+          canUndo: () => useWorkspaceStore.getState().canUndoEdit(),
+          canRedo: () => useWorkspaceStore.getState().canRedoEdit(),
         },
         view: {
           openSettings,
@@ -99,6 +174,8 @@ export function App() {
           zoomIn,
           zoomOut,
           resetZoom,
+          toggleFullscreen,
+          canToggleFullscreen: () => currentPlatformCapabilities().has('window.fullscreen'),
         },
         search: { openFind, openReplace },
         palette: { open: openCommandPalette },
@@ -109,8 +186,10 @@ export function App() {
       }),
     [
       availableViewModes,
+      canUndoFileCreation,
       closeActiveFile,
       createFile,
+      createFolder,
       openCommandPalette,
       openFile,
       openFind,
@@ -118,19 +197,40 @@ export function App() {
       openReplace,
       openSettings,
       openVersionHistory,
+      refreshWorkspace,
+      rootPath,
       saveActive,
       saveActiveAs,
+      selectedFolderPath,
       setViewMode,
       toggleSidebar,
+      undoFileCreation,
       zoomIn,
       zoomOut,
       resetZoom,
+      toggleFullscreen,
+      runRedo,
+      runUndo,
       language,
     ],
   );
 
   const nativeMenuHandlers = useMemo(
     () => ({
+      /*
+       * The macOS Edit menu's Undo and Redo are app items, not the system
+       * ones, so the system no longer performs them for fields the app does
+       * not own. A Cmd+Z the keydown handler left to such a field arrives
+       * here, and the field gets its native undo back.
+       */
+      onUndo: () => {
+        if (isTextFieldOutsideEditor(document.activeElement)) document.execCommand('undo');
+        else dispatchCommand(commandRegistry, 'edit.undo');
+      },
+      onRedo: () => {
+        if (isTextFieldOutsideEditor(document.activeElement)) document.execCommand('redo');
+        else dispatchCommand(commandRegistry, 'edit.redo');
+      },
       onNewFile: () => dispatchCommand(commandRegistry, 'file.new'),
       onNewWindow: () => dispatchCommand(commandRegistry, 'window.new'),
       onOpen: () => dispatchCommand(commandRegistry, 'file.open'),
@@ -165,6 +265,7 @@ export function App() {
   useScrollSync(editorRef, editorScrollRef, previewRef, syncScroll && effectiveViewMode === 'split', activeFile?.id ?? null, previewElement);
   useResponsiveSplitWidth(bodyRef, effectiveViewMode, sidebarMode, sidebarWidth, editorWidth, viewportProfile.profile);
   useWindowSizeConstraints();
+  useSplitAvailabilityNotice(viewMode, availableViewModes);
   useWindowDocumentState(activeFile);
   useAutoUpdater();
   const { startSidebarResize, startPaneResize } = usePaneResizers({
@@ -231,6 +332,12 @@ function PaneResizer({
       onPointerDown={onPointerDown}
     />
   );
+}
+
+/* What the user actually presses: the OS key on macOS, ours elsewhere. */
+function fullscreenShortcutLabel(): string {
+  const shortcut = Platform.windowChrome.providesNativeFullscreenCommand ? 'mod+control+f' : 'f11';
+  return formatShortcut(shortcut) ?? '';
 }
 
 function paneResizerLabel(viewMode: ViewMode, t: ReturnType<typeof useI18n>['t']): string {

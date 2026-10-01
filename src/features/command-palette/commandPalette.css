@@ -81,7 +81,7 @@
   font-weight: 500;
 }
 
-.command-palette-id {
+.command-palette-section {
   overflow: hidden;
   color: var(--text-muted);
   font-family: var(--font-mono);

@@ -1,3 +1,4 @@
+import { scrollBehavior } from '../core/motion';
 import { RefObject, useEffect } from 'react';
 import { editorLineMetricStyleKey, measureEditorLineMetrics, type EditorLineMetrics } from '../core/editor/lineMetrics';
 
@@ -43,7 +44,7 @@ export function scrollEditorToSourceLine(
   const metrics = measureEditorLineMetrics(editor, editor.value, window.getComputedStyle(editor));
   editorScroller.scrollTo({
     top: Math.max(0, getEditorTopForLine(editor, line, metrics) - ANCHOR_OFFSET_PX),
-    behavior: 'smooth',
+    behavior: scrollBehavior(),
   });
 }
 

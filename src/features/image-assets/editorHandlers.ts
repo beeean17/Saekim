@@ -4,6 +4,7 @@ import type { ImageDownloadProgressPayload, ImagePickPayload } from '../../platf
 import { Backend } from '../../platform/common/backend';
 import type { OpenFile } from '../../types/workspace';
 import { translateCurrent } from '../../i18n/current';
+import { dismissNotification, notify, notifyError } from '../../core/notifications';
 
 type DroppedImage =
   | { type: 'remote'; url: string }
@@ -77,7 +78,7 @@ export async function insertSelectedImage(
     try {
       currentFilePath = requireSavedActiveFile(activeFile);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : translateCurrent('image.saveFirst'));
+      notifyError(translateCurrent('image.saveFirst'), error);
       textarea.focus();
       return;
     }
@@ -99,7 +100,7 @@ export async function insertSelectedImage(
     insertTextAtSelection(textarea, markdownImageSnippet(assetPath, imageAltText(picked)));
   } catch (error) {
     console.error('이미지 복사 실패:', error);
-    window.alert(error instanceof Error ? error.message : translateCurrent('image.copyFailed'));
+    notifyError(translateCurrent('image.copyFailed'), error);
     textarea.focus();
   }
 }
@@ -115,7 +116,7 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
   try {
     currentFilePath = requireSavedActiveFile(activeFile);
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : translateCurrent('image.saveFirst'));
+    notifyError(translateCurrent('image.saveFirst'), error);
     textarea.focus();
     return;
   }
@@ -127,18 +128,32 @@ async function insertDroppedRemoteImage(textarea: HTMLTextAreaElement, activeFil
   let unlisten: (() => void) | null = null;
   try {
     if (Backend.runtime.isTauriRuntime()) {
+      /*
+       * Progress goes to a notification, not into the document. Rewriting the
+       * placeholder on every tick edited the user's text dozens of times for a
+       * single drop, which floods the undo history and makes the caret jump.
+       */
       unlisten = await Backend.runtime.listenImageDownloadProgress((payload: ImageDownloadProgressPayload) => {
         if (payload.id !== id || payload.status !== 'progress') return;
-        replacePendingImageMarker(textarea, id, pendingImageSnippet(id, payload.progress));
+        notify(
+          payload.progress === null
+            ? translateCurrent('image.downloading')
+            : translateCurrent('image.downloadingProgress', { progress: payload.progress }),
+          { key: id, tone: 'info', timeout: null },
+        );
       });
     }
 
     const assetPath = await Backend.images.downloadImageToAssets(id, imageUrl, currentFilePath);
     replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
+    dismissNotification(id);
   } catch (error) {
-    const message = error instanceof Error ? error.message : translateCurrent('image.downloadFailed');
     console.error('이미지 다운로드 실패:', error);
-    replacePendingImageMarker(textarea, id, failedImageSnippet(id, message));
+    dismissNotification(id);
+    notifyError(translateCurrent('image.downloadFailed'), error);
+    /* Take the placeholder back out; a failed download should leave the
+       document exactly as the user had it. */
+    removePendingImageMarker(textarea, id);
   } finally {
     unlisten?.();
     textarea.focus();
@@ -178,13 +193,13 @@ async function insertImageFileFromBytes(
   try {
     currentFilePath = requireSavedActiveFile(activeFile);
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : translateCurrent('image.saveFirst'));
+    notifyError(translateCurrent('image.saveFirst'), error);
     textarea.focus();
     return;
   }
 
   if (file.size > MAX_DROPPED_IMAGE_BYTES) {
-    window.alert(translateCurrent('image.tooLarge'));
+    notify(translateCurrent('image.tooLarge'), { tone: 'warning' });
     textarea.focus();
     return;
   }
@@ -201,22 +216,17 @@ async function insertImageFileFromBytes(
       replacePendingImageMarker(textarea, id, markdownImageSnippet(assetPath));
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : translateCurrent('image.importFailed');
     console.error('이미지 가져오기 실패:', error);
-    replacePendingImageMarker(textarea, id, failedImageSnippet(id, message));
+    notifyError(translateCurrent('image.importFailed'), error);
+    removePendingImageMarker(textarea, id);
   } finally {
     textarea.focus();
   }
 }
 
-function insertDroppedImageHelp(textarea: HTMLTextAreaElement): void {
-  insertTextAtSelection(
-    textarea,
-    failedImageSnippet(
-      `help-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      translateCurrent('image.urlNotFound'),
-    ),
-  );
+/* A drop we cannot make sense of is reported, not written into the document. */
+function insertDroppedImageHelp(_textarea: HTMLTextAreaElement): void {
+  notify(translateCurrent('image.urlNotFound'), { tone: 'warning' });
 }
 
 function markdownImageSnippet(path: string, altText?: string): string {
@@ -236,9 +246,7 @@ function pendingImageSnippet(id: string, progress: number | null): string {
   return `![${label}](saekim-pending-image://${id})`;
 }
 
-function failedImageSnippet(id: string, message: string): string {
-  return `![${translateCurrent('image.downloadErrorAlt', { message: escapeMarkdownAlt(message) })}](saekim-failed-image://${id})`;
-}
+
 
 function requireSavedActiveFile(activeFile: OpenFile | null): string {
   if (!activeFile || activeFile.path.startsWith('~') || activeFile.path.startsWith('browser://')) {
@@ -375,6 +383,11 @@ function replacePendingImageMarker(textarea: HTMLTextAreaElement, id: string, re
   if (!match || match.index === undefined) return;
 
   replaceTextRange(textarea, match.index, match.index + match[0].length, replacement);
+}
+
+/** Removes the placeholder, leaving the document as it was before the drop. */
+function removePendingImageMarker(textarea: HTMLTextAreaElement, id: string): void {
+  replacePendingImageMarker(textarea, id, '');
 }
 
 function replacePendingImageMarkerWithSelectedAlt(textarea: HTMLTextAreaElement, id: string, assetPath: string): void {

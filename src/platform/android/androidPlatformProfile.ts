@@ -15,6 +15,7 @@ class AndroidPlatformProfile extends BasePlatformProfile {
         titlebarClassName: '',
         showsApplicationMenu: false,
         syncsNativeTitlebarColor: false,
+        providesNativeFullscreenCommand: false,
       },
     });
   }

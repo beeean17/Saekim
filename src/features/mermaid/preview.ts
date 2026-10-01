@@ -1,3 +1,5 @@
+import { translateCurrent } from '../../i18n/current';
+import { notify } from '../../core/notifications';
 import type { PreviewContribution } from '../../app/feature';
 import { registerMarkdownFenceRenderer } from '../../core/markdown/extensions';
 
@@ -37,6 +39,7 @@ export const mermaidPreviewEnhancement: PreviewContribution = {
           }
         } catch (error) {
           console.error('failed to render mermaid block', error);
+          notify(translateCurrent('preview.mermaidFailed'), { tone: 'warning', key: 'mermaid-render' });
           if (!signal.aborted) block.dataset.rendered = 'false';
         }
       }),

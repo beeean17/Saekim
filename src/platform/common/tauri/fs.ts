@@ -72,6 +72,10 @@ export async function renameEntry(path: string, newName: string): Promise<string
   return invokeCommand<string>('rename_workspace_entry', { path, newName });
 }
 
+export async function createFile(parentPath: string, name: string): Promise<OpenFilePayload> {
+  return invokeCommand<OpenFilePayload>('create_workspace_file', { parentPath, name });
+}
+
 export async function createFolder(parentPath: string, name: string): Promise<string> {
   return invokeCommand<string>('create_workspace_folder', { parentPath, name });
 }

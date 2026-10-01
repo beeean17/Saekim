@@ -87,7 +87,7 @@ textarea {
 
 @media (hover: hover) {
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-faint);
+    background: var(--text-decorative);
     background-clip: padding-box;
   }
 }

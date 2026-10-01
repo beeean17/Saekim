@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isAndroidRuntime } from '../platform/common/runtime';
 
 export type ViewportProfile = 'compact' | 'medium' | 'expanded';
 
@@ -16,12 +17,21 @@ export function viewportProfileForWidth(width: number): ViewportProfile {
   return 'expanded';
 }
 
+export function viewportProfileForViewport(
+  width: number,
+  height: number,
+  useShortestDimension = false,
+): ViewportProfile {
+  return viewportProfileForWidth(useShortestDimension ? Math.min(width, height) : width);
+}
+
 export function getViewportProfileSnapshot(): ViewportProfileSnapshot {
   if (typeof window === 'undefined') return { profile: 'expanded', width: 0 };
 
   const width = Math.round(window.visualViewport?.width ?? window.innerWidth);
+  const height = Math.round(window.visualViewport?.height ?? window.innerHeight);
   return {
-    profile: viewportProfileForWidth(width),
+    profile: viewportProfileForViewport(width, height, isAndroidRuntime()),
     width,
   };
 }

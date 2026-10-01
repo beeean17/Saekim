@@ -12,6 +12,7 @@ export function TreeContextMenu({
   node,
   position,
   onRename,
+  onCreateFile,
   onCreateFolder,
   onDuplicate,
   onTrash,
@@ -20,6 +21,7 @@ export function TreeContextMenu({
   node: FileTreeNode;
   position: TreeMenuPosition;
   onRename: () => void;
+  onCreateFile: () => void;
   onCreateFolder: () => void;
   onDuplicate: () => void;
   onTrash: () => void;
@@ -61,7 +63,10 @@ export function TreeContextMenu({
     >
       <button role="menuitem" type="button" onClick={() => run(onRename)}>{t('sidebar.rename')}</button>
       {node.type === 'folder' ? (
-        <button role="menuitem" type="button" onClick={() => run(onCreateFolder)}>{t('sidebar.createFolder')}</button>
+        <>
+          <button role="menuitem" type="button" onClick={() => run(onCreateFile)}>{t('sidebar.createFile')}</button>
+          <button role="menuitem" type="button" onClick={() => run(onCreateFolder)}>{t('sidebar.createFolder')}</button>
+        </>
       ) : (
         <button role="menuitem" type="button" onClick={() => run(onDuplicate)}>{t('sidebar.duplicate')}</button>
       )}

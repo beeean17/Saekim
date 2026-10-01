@@ -1,4 +1,5 @@
 import { Backend } from '../../platform/common/backend';
+import { highlightCodeToHtml } from '../../core/markdown/codeHighlighter';
 
 const EXPORT_ROOT_CLASS = 'pdf-export-root';
 const EXPORTING_BODY_CLASS = 'pdf-exporting';
@@ -331,17 +332,13 @@ async function renderCodeBlocksForPdf(root: HTMLElement): Promise<void> {
   const blocks = Array.from(root.querySelectorAll<HTMLElement>('pre[data-lang]'));
   if (blocks.length === 0) return;
 
-  const { codeToHtml } = await import('shiki');
   await Promise.all(
     blocks.map(async (block) => {
       const lang = block.dataset.lang;
       if (!lang) return;
 
       try {
-        const highlighted = await codeToHtml(readPdfCodeBlockSource(block), {
-          lang,
-          theme: 'github-light',
-        });
+        const highlighted = await highlightCodeToHtml(readPdfCodeBlockSource(block), lang, 'light');
         const template = document.createElement('template');
         template.innerHTML = highlighted.trim();
         const highlightedPre = template.content.firstElementChild;

@@ -2,6 +2,8 @@ import type { SaekimFeature } from './feature';
 import { appCommands } from '../features/app-commands';
 import { commandPaletteAppContribution, commandPaletteCommands } from '../features/command-palette';
 import { externalChangesAppContribution } from '../features/external-changes';
+import { confirmDialogAppContribution } from '../core/dialogs';
+import { helpAppContribution } from '../features/help';
 import { htmlPreviewContribution } from '../features/html-preview';
 import { imageAssetsEditorContribution } from '../features/image-assets';
 import { katexEditorContribution } from '../features/katex';
@@ -37,6 +39,17 @@ const featureCatalog: SaekimFeature[] = [
     dependsOn: ['app-commands'],
     app: commandPaletteAppContribution,
     commands: commandPaletteCommands,
+  },
+  {
+    id: 'help',
+    label: 'Help',
+    dependsOn: ['app-commands'],
+    app: helpAppContribution,
+  },
+  {
+    id: 'confirm-dialog',
+    label: 'Confirmation Dialog',
+    app: confirmDialogAppContribution,
   },
   {
     id: 'external-change-protection',

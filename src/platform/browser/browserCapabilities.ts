@@ -11,4 +11,5 @@ export const browserCapabilities: ReadonlySet<PlatformCapability> = new Set([
   'image.downloadToAssets',
   'pdf.save',
   'metadata.sqlite',
+  'window.fullscreen',
 ]);

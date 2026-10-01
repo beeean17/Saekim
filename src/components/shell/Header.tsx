@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CommandRegistry } from '../../app/commands';
 import { Platform } from '../../platform/common/platform';
 import { useUIStore } from '../../store/ui';
@@ -9,19 +9,22 @@ import { IconButton } from '../primitives/IconButton';
 import { SegmentedControl } from '../ui/primitives/SegmentedControl';
 import { MenuSurface } from '../ui/surface/MenuSurface';
 import { buildAppMenus, type AppMenuGroup, type AppMenuId } from './appMenus';
-import { handleTitlebarMouseDown } from './titlebarWindowControls';
 import { useI18n } from '../../i18n/useI18n';
 
 interface HeaderProps {
   commandRegistry: CommandRegistry;
+  android: boolean;
+  compact: boolean;
   effectiveViewMode: ViewMode;
   availableViewModes: readonly ViewMode[];
 }
 
-export function Header({ commandRegistry, effectiveViewMode, availableViewModes }: HeaderProps) {
+export function Header({ commandRegistry, android, compact, effectiveViewMode, availableViewModes }: HeaderProps) {
   const { t } = useI18n();
   const toggleSettings = useUIStore((state) => state.toggleSettings);
   const settingsOpen = useUIStore((state) => state.settingsOpen);
+  const compactSidebarOpen = useUIStore((state) => state.compactSidebarOpen);
+  const toggleCompactSidebar = useUIStore((state) => state.toggleCompactSidebar);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const dirty = isDirty(activeFile);
   const windowChrome = Platform.windowChrome;
@@ -31,18 +34,36 @@ export function Header({ commandRegistry, effectiveViewMode, availableViewModes 
   const showHeaderMenu = windowChrome.showsApplicationMenu;
 
   return (
-    <header className={titlebarClassName} onMouseDown={handleTitlebarMouseDown}>
+    <header className={titlebarClassName}>
+      {/*
+        Tauri owns dragging and double-click-to-maximize for this element.
+        Adding our own mouse handler on top made the window toggle twice and
+        land back where it started, so there is none here on purpose.
+      */}
       <div className="titlebar-drag" data-tauri-drag-region />
+      {compact ? (
+        <IconButton
+          aria-controls="saekim-sidebar"
+          aria-expanded={compactSidebarOpen}
+          className="header-btn compact-sidebar-trigger"
+          label={compactSidebarOpen ? t('sidebar.closeExplorer') : t('sidebar.openExplorer')}
+          onClick={toggleCompactSidebar}
+        >
+          <Icon name={compactSidebarOpen ? 'folderOpen' : 'folder'} />
+        </IconButton>
+      ) : null}
       {showHeaderMenu ? (
         <AppMenu
           commandRegistry={commandRegistry}
           effectiveViewMode={effectiveViewMode}
         />
       ) : null}
-      <div className="breadcrumb titlebar-path" data-tauri-drag-region title={activeFile?.name}>
-        {activeFile ? <span className="crumb current">{activeFile.name}</span> : null}
-        {dirty ? <span className="dot" title={t('document.modified')} /> : null}
-      </div>
+      {!android ? (
+        <div className="breadcrumb titlebar-path" title={activeFile?.name}>
+          {activeFile ? <span className="crumb current">{activeFile.name}</span> : null}
+          {dirty ? <span className="dot" title={t('document.modified')} /> : null}
+        </div>
+      ) : null}
 
       <div className="titlebar-right">
         <ViewToggle availableViewModes={availableViewModes} effectiveViewMode={effectiveViewMode} />
@@ -125,7 +146,7 @@ function AppMenu({
   commandRegistry: CommandRegistry;
   effectiveViewMode: ViewMode;
 }) {
-  const { language, t } = useI18n();
+  const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -133,25 +154,16 @@ function AppMenu({
   const syncScroll = useUIStore((state) => state.syncScroll);
   const toggleSyncScroll = useUIStore((state) => state.toggleSyncScroll);
 
-  const menus = useMemo<AppMenuGroup[]>(
-    () =>
-      buildAppMenus({
-        commandRegistry,
-        viewMode,
-        effectiveViewMode,
-        syncScroll,
-        toggleSyncScroll,
-        getDocumentCommandTarget: () => lastFocusedRef.current,
-      }),
-    [
-      commandRegistry,
-      effectiveViewMode,
-      language,
-      syncScroll,
-      toggleSyncScroll,
-      viewMode,
-    ],
-  );
+  /* Rebuilt each render so the enabled state of each item reflects the
+     document that is open right now; see SidebarMenu for the full reasoning. */
+  const menus: AppMenuGroup[] = buildAppMenus({
+    commandRegistry,
+    viewMode,
+    effectiveViewMode,
+    syncScroll,
+    toggleSyncScroll,
+    getDocumentCommandTarget: () => lastFocusedRef.current,
+  });
 
   useEffect(() => {
     if (!openMenu) return;

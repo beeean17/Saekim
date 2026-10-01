@@ -143,10 +143,14 @@ export function PreviewContent({ previewRef, onPreviewElementChange }: PreviewCo
         interactionMode={previewInteractionMode}
         onMount={setPreviewElement}
       >
+        {/* The editor pane already announces the empty state and offers the
+            actions; this side says what this pane is for and stays silent to
+            screen readers so the message is not read out twice. */}
         <EmptyState
           className="empty-document-state"
-          title={t('empty.title')}
-          description={t('empty.description')}
+          role="presentation"
+          title={t('preview.empty.title')}
+          description={t('preview.empty.description')}
         />
       </PreviewSurfaceRoot>
     );

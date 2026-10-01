@@ -1,3 +1,5 @@
+import { translateCurrent } from '../i18n/current';
+import { notifyError } from '../core/notifications';
 import { useEffect, useRef, useState } from 'react';
 import { Backend } from '../platform/common/backend';
 import { useSettingsStore } from '../store/settings';
@@ -105,6 +107,7 @@ function buildSession(): AppSession {
 function saveSession(scope: 'ui' | 'documents'): void {
   void Backend.metadata.saveSession(buildSession(), scope).catch((error) => {
     console.error('세션 저장 실패:', error);
+    notifyError(translateCurrent('session.saveFailed'), error, { key: 'session-save' });
   });
 }
 

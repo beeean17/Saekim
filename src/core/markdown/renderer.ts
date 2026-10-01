@@ -3,6 +3,7 @@ import type StateCore from 'markdown-it/lib/rules_core/state_core.mjs';
 import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import type Token from 'markdown-it/lib/token.mjs';
 import { escapeHtml } from './escape';
+import { highlightCodeToHtml } from './codeHighlighter';
 import { getMarkdownFenceRenderers, getMarkdownItPlugins, getMarkdownMathRenderer } from './extensions';
 import { translateCurrent } from '../../i18n/current';
 
@@ -170,8 +171,6 @@ md.renderer.rules.fence = (tokens, idx) => {
   return `<pre${attrs} data-lang="${escapeHtml(lang)}"><code>${escapeHtml(content)}</code></pre>`;
 };
 
-let shikiModulePromise: Promise<typeof import('shiki')> | null = null;
-
 export interface RenderMarkdownOptions {
   basePath?: string;
   theme?: 'light' | 'dark';
@@ -249,12 +248,7 @@ async function highlightCode(html: string, theme: 'light' | 'dark'): Promise<str
       if (!lang) return;
 
       try {
-        shikiModulePromise ??= import('shiki');
-        const { codeToHtml } = await shikiModulePromise;
-        const highlighted = await codeToHtml(code, {
-          lang,
-          theme: theme === 'dark' ? 'github-dark' : 'github-light',
-        });
+        const highlighted = await highlightCodeToHtml(code, lang, theme);
         const template = doc.createElement('template');
         template.innerHTML = highlighted.trim();
         const highlightedPre = template.content.firstElementChild;

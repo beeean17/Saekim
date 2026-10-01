@@ -8,6 +8,7 @@ pub struct NativePdfExportPayload {
 }
 
 impl NativePdfExportPayload {
+    #[cfg(target_os = "windows")]
     fn saved(path: String) -> Self {
         Self {
             status: "saved",
@@ -15,6 +16,7 @@ impl NativePdfExportPayload {
         }
     }
 
+    #[cfg(not(target_os = "windows"))]
     fn unsupported() -> Self {
         Self {
             status: "unsupported",
@@ -26,72 +28,16 @@ impl NativePdfExportPayload {
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub async fn print_webview_pdf(
-    window: tauri::WebviewWindow,
-    path: String,
-    content_width: f64,
-    content_height: f64,
+    _window: tauri::WebviewWindow,
+    _path: String,
+    _content_width: f64,
+    _content_height: f64,
 ) -> Result<NativePdfExportPayload, String> {
-    use block2::RcBlock;
-    use objc2::{msg_send, sel, MainThreadMarker};
-    use objc2_foundation::{NSData, NSError, NSPoint, NSRect, NSSize};
-    use objc2_web_kit::{WKPDFConfiguration, WKWebView};
-    use std::{ptr::NonNull, sync::mpsc, time::Duration};
-
-    let (sender, receiver) = mpsc::channel::<Result<Option<Vec<u8>>, String>>();
-    window
-        .with_webview(move |platform_webview| unsafe {
-            let webview = &*(platform_webview.inner().cast::<WKWebView>());
-            let supported: bool = msg_send![
-                webview,
-                respondsToSelector: sel!(createPDFWithConfiguration:completionHandler:)
-            ];
-
-            if !supported {
-                let _ = sender.send(Ok(None));
-                return;
-            }
-
-            let configuration = WKPDFConfiguration::new(MainThreadMarker::new_unchecked());
-            configuration.setRect(NSRect::new(
-                NSPoint::ZERO,
-                NSSize::new(content_width.max(1.0), content_height.max(1.0)),
-            ));
-
-            let completion = RcBlock::new(move |data: *mut NSData, error: *mut NSError| {
-                let result = if !data.is_null() {
-                    let data = &*data;
-                    let length = data.length();
-                    let mut bytes = vec![0_u8; length];
-                    if let Some(buffer) = NonNull::new(bytes.as_mut_ptr().cast()) {
-                        data.getBytes_length(buffer, length);
-                    }
-                    Ok(Some(bytes))
-                } else if !error.is_null() {
-                    Err((&*error).localizedDescription().to_string())
-                } else {
-                    Err("WKWebView returned neither PDF data nor an error".to_string())
-                };
-                let _ = sender.send(result);
-            });
-
-            webview.createPDFWithConfiguration_completionHandler(Some(&configuration), &completion);
-        })
-        .map_err(|error| error.to_string())?;
-
-    let native_pdf = tauri::async_runtime::spawn_blocking(move || {
-        receiver
-            .recv_timeout(Duration::from_secs(30))
-            .map_err(|error| format!("timed out waiting for WKWebView PDF: {error}"))?
-    })
-    .await
-    .map_err(|error| error.to_string())??;
-
-    let Some(pdf_bytes) = native_pdf else {
-        return Ok(NativePdfExportPayload::unsupported());
-    };
-
-    std::fs::write(&path, pdf_bytes).map_err(|error| error.to_string())?;
-    Ok(NativePdfExportPayload::saved(path))
+    // WKWebView createPDF only captures a rectangle inside the live view bounds. The prepared
+    // A4 export surface is taller than the app viewport, so treating that API as a full-document
+    // printer creates a formally valid but blank PDF. Let the frontend use its paginated fallback
+    // until macOS has a dedicated off-screen print webview.
+    Ok(NativePdfExportPayload::unsupported())
 }
 
 #[cfg(target_os = "windows")]

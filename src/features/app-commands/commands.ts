@@ -1,5 +1,6 @@
 import type { CommandContributionFactory } from '../../app/feature';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
+import { Platform } from '../../platform/common/platform';
 import { translate } from '../../i18n/messages';
 import { useSettingsStore } from '../../store/settings';
 
@@ -14,6 +15,45 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       menu: { section: 'file', group: 'new', order: 10 },
       keywords: ['document', 'create'],
       run: ctx.file.newFile,
+    },
+    {
+      /* No shortcut of its own: undo is one user-facing action, dispatched by
+         `edit.undo` below, which decides whether the last thing worth undoing
+         was a text edit or the creation of an untouched file. */
+      id: 'file.undoCreate',
+      label: t('command.undoFileCreation'),
+      keywords: ['undo', 'create', 'file'],
+      isEnabled: ctx.file.canUndoFileCreation,
+      run: ctx.file.undoFileCreation,
+    },
+    {
+      id: 'edit.undo',
+      label: t('menu.undo'),
+      defaultShortcut: 'mod+z',
+      yieldsToTextFields: true,
+      menu: { section: 'edit', group: 'undo', order: 1 },
+      keywords: ['undo', 'revert'],
+      isEnabled: () => ctx.editor.canUndo() || ctx.file.canUndoFileCreation(),
+      run: ctx.editor.undo,
+    },
+    {
+      id: 'edit.redo',
+      label: t('menu.redo'),
+      /* Shift-Cmd-Z on macOS, Ctrl+Shift+Z on Windows and Linux. */
+      defaultShortcut: 'mod+shift+z',
+      yieldsToTextFields: true,
+      menu: { section: 'edit', group: 'undo', order: 2 },
+      keywords: ['redo'],
+      isEnabled: ctx.editor.canRedo,
+      run: ctx.editor.redo,
+    },
+    {
+      id: 'folder.new',
+      label: t('command.newFolder'),
+      menu: { section: 'file', group: 'new', order: 15 },
+      keywords: ['folder', 'directory', 'create'],
+      isEnabled: ctx.file.canCreateFolder,
+      run: ctx.file.newFolder,
     },
     ...(currentPlatformCapabilities().has('window.chrome')
       ? [
@@ -41,10 +81,18 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       run: ctx.file.openFolder,
     },
     {
+      id: 'workspace.refresh',
+      label: t('sidebar.refresh'),
+      defaultShortcut: 'mod+r',
+      keywords: ['reload', 'workspace', 'explorer'],
+      run: ctx.file.refreshWorkspace,
+    },
+    {
       id: 'file.save',
       label: t('command.save'),
       defaultShortcut: 'mod+s',
       menu: { section: 'file', group: 'save', order: 50 },
+      isEnabled: ctx.file.hasDocument,
       run: ctx.file.save,
     },
     {
@@ -52,6 +100,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       label: t('command.saveAs'),
       defaultShortcut: 'mod+shift+s',
       menu: { section: 'file', group: 'save', order: 60 },
+      isEnabled: ctx.file.hasDocument,
       run: ctx.file.saveAs,
     },
     {
@@ -59,6 +108,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       label: t('command.print'),
       defaultShortcut: 'mod+p',
       menu: { section: 'file', group: 'output', order: 70 },
+      isEnabled: ctx.file.hasDocument,
       run: ctx.file.print,
     },
     {
@@ -66,6 +116,7 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       label: t('command.closeFile'),
       defaultShortcut: 'mod+w',
       menu: { section: 'file', group: 'close', order: 90 },
+      isEnabled: ctx.file.hasDocument,
       run: ctx.file.close,
     },
     ...(currentPlatformCapabilities().has('window.chrome')
@@ -125,6 +176,25 @@ export const appCommands: CommandContributionFactory = (ctx) => {
       menu: { section: 'view', group: 'zoom', order: 60 },
       run: ctx.view.resetZoom,
     },
+    ...(ctx.view.canToggleFullscreen()
+      ? [
+          {
+            id: 'view.toggleFullscreen',
+            label: t('command.toggleFullscreen'),
+            /*
+             * F11 is the standard key everywhere the app has to supply one.
+             * macOS is the exception: its View menu already offers Enter Full
+             * Screen on Control-Command-F, so binding anything here would just
+             * fight the OS. Deliberately not the title-bar double click either,
+             * which every platform reserves for maximise/restore.
+             */
+            defaultShortcut: Platform.windowChrome.providesNativeFullscreenCommand ? undefined : 'f11',
+            menu: { section: 'view', group: 'window', order: 80 },
+            keywords: ['fullscreen', 'full screen', 'presentation', 'focus'],
+            run: ctx.view.toggleFullscreen,
+          },
+        ]
+      : []),
     {
       id: 'view.toggleSidebar',
       label: t('command.toggleSidebar'),

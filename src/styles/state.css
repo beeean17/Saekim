@@ -1,0 +1,52 @@
+/*
+ * Global interaction-state rules.
+ *
+ * Loaded last so that a disabled control always reads as disabled, no matter
+ * which component stylesheet painted it. Individual components may still opt
+ * out by raising specificity, but they should not need to.
+ */
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.42;
+}
+
+/* A disabled control must not light up under the pointer. */
+button:disabled:hover,
+select:disabled:hover,
+input:disabled:hover,
+[aria-disabled="true"]:hover {
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+/*
+ * Segmented controls express the current choice with aria-pressed/aria-checked
+ * so assistive tech can read it; keep the visual selection tied to the same
+ * attribute instead of a class that only sighted users can perceive.
+ */
+.ui-segmented button[aria-pressed="true"],
+.ui-segmented button[aria-selected="true"],
+.ui-segmented button.active {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/*
+ * Drop targets. Dragging a file over the app should say where it will land.
+ */
+.is-drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+  background: var(--accent-soft);
+}
+
+.is-drop-target .editor-textarea {
+  background: transparent;
+}

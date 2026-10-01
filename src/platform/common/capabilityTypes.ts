@@ -12,4 +12,5 @@ export type PlatformCapability =
   | 'metadata.sqlite'
   | 'externalFile.open'
   | 'window.chrome'
+  | 'window.fullscreen'
   | 'native.menu';

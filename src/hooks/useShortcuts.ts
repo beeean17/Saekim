@@ -6,7 +6,7 @@ export function useShortcuts(commands: CommandRegistry): void {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing || event.repeat) return;
       const shortcut = shortcutFromKeyboardEvent(event);
-      if (shortcut && dispatchShortcut(commands, shortcut)) event.preventDefault();
+      if (shortcut && dispatchShortcut(commands, shortcut, event.target)) event.preventDefault();
     };
 
     window.addEventListener('keydown', onKeyDown);

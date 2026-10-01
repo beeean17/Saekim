@@ -24,8 +24,6 @@ export function StructuredDataPreview({ content, fileType, fileKey }: Structured
     setMode(defaultMode);
   }, [defaultMode, fileKey]);
 
-  if (activeMode === 'raw') return <RawPreview content={content} />;
-
   return (
     <div className="structured-preview">
       <PreviewModeTabs
@@ -37,7 +35,9 @@ export function StructuredDataPreview({ content, fileType, fileKey }: Structured
         value={activeMode}
         onChange={(value) => setMode(value as StructuredMode)}
       />
-      {!parsed.ok ? (
+      {activeMode === 'raw' ? (
+        <RawPreview content={content} />
+      ) : !parsed.ok ? (
         <>
           <PreviewErrorPanel title={t('structured.parseFailed', { type: fileType.label.toUpperCase() })} message={parsed.error} />
           <RawPreview content={content} compact />
@@ -56,8 +56,6 @@ export function TabularDataPreview({ content, fileType }: StructuredDataPreviewP
   const parsed = useMemo(() => parseTabularData(content, fileType.language), [content, fileType.language]);
   const [mode, setMode] = useState<TabularMode>('table');
 
-  if (mode === 'raw') return <RawPreview content={content} />;
-
   return (
     <div className="structured-preview tabular-preview">
       <PreviewModeTabs
@@ -68,7 +66,9 @@ export function TabularDataPreview({ content, fileType }: StructuredDataPreviewP
         value={mode}
         onChange={(value) => setMode(value as TabularMode)}
       />
-      {!parsed.ok ? (
+      {mode === 'raw' ? (
+        <RawPreview content={content} />
+      ) : !parsed.ok ? (
         <>
           <PreviewErrorPanel title={t('structured.parseFailed', { type: fileType.label.toUpperCase() })} message={parsed.error} />
           <RawPreview content={content} compact />

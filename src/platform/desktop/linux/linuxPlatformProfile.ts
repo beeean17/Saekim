@@ -10,6 +10,7 @@ class LinuxPlatformProfile extends BaseDesktopPlatformProfile {
         titlebarClassName: '',
         showsApplicationMenu: true,
         syncsNativeTitlebarColor: true,
+        providesNativeFullscreenCommand: false,
       },
     });
   }

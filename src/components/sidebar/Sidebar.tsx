@@ -1,22 +1,55 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject, type TouchEvent } from 'react';
-import type { CommandRegistry } from '../../app/commands';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, type TouchEvent } from 'react';
+import { dispatchCommand, formatShortcut, type CommandRegistry } from '../../app/commands';
 import { enabledFeatures } from '../../app/featureRegistry';
 import { relativeTime } from '../../core/format/relativeTime';
 import { selectSidebarContributions } from '../../core/sidebar/registry';
 import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
-import { isDirty, selectActiveFile, useWorkspaceStore } from '../../store/workspace';
+import { Platform } from '../../platform/common/platform';
+import { isDirty, selectActiveFile, useWorkspaceStore, type PendingFileCreation } from '../../store/workspace';
 import { useUIStore } from '../../store/ui';
 import type { FileTreeNode, OpenFile, ViewMode, WorkspaceSearchItem } from '../../types/workspace';
 import { Icon } from '../primitives/Icon';
 import { IconButton } from '../primitives/IconButton';
-import { Dialog } from '../ui/overlay/Dialog';
+import { Dialog, DialogActions } from '../ui/overlay/Dialog';
+import { Button } from '../ui/primitives/Button';
+import { EmptyState } from '../ui/feedback/EmptyState';
 import { CloseButton } from '../ui/primitives/CloseButton';
 import { SearchField } from '../ui/primitives/SearchField';
 import { SidebarMenu } from './SidebarMenu';
 import { SidebarToggle } from './SidebarToggle';
 import { TreeContextMenu, type TreeMenuPosition } from './TreeContextMenu';
 import { useI18n } from '../../i18n/useI18n';
+import { notify, notifyError } from '../../core/notifications';
+import { requestConfirmation } from '../../core/dialogs/confirm';
+import { ImagePreviewModal, insertImageSnippetIntoDocument } from './ImagePreviewModal';
+import {
+  androidContentWorkspaceDisplayName,
+  androidDocumentIdDisplayName,
+  androidTreeDocumentId,
+  appendBlockSnippet,
+  displayWorkspacePath,
+  errorMessage,
+  escapeMarkdownAlt,
+  escapeMarkdownDestination,
+  fileNameFromPath,
+  isContentUriPath,
+  isPathInsideWorkspaceEntry,
+  isPlaceholderDocumentPath,
+  isWorkspaceImageAsset,
+  localImagePreviewSrc,
+  markdownImagePathForContentDocument,
+  markdownImagePathForDocument,
+  markdownImageSnippet,
+  normalizePath,
+  parentContentDocumentId,
+  parentFolderFromPath,
+  parentFolderPath,
+  parseContentTreeDocumentUri,
+  pathParts,
+  pathRoot,
+  relativePath,
+} from './sidebarPaths';
 
 interface SidebarProps {
   compact: boolean;
@@ -45,12 +78,23 @@ export function Sidebar({
   const openFiles = useWorkspaceStore((state) => state.openFiles);
   const activeFile = useWorkspaceStore(selectActiveFile);
   const openFile = useWorkspaceStore((state) => state.openFile);
+  const openFolder = useWorkspaceStore((state) => state.openFolder);
+  const createFile = useWorkspaceStore((state) => state.createFile);
+  const createFolder = useWorkspaceStore((state) => state.createFolder);
+  const selectedFolderPath = useWorkspaceStore((state) => state.selectedFolderPath);
+  const pendingFileCreation = useWorkspaceStore((state) => state.pendingFileCreation);
+  const pendingFolderCreation = useWorkspaceStore((state) => state.pendingFolderCreation);
+  const commitFileCreation = useWorkspaceStore((state) => state.commitFileCreation);
+  const cancelFileCreation = useWorkspaceStore((state) => state.cancelFileCreation);
+  const cancelFolderCreation = useWorkspaceStore((state) => state.cancelFolderCreation);
+  const selectFolder = useWorkspaceStore((state) => state.selectFolder);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const saveFile = useWorkspaceStore((state) => state.saveFile);
   const renameWorkspaceEntry = useWorkspaceStore((state) => state.renameWorkspaceEntry);
   const removeWorkspaceEntry = useWorkspaceStore((state) => state.removeWorkspaceEntry);
   const refresh = useWorkspaceStore((state) => state.refresh);
+  const refreshFolder = useWorkspaceStore((state) => state.refreshFolder);
   const fileOperationsAvailable = currentPlatformCapabilities().has('folder.operations');
   const sidebarContributions = useMemo(() => selectSidebarContributions(enabledFeatures), []);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState('explorer');
@@ -58,13 +102,22 @@ export function Sidebar({
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [workspaceSearchResults, setWorkspaceSearchResults] = useState<WorkspaceSearchItem[] | null>(null);
   const [workspaceSearchError, setWorkspaceSearchError] = useState<string | null>(null);
+  const [workspaceSearchNeedsFolder, setWorkspaceSearchNeedsFolder] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ path: string; name: string } | null>(null);
   const [treeMenu, setTreeMenu] = useState<{ node: FileTreeNode; position: TreeMenuPosition } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<FileTreeNode | null>(null);
   const closeSearch = () => {
     setWorkspaceSearchQuery('');
     setWorkspaceSearchOpen(false);
   };
   const searchNeedle = workspaceSearchQuery.trim();
+
+  useEffect(() => {
+    if (!pendingFileCreation) return;
+    setActiveSidebarPanel('explorer');
+    setWorkspaceSearchOpen(false);
+    setWorkspaceSearchQuery('');
+  }, [pendingFileCreation]);
 
   useEffect(() => {
     if (!compact && compactSidebarOpen) closeCompactSidebar();
@@ -113,32 +166,39 @@ export function Sidebar({
     if (startX !== null && endX !== undefined && startX - endX >= 64) closeCompactSidebar();
   };
 
-  const refreshAfterOperation = async () => {
+  const refreshAfterOperation = async (parentPath?: string) => {
     try {
-      await refresh();
+      if (parentPath) await refreshFolder(parentPath);
+      else await refresh();
     } catch (error) {
       reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
-  const renameEntry = async (node: FileTreeNode) => {
-    const nextName = window.prompt(t('sidebar.renamePrompt'), node.name);
-    if (!nextName || nextName === node.name) return;
+  const renameEntry = async (node: FileTreeNode, nextName: string) => {
+    const normalizedName = nextName.trim();
+    if (!normalizedName) return;
+    if (normalizedName === node.name) {
+      setRenameTarget(null);
+      return;
+    }
     try {
-      const nextPath = await Backend.folders.renameEntry(node.path, nextName);
+      const nextPath = await Backend.folders.renameEntry(node.path, normalizedName);
       renameWorkspaceEntry(node.path, nextPath);
-      await refreshAfterOperation();
+      setRenameTarget(null);
+      await refreshAfterOperation(parentFolderPath(node.path));
     } catch (error) {
-      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
+      throw new Error(t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
-  const createFolder = async (parentPath: string) => {
-    const name = window.prompt(t('sidebar.folderNamePrompt'), t('sidebar.defaultFolderName'));
-    if (!name) return;
+  const commitFolderCreation = async (name: string) => {
+    const pending = useWorkspaceStore.getState().pendingFolderCreation;
+    if (!pending || !name.trim()) return;
     try {
-      await Backend.folders.createFolder(parentPath, name);
-      await refreshAfterOperation();
+      await Backend.folders.createFolder(pending.parentPath, name.trim());
+      cancelFolderCreation();
+      await refreshAfterOperation(pending.parentPath);
     } catch (error) {
-      reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
+      throw new Error(t('sidebar.fileActionFailed', { message: errorMessage(error) }));
     }
   };
   const duplicateFile = async (node: FileTreeNode) => {
@@ -150,7 +210,14 @@ export function Sidebar({
     }
   };
   const trashEntry = async (node: FileTreeNode) => {
-    if (!window.confirm(t('sidebar.trashConfirm', { name: node.name }))) return;
+    const confirmed = await requestConfirmation({
+      title: t('sidebar.moveToTrash'),
+      message: t('sidebar.trashConfirm', { name: node.name }),
+      confirmLabel: t('sidebar.moveToTrash'),
+      cancelLabel: t('common.cancel'),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     const affectedFiles = openFiles.filter((file) => isPathInsideWorkspaceEntry(file.path, node.path));
     const dirtyFiles = affectedFiles.filter((file) => isDirty(file));
     if (dirtyFiles.length > 0) {
@@ -165,7 +232,7 @@ export function Sidebar({
     }
     try {
       await Backend.folders.trashEntry(node.path);
-      removeWorkspaceEntry(node.path);
+      removeWorkspaceEntry(node.path, affectedFiles.map((file) => file.id));
       await refreshAfterOperation();
     } catch (error) {
       reportFileOperationError(error, t('sidebar.fileActionFailed', { message: errorMessage(error) }));
@@ -179,10 +246,14 @@ export function Sidebar({
       return;
     }
     if (!rootPath || rootPath.startsWith('~')) {
+      /* There is nothing to search yet; saying "no matches" would imply the
+         search ran and came back empty. */
       setWorkspaceSearchResults([]);
       setWorkspaceSearchError(null);
+      setWorkspaceSearchNeedsFolder(true);
       return;
     }
+    setWorkspaceSearchNeedsFolder(false);
 
     let cancelled = false;
     const timeout = window.setTimeout(() => {
@@ -227,13 +298,19 @@ export function Sidebar({
   }, [rootPath, searchNeedle]);
   const addImageToDocument = (image: { path: string; name: string }) => {
     if (!activeFile) {
-      window.alert(t('sidebar.addImageFirst'));
+      notify(t('sidebar.addImageFirst'), { tone: 'warning' });
       return;
     }
 
     const imagePath = markdownImagePathForDocument(image.path, activeFile.path);
     insertImageSnippetIntoDocument(textareaRef.current, activeFile, updateContent, markdownImageSnippet(imagePath, image.name, t('image.defaultAlt')));
     setImagePreview(null);
+  };
+  const commitPendingFile = async (name: string, focusEditor: boolean) => {
+    const path = await commitFileCreation(name);
+    if (path && focusEditor) {
+      window.requestAnimationFrame(() => textareaRef.current?.focus());
+    }
   };
 
   return (
@@ -258,13 +335,23 @@ export function Sidebar({
       onTouchStart={handleDrawerTouchStart}
     >
       <div className="sidebar-head">
-        <SidebarToggle compact={compact} />
-        <SidebarMenu
-          className="sidebar-actions"
-          textareaRef={textareaRef}
-          commandRegistry={commandRegistry}
-          effectiveViewMode={effectiveViewMode}
-        />
+        <div className="sidebar-head-icons">
+          <SidebarToggle compact={compact} />
+          <div className="sidebar-actions">
+            <SidebarMenu
+              textareaRef={textareaRef}
+              commandRegistry={commandRegistry}
+              effectiveViewMode={effectiveViewMode}
+            />
+            <IconButton
+              disabled={!rootPath || rootPath.startsWith('~')}
+              label={`${t('sidebar.refresh')} (${formatShortcut('mod+r')})`}
+              onClick={() => dispatchCommand(commandRegistry, 'workspace.refresh')}
+            >
+              <Icon name="refresh" />
+            </IconButton>
+          </div>
+        </div>
       </div>
       <SidebarPanelTabs
         activeId={activeSidebarPanel}
@@ -277,16 +364,17 @@ export function Sidebar({
       {activeSidebarPanel === 'explorer' ? (
         <>
           <FolderPath
-            canCreateFolder={fileOperationsAvailable && Boolean(rootPath)}
             path={rootPath}
-            onCreateFolder={() => rootPath && void createFolder(rootPath)}
+            onOpenFolder={
+              currentPlatformCapabilities().has('folder.open') ? () => void openFolder() : null
+            }
             onSearch={() => setWorkspaceSearchOpen((open) => !open)}
-            onRefresh={() => void refresh()}
           />
           {workspaceSearchOpen ? (
             <SearchField
               autoFocus
               className="sidebar-search"
+              label={t('sidebar.searchPlaceholder')}
               value={workspaceSearchQuery}
               placeholder={t('sidebar.searchPlaceholder')}
               onChange={setWorkspaceSearchQuery}
@@ -297,6 +385,7 @@ export function Sidebar({
             {searchNeedle ? (
               <WorkspaceSearchResults
                 activePath={activeFile?.path ?? null}
+                needsFolder={workspaceSearchNeedsFolder}
                 error={workspaceSearchError}
                 items={workspaceSearchResults}
                 openFiles={openFiles}
@@ -304,18 +393,55 @@ export function Sidebar({
                 onPreviewImage={(item) => setImagePreview({ path: item.path, name: item.name })}
               />
             ) : (
-              tree.map((node) => (
-                <FileTreeNodeView
-                  activePath={activeFile?.path ?? null}
-                  key={node.id}
-                  node={node}
-                  openFiles={openFiles}
-                  onToggle={toggleFolder}
-                  onOpen={(path) => void openFile(path)}
-                  onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
-                  onContextMenu={fileOperationsAvailable ? (node, position) => setTreeMenu({ node, position }) : undefined}
-                />
-              ))
+              <>
+                {pendingFileCreation && pendingFileCreation.parentPath === rootPath ? (
+                  <PendingFileInput
+                    key={pendingFileCreation.id}
+                    pending={pendingFileCreation}
+                    onCancel={cancelFileCreation}
+                    onCommit={commitPendingFile}
+                  />
+                ) : null}
+                {!rootPath && !pendingFileCreation ? (
+                  <EmptyState
+                    className="sidebar-empty-state"
+                    title={t('sidebar.noFolder')}
+                    description={t('sidebar.noFolderDescription')}
+                    actions={
+                      currentPlatformCapabilities().has('folder.open') ? (
+                        <Button
+                          className="empty-document-action"
+                          variant="primary"
+                          onClick={() => void openFolder()}
+                        >
+                          {t('sidebar.openFolderAction')}
+                        </Button>
+                      ) : null
+                    }
+                  />
+                ) : null}
+                {tree.map((node) => (
+                  <FileTreeNodeView
+                    activePath={activeFile?.path ?? null}
+                    key={node.id}
+                    node={node}
+                    openFiles={openFiles}
+                    pendingFileCreation={pendingFileCreation}
+                    renameTargetPath={renameTarget?.path ?? null}
+                    selectedFolderPath={selectedFolderPath}
+                    onCancelFileCreation={cancelFileCreation}
+                    onCancelRename={() => setRenameTarget(null)}
+                    onCommitFileCreation={commitPendingFile}
+                    onCommitRename={renameEntry}
+                    onToggle={toggleFolder}
+                    onOpen={(path) => void openFile(path)}
+                    onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
+                    contextTargetPath={treeMenu?.node.path ?? null}
+                    onSelectFolder={selectFolder}
+                    onContextMenu={fileOperationsAvailable ? (node, position) => setTreeMenu({ node, position }) : undefined}
+                  />
+                ))}
+              </>
             )}
           </div>
         </>
@@ -338,10 +464,26 @@ export function Sidebar({
           node={treeMenu.node}
           position={treeMenu.position}
           onClose={() => setTreeMenu(null)}
+          onCreateFile={() => void createFile(treeMenu.node.path)}
           onCreateFolder={() => void createFolder(treeMenu.node.path)}
           onDuplicate={() => void duplicateFile(treeMenu.node)}
-          onRename={() => void renameEntry(treeMenu.node)}
+          onRename={() => {
+            cancelFileCreation();
+            cancelFolderCreation();
+            setRenameTarget(treeMenu.node);
+          }}
           onTrash={() => void trashEntry(treeMenu.node)}
+        />
+      ) : null}
+      {pendingFolderCreation ? (
+        <EntryNameDialog
+          confirmLabel={t('sidebar.createAction')}
+          initialName={pendingFolderCreation.name}
+          inputLabel={t('sidebar.folderNamePrompt')}
+          operationId={`create-folder-${pendingFolderCreation.id}`}
+          title={t('sidebar.createFolderTitle')}
+          onClose={cancelFolderCreation}
+          onSubmit={commitFolderCreation}
         />
       ) : null}
       {imagePreview ? (
@@ -395,80 +537,201 @@ function SidebarPanelTabs({
 }
 
 function FolderPath({
-  canCreateFolder,
   path,
-  onCreateFolder,
+  onOpenFolder,
   onSearch,
-  onRefresh,
 }: {
-  readonly canCreateFolder: boolean;
   readonly path: string | null;
-  readonly onCreateFolder: () => void;
+  readonly onOpenFolder: (() => void) | null;
   readonly onSearch: () => void;
-  readonly onRefresh: () => void;
 }) {
   const { t } = useI18n();
-  const label = path ? displayWorkspacePath(path) : t('sidebar.noFolder');
 
+  /*
+   * With no workspace this used to render "No folder open" inside a bordered
+   * box with a magnifier beside it, which reads as a search field you can type
+   * into. Now it is plainly a button that opens a folder - or nothing at all
+   * on platforms that cannot.
+   */
+  if (!path) {
+    if (!onOpenFolder) return null;
+    return (
+      <div className="sidebar-folder-path sidebar-folder-path-empty">
+        <button className="sidebar-open-folder" type="button" onClick={onOpenFolder}>
+          <Icon name="folderOpen" />
+          <span>{t('sidebar.openFolderAction')}</span>
+        </button>
+      </div>
+    );
+  }
+
+  const label = displayWorkspacePath(path);
   return (
     <div className="sidebar-folder-path" title={label}>
       <span className="sidebar-folder-path-text"><span className="sidebar-folder-path-value">{label}</span></span>
       <div className="sidebar-folder-actions">
-        {canCreateFolder ? (
-          <IconButton label={t('sidebar.newFolder')} onClick={onCreateFolder}>
-            <Icon name="folder" />
-          </IconButton>
-        ) : null}
         <IconButton label={t('sidebar.searchFiles')} onClick={onSearch}>
           <Icon name="search" />
-        </IconButton>
-        <IconButton label={t('sidebar.refresh')} onClick={onRefresh}>
-          <Icon name="refresh" />
         </IconButton>
       </div>
     </div>
   );
 }
 
-function displayWorkspacePath(path: string): string {
-  if (path.startsWith('~android/')) return path.slice('~android/'.length);
-  if (path.startsWith('content://')) return androidContentWorkspaceDisplayName(path);
-  return path;
+export function PendingFileInput({
+  pending,
+  onCancel,
+  onCommit,
+}: {
+  pending: PendingFileCreation;
+  onCancel: () => void;
+  onCommit: (name: string, focusEditor: boolean) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const submittingRef = useRef(false);
+  const [name, setName] = useState(pending.name);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    const extensionStart = pending.name.lastIndexOf('.');
+    input.setSelectionRange(0, extensionStart > 0 ? extensionStart : pending.name.length);
+  }, [pending.id, pending.name]);
+
+  const commit = async (focusEditor: boolean) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setError(null);
+    try {
+      await onCommit(name, focusEditor);
+    } catch (commitError) {
+      setError(errorMessage(commitError));
+      submittingRef.current = false;
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  };
+
+  return (
+    <div className={`file pending-file ${error ? 'invalid' : ''}`}>
+      <Icon name="file" />
+      <input
+        aria-label={t('sidebar.newFileName')}
+        aria-invalid={error ? true : undefined}
+        ref={inputRef}
+        value={name}
+        onBlur={() => void commit(false)}
+        onChange={(event) => {
+          setName(event.currentTarget.value);
+          setError(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            onCancel();
+            return;
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            void commit(true);
+          }
+        }}
+      />
+      {error ? <span className="pending-file-error" role="alert" title={error}>{error}</span> : null}
+    </div>
+  );
 }
 
-function androidContentWorkspaceDisplayName(path: string): string {
-  try {
-    const url = new URL(path);
-    const treeId = androidTreeDocumentId(url);
-    if (treeId) return androidDocumentIdDisplayName(treeId);
-    if (url.hostname === 'com.android.providers.downloads.documents') return 'Downloads';
-    if (url.hostname === 'com.android.externalstorage.documents') return 'Storage';
-    if (url.hostname === 'com.android.providers.media.documents') return 'Media';
-    return url.hostname || 'Android document';
-  } catch {
-    return 'Android document';
-  }
-}
+export function InlineEntryNameInput({
+  initialName,
+  label,
+  selectBaseName = false,
+  onCancel,
+  onCommit,
+}: {
+  initialName: string;
+  label: string;
+  selectBaseName?: boolean;
+  onCancel: () => void;
+  onCommit: (name: string) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const cancelledRef = useRef(false);
+  const submittingRef = useRef(false);
+  const [name, setName] = useState(initialName);
+  const [error, setError] = useState<string | null>(null);
 
-function androidTreeDocumentId(url: URL): string | null {
-  const parts = url.pathname.split('/').filter(Boolean);
-  const treeIndex = parts.indexOf('tree');
-  if (treeIndex < 0 || treeIndex + 1 >= parts.length) return null;
-  return decodeURIComponent(parts[treeIndex + 1]);
-}
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    const extensionStart = selectBaseName ? initialName.lastIndexOf('.') : -1;
+    input.setSelectionRange(0, extensionStart > 0 ? extensionStart : initialName.length);
+  }, [initialName, selectBaseName]);
 
-function androidDocumentIdDisplayName(documentId: string): string {
-  const withoutVolume = documentId.startsWith('primary:') ? documentId.slice('primary:'.length) : documentId;
-  const normalized = withoutVolume.replace(/^\/+/, '');
-  if (normalized === 'Download') return 'Downloads';
-  if (normalized.startsWith('Download/')) return normalized.replace('Download', 'Downloads').replace(/\//g, ' / ');
-  return normalized.replace(/\//g, ' / ') || 'Android document';
+  const commit = async () => {
+    if (cancelledRef.current || submittingRef.current) return;
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      setError(t('sidebar.entryNameRequired'));
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+    submittingRef.current = true;
+    setError(null);
+    try {
+      await onCommit(normalizedName);
+    } catch (commitError) {
+      submittingRef.current = false;
+      setError(errorMessage(commitError));
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  };
+
+  return (
+    <>
+      <input
+        aria-invalid={error ? true : undefined}
+        aria-label={label}
+        className="inline-entry-name"
+        ref={inputRef}
+        title={error ?? undefined}
+        value={name}
+        onBlur={() => void commit()}
+        onChange={(event) => {
+          setName(event.currentTarget.value);
+          setError(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            cancelledRef.current = true;
+            onCancel();
+            return;
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            void commit();
+          }
+        }}
+      />
+      {error ? <span className="inline-entry-error" role="alert">{error}</span> : null}
+    </>
+  );
 }
 
 function WorkspaceSearchResults({
   activePath,
   error,
   items,
+  needsFolder,
   openFiles,
   onOpen,
   onPreviewImage,
@@ -476,11 +739,13 @@ function WorkspaceSearchResults({
   activePath: string | null;
   error: string | null;
   items: WorkspaceSearchItem[] | null;
+  needsFolder: boolean;
   openFiles: OpenFile[];
   onOpen: (path: string) => void;
   onPreviewImage: (item: WorkspaceSearchItem) => void;
 }) {
   const { t } = useI18n();
+  if (needsFolder) return <div className="workspace-search-message">{t('sidebar.searchNeedsFolder')}</div>;
   if (error) return <div className="workspace-search-message" title={error}>{t('sidebar.searchUnavailable')}</div>;
   if (!items) return <div className="workspace-search-message">{t('sidebar.searching')}</div>;
   if (items.length === 0) return <div className="workspace-search-message">{t('sidebar.noMatches')}</div>;
@@ -507,10 +772,19 @@ function WorkspaceSearchResults({
   });
 }
 
-function FileTreeNodeView({
+export function FileTreeNodeView({
   node,
   activePath,
   openFiles,
+  pendingFileCreation,
+  renameTargetPath,
+  selectedFolderPath,
+  contextTargetPath,
+  onCancelFileCreation,
+  onCancelRename,
+  onCommitFileCreation,
+  onCommitRename,
+  onSelectFolder,
   onToggle,
   onOpen,
   onPreviewImage,
@@ -519,6 +793,15 @@ function FileTreeNodeView({
   node: FileTreeNode;
   activePath: string | null;
   openFiles: OpenFile[];
+  pendingFileCreation: PendingFileCreation | null;
+  renameTargetPath: string | null;
+  selectedFolderPath: string | null;
+  contextTargetPath: string | null;
+  onCancelFileCreation: () => void;
+  onCancelRename: () => void;
+  onCommitFileCreation: (name: string, focusEditor: boolean) => Promise<void>;
+  onCommitRename: (node: FileTreeNode, name: string) => Promise<void>;
+  onSelectFolder: (path: string) => void;
   onToggle: (path: string) => Promise<void>;
   onOpen: (path: string) => void;
   onPreviewImage: (node: FileTreeNode) => void;
@@ -526,26 +809,62 @@ function FileTreeNodeView({
 }) {
   const { language, t } = useI18n();
   if (node.type === 'folder') {
+    const creatingInside = pendingFileCreation?.parentPath === node.path;
+    const renaming = renameTargetPath === node.path;
     return (
       <div>
-        <button
-          className={`folder ${node.isOpen ? 'open' : ''}`}
-          type="button"
-          onContextMenu={(event) => showTreeContextMenu(event, node, onContextMenu)}
-          onKeyDown={(event) => showTreeContextMenuFromKeyboard(event, node, onContextMenu)}
-          onClick={() => void onToggle(node.path)}
-        >
-          <Icon name="chevronRight" className="ic chev" />
-          <span>{node.name}</span>
-        </button>
-        {node.isOpen && node.children ? (
+        {renaming ? (
+          <div className={`folder renaming ${node.isOpen ? 'open' : ''} ${node.path === selectedFolderPath ? 'selected' : ''}`}>
+            <Icon name="chevronRight" className="ic chev" />
+            <InlineEntryNameInput
+              initialName={node.name}
+              label={t('sidebar.renamePrompt')}
+              onCancel={onCancelRename}
+              onCommit={(name) => onCommitRename(node, name)}
+            />
+          </div>
+        ) : (
+          <button
+            aria-pressed={node.path === selectedFolderPath}
+            className={`folder ${node.isOpen ? 'open' : ''} ${node.path === selectedFolderPath ? 'selected' : ''} ${node.path === contextTargetPath ? 'context-target' : ''}`}
+            type="button"
+            onPointerDown={preventRightClickSelection}
+            onContextMenu={(event) => showTreeContextMenu(event, node, onContextMenu)}
+            onKeyDown={(event) => showTreeContextMenuFromKeyboard(event, node, onContextMenu)}
+            onClick={() => {
+              if (node.path === selectedFolderPath) void onToggle(node.path);
+              else onSelectFolder(node.path);
+            }}
+          >
+            <Icon name="chevronRight" className="ic chev" />
+            <span>{node.name}</span>
+          </button>
+        )}
+        {node.isOpen && (node.children || creatingInside) ? (
           <div className="file-list">
-            {node.children.map((child) => (
+            {creatingInside && pendingFileCreation ? (
+              <PendingFileInput
+                key={pendingFileCreation.id}
+                pending={pendingFileCreation}
+                onCancel={onCancelFileCreation}
+                onCommit={onCommitFileCreation}
+              />
+            ) : null}
+            {(node.children ?? []).map((child) => (
               <FileTreeNodeView
                 activePath={activePath}
                 key={child.id}
                 node={child}
                 openFiles={openFiles}
+                pendingFileCreation={pendingFileCreation}
+                renameTargetPath={renameTargetPath}
+                selectedFolderPath={selectedFolderPath}
+                contextTargetPath={contextTargetPath}
+                onCancelFileCreation={onCancelFileCreation}
+                onCancelRename={onCancelRename}
+                onCommitFileCreation={onCommitFileCreation}
+                onCommitRename={onCommitRename}
+                onSelectFolder={onSelectFolder}
                 onToggle={onToggle}
                 onOpen={onOpen}
                 onPreviewImage={onPreviewImage}
@@ -562,11 +881,26 @@ function FileTreeNodeView({
   const openFile = openFiles.find((file) => file.path === node.path);
   const dirty = isDirty(openFile ?? null);
   const imageAsset = isWorkspaceImageAsset(node.path);
+  if (renameTargetPath === node.path) {
+    return (
+      <div className={`file renaming ${active ? 'current' : ''} ${imageAsset ? 'asset-file' : ''}`}>
+        <Icon name={imageAsset ? 'image' : 'file'} />
+        <InlineEntryNameInput
+          initialName={node.name}
+          label={t('sidebar.renamePrompt')}
+          selectBaseName
+          onCancel={onCancelRename}
+          onCommit={(name) => onCommitRename(node, name)}
+        />
+      </div>
+    );
+  }
   return (
     <button
-      className={`file ${active ? 'current' : ''} ${imageAsset ? 'asset-file' : ''}`}
+      className={`file ${active ? 'current' : ''} ${imageAsset ? 'asset-file' : ''} ${node.path === contextTargetPath ? 'context-target' : ''}`}
       title={imageAsset ? node.path : undefined}
       type="button"
+      onPointerDown={preventRightClickSelection}
       onContextMenu={(event) => showTreeContextMenu(event, node, onContextMenu)}
       onKeyDown={(event) => showTreeContextMenuFromKeyboard(event, node, onContextMenu)}
       onClick={() => {
@@ -591,7 +925,13 @@ function showTreeContextMenu(
 ): void {
   if (!onContextMenu) return;
   event.preventDefault();
+  event.stopPropagation();
+  window.getSelection()?.removeAllRanges();
   onContextMenu(node, clampTreeMenuPosition(event.clientX, event.clientY));
+}
+
+function preventRightClickSelection(event: ReactPointerEvent<HTMLButtonElement>): void {
+  if (event.button === 2) window.getSelection()?.removeAllRanges();
 }
 
 function showTreeContextMenuFromKeyboard(
@@ -608,240 +948,107 @@ function showTreeContextMenuFromKeyboard(
 function clampTreeMenuPosition(x: number, y: number): TreeMenuPosition {
   return {
     x: Math.max(8, Math.min(x, window.innerWidth - 196)),
-    y: Math.max(8, Math.min(y, window.innerHeight - 152)),
+    y: Math.max(8, Math.min(y, window.innerHeight - 190)),
   };
 }
 
-function ImagePreviewModal({
-  canAddToDocument,
-  image,
-  onAddToDocument,
+export function EntryNameDialog({
+  confirmLabel,
+  initialName,
+  inputLabel,
+  operationId,
+  selectBaseName = false,
+  title,
   onClose,
+  onSubmit,
 }: {
-  canAddToDocument: boolean;
-  image: { path: string; name: string };
-  onAddToDocument: () => void;
+  confirmLabel: string;
+  initialName: string;
+  inputLabel: string;
+  operationId: string;
+  selectBaseName?: boolean;
+  title: string;
   onClose: () => void;
+  onSubmit: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const [src, setSrc] = useState(() => localImagePreviewSrc(image.path));
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [name, setName] = useState(initialName);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    setSrc(localImagePreviewSrc(image.path));
-    if (isContentUriPath(image.path)) {
-      void Backend.images
-        .resolveImageSrc(image.path)
-        .then((resolved) => {
-          if (!cancelled && resolved) setSrc(resolved);
-        })
-        .catch((error) => console.warn('failed to resolve image preview', error));
+    setName(initialName);
+    setError(null);
+    setSubmitting(false);
+    const frame = window.requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      const extensionStart = selectBaseName ? initialName.lastIndexOf('.') : -1;
+      input.setSelectionRange(0, extensionStart > 0 ? extensionStart : initialName.length);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialName, operationId, selectBaseName]);
+
+  const submit = async () => {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      setError(t('sidebar.entryNameRequired'));
+      inputRef.current?.focus();
+      return;
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [image.path]);
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit(normalizedName);
+    } catch (submitError) {
+      setSubmitting(false);
+      setError(errorMessage(submitError));
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  };
 
   return (
     <Dialog
+      closeOnBackdrop={!submitting}
       open
-      title={t('sidebar.imagePreview', { name: image.name })}
-      className="image-preview-modal"
-      backdropClassName="image-preview-backdrop"
-      onClose={onClose}
+      title={title}
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
     >
-        <div className="image-preview-head">
-          <div>
-            <strong>{image.name}</strong>
-            <span>{image.path}</span>
-          </div>
-          <div className="image-preview-actions">
-            <button
-              className="image-preview-add"
-              disabled={!canAddToDocument}
-              type="button"
-              title={canAddToDocument ? t('sidebar.addImage') : t('sidebar.addImageFirst')}
-              onClick={onAddToDocument}
-            >
-              {t('sidebar.addImage')}
-            </button>
-            <CloseButton className="image-preview-close" onClick={onClose}>
-              x
-            </CloseButton>
-          </div>
-        </div>
-        <div className="image-preview-body">
-          <img alt={image.name} src={src} />
-        </div>
+      <form
+        className="entry-name-dialog"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <h2>{title}</h2>
+        <label>
+          <span>{inputLabel}</span>
+          <input
+            aria-invalid={error ? true : undefined}
+            disabled={submitting}
+            ref={inputRef}
+            value={name}
+            onChange={(event) => {
+              setName(event.currentTarget.value);
+              setError(null);
+            }}
+          />
+        </label>
+        {error ? <p className="entry-name-dialog-error" role="alert">{error}</p> : null}
+        <DialogActions>
+          <Button disabled={submitting} variant="surface" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button disabled={submitting} variant="primary" type="submit">{confirmLabel}</Button>
+        </DialogActions>
+      </form>
     </Dialog>
   );
 }
 
-function isWorkspaceImageAsset(path: string): boolean {
-  const contentUri = parseContentTreeDocumentUri(path);
-  const normalized = (contentUri?.documentId ?? path).replace(/\\/g, '/').toLowerCase();
-  return (
-    normalized.includes('/.assets/') &&
-    /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/.test(normalized)
-  );
-}
-
-function localImagePreviewSrc(path: string): string {
-  return Backend.runtime.toFileSrc(path);
-}
-
-function insertImageSnippetIntoDocument(
-  textarea: HTMLTextAreaElement | null,
-  activeFile: OpenFile,
-  updateContent: (id: string, text: string) => void,
-  snippet: string,
-): void {
-  const value = textarea?.value ?? activeFile.content;
-  const start = textarea ? textarea.selectionStart : value.length;
-  const end = textarea ? textarea.selectionEnd : value.length;
-  const insertion = textarea ? snippet : appendBlockSnippet(value, snippet);
-  const next = `${value.slice(0, start)}${insertion}${value.slice(end)}`;
-  const cursor = start + insertion.length;
-
-  updateContent(activeFile.id, next);
-
-  if (!textarea) return;
-  window.requestAnimationFrame(() => {
-    textarea.focus();
-    textarea.selectionStart = cursor;
-    textarea.selectionEnd = cursor;
-  });
-}
-
-function appendBlockSnippet(value: string, snippet: string): string {
-  if (!value) return snippet;
-  return `${value.endsWith('\n') ? '' : '\n'}${snippet}`;
-}
-
-function markdownImageSnippet(path: string, altText: string, defaultAlt = 'image'): string {
-  const alt = escapeMarkdownAlt(altText.replace(/\.[^.]+$/, '') || defaultAlt);
-  return `![${alt}](<${escapeMarkdownDestination(path)}>)`;
-}
-
-function markdownImagePathForDocument(imagePath: string, documentPath: string): string {
-  if (isPlaceholderDocumentPath(documentPath)) return normalizePath(imagePath);
-  if (isContentUriPath(documentPath)) return markdownImagePathForContentDocument(imagePath, documentPath);
-
-  const image = normalizePath(imagePath);
-  const documentDir = parentFolderFromPath(documentPath);
-  if (!documentDir || pathRoot(image) !== pathRoot(documentDir)) return image;
-
-  const relative = relativePath(documentDir, image);
-  if (!relative || relative.startsWith('../')) return relative || fileNameFromPath(image);
-  return relative.startsWith('./') ? relative : `./${relative}`;
-}
-
-function markdownImagePathForContentDocument(imagePath: string, documentPath: string): string {
-  if (!isContentUriPath(imagePath)) return normalizePath(imagePath);
-
-  const image = parseContentTreeDocumentUri(imagePath);
-  const document = parseContentTreeDocumentUri(documentPath);
-  if (!image || !document || image.prefix !== document.prefix || image.treeId !== document.treeId) {
-    return normalizePath(imagePath);
-  }
-
-  const documentParentId = parentContentDocumentId(document.documentId);
-  if (!documentParentId || !image.documentId.startsWith(`${documentParentId}/`)) return normalizePath(imagePath);
-
-  const relative = image.documentId.slice(documentParentId.length + 1);
-  return relative.startsWith('.') ? `./${relative}` : relative;
-}
-
-function relativePath(fromDirectory: string, toPath: string): string {
-  const fromParts = pathParts(fromDirectory);
-  const toParts = pathParts(toPath);
-  let common = 0;
-
-  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
-    common += 1;
-  }
-
-  return [...Array.from({ length: fromParts.length - common }, () => '..'), ...toParts.slice(common)].join('/');
-}
-
-function parentFolderFromPath(path: string): string | null {
-  const normalized = normalizePath(path);
-  const index = normalized.lastIndexOf('/');
-  if (index <= 0) return null;
-  return normalized.slice(0, index);
-}
-
-function pathParts(path: string): string[] {
-  return normalizePath(path)
-    .replace(/^[A-Za-z]:\//, '')
-    .replace(/^\/+/, '')
-    .split('/')
-    .filter(Boolean);
-}
-
-function pathRoot(path: string): string {
-  const normalized = normalizePath(path);
-  const windowsDrive = normalized.match(/^[A-Za-z]:\//)?.[0];
-  if (windowsDrive) return windowsDrive.toUpperCase();
-  return normalized.startsWith('/') ? '/' : '';
-}
-
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, '/');
-}
-
-function isPlaceholderDocumentPath(path: string): boolean {
-  return path.startsWith('~') || path.startsWith('browser://');
-}
-
-function isPathInsideWorkspaceEntry(path: string, entryPath: string): boolean {
-  return path === entryPath || path.startsWith(`${entryPath}/`) || path.startsWith(`${entryPath}\\`);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function reportFileOperationError(_error: unknown, message: string): void {
-  window.alert(message);
-}
-
-function isContentUriPath(path: string): boolean {
-  return /^content:\/\//i.test(path);
-}
-
-function parseContentTreeDocumentUri(path: string): { prefix: string; treeId: string; documentId: string } | null {
-  try {
-    const url = new URL(path);
-    const parts = url.pathname.split('/').filter(Boolean);
-    const treeIndex = parts.indexOf('tree');
-    const documentIndex = parts.indexOf('document');
-    if (url.protocol !== 'content:' || treeIndex < 0 || documentIndex < 0) return null;
-    if (treeIndex + 1 >= parts.length || documentIndex + 1 >= parts.length) return null;
-    return {
-      prefix: `${url.protocol}//${url.host}`,
-      treeId: decodeURIComponent(parts[treeIndex + 1]),
-      documentId: decodeURIComponent(parts[documentIndex + 1]),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function parentContentDocumentId(documentId: string): string | null {
-  const index = documentId.lastIndexOf('/');
-  if (index <= 0) return null;
-  return documentId.slice(0, index);
-}
-
-function fileNameFromPath(path: string): string {
-  return normalizePath(path).split('/').filter(Boolean).pop() ?? 'image';
-}
-
-function escapeMarkdownDestination(path: string): string {
-  return normalizePath(path).replace(/>/g, '%3E');
-}
-
-function escapeMarkdownAlt(value: string): string {
-  return value.replace(/]/g, '\\]');
+function reportFileOperationError(error: unknown, message: string): void {
+  notifyError(message, error);
 }

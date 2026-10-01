@@ -1,11 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Allow every Saekim window to receive Tauri events.",
+  "description": "Allow every Saekim window to receive Tauri events on every platform.",
   "windows": ["main", "window*"],
   "permissions": [
-    "core:event:default",
-    "process:allow-restart",
-    "updater:default"
+    "core:event:default"
   ]
 }

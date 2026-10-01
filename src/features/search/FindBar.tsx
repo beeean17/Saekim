@@ -8,6 +8,9 @@ import { Backend } from '../../platform/common/backend';
 import { useWorkspaceStore } from '../../store/workspace';
 import type { OpenFile, WorkspaceSearchItem } from '../../types/workspace';
 import { useI18n } from '../../i18n/useI18n';
+import { Dialog, DialogActions } from '../../components/ui/overlay/Dialog';
+import { Button } from '../../components/ui/primitives/Button';
+import { notify } from '../../core/notifications';
 
 interface SearchOptions {
   caseSensitive: boolean;
@@ -53,6 +56,7 @@ export function FindBar({
   const [activeIndex, setActiveIndex] = useState(0);
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchItem[] | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [confirmReplaceAll, setConfirmReplaceAll] = useState(false);
   const searchRange = selectionOnly ? initialSelection.current : { start: 0, end: file.content.length };
   const matchResult = useMemo(
     () => findMatches(file.content, query, options, searchRange),
@@ -86,9 +90,10 @@ export function FindBar({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    textarea.focus();
+    /* Selecting without focusing avoids the focus ping-pong that made the
+       match highlight flicker and drop out of the system's active selection. */
     textarea.setSelectionRange(match.start, match.end);
-    inputRef.current?.focus();
+    scrollSelectionIntoView(textarea, match.start);
   }, [activeIndex, matches, scope, textareaRef]);
 
   useEffect(() => {
@@ -151,13 +156,20 @@ export function FindBar({
     updateContent(file.id, nextContent);
     selectEditorRange(textareaRef.current, match.start, match.start + inserted.length);
   };
+  /*
+   * Replace all rewrites the whole document in one go. It asks first and then
+   * says how much it changed; the edit itself lands as a single undo step.
+   */
   const replaceAll = () => {
     if (matches.length === 0) return;
+    const replaced = matches.length;
     const nextContent = [...matches].reverse().reduce((content, match) => {
       const inserted = replacementForMatch(match, replacement, options.useRegex);
       return `${content.slice(0, match.start)}${inserted}${content.slice(match.end)}`;
     }, file.content);
     updateContent(file.id, nextContent);
+    setConfirmReplaceAll(false);
+    notify(t('search.replaceAllDone', { count: replaced }), { tone: 'success' });
   };
 
   return (
@@ -176,6 +188,7 @@ export function FindBar({
           <SearchField
             ref={inputRef}
             className="find-search-field"
+            label={scope === 'document' ? t('search.findDocument') : t('search.findWorkspace')}
             value={query}
             placeholder={scope === 'document' ? t('search.findDocument') : t('search.findWorkspace')}
             onChange={setQuery}
@@ -236,11 +249,32 @@ export function FindBar({
             <IconButton label={t('search.previous')} onClick={() => go(-1)}><Icon name="chevronUp" /></IconButton>
             <IconButton label={t('search.next')} onClick={() => go(1)}><Icon name="chevronDown" /></IconButton>
             {replaceOpen ? <button className="find-action" type="button" onClick={replaceCurrent}>{t('search.replace')}</button> : null}
-            {replaceOpen ? <button className="find-action" type="button" onClick={replaceAll}>{t('search.replaceAll')}</button> : null}
+            {replaceOpen ? (
+              <button
+                className="find-action"
+                disabled={matches.length === 0}
+                type="button"
+                onClick={() => setConfirmReplaceAll(true)}
+              >
+                {t('search.replaceAll')}
+              </button>
+            ) : null}
           </>
         ) : null}
         <CloseButton className="find-close" onClick={onClose}>{t('common.close')}</CloseButton>
       </div>
+      <Dialog
+        className="find-confirm"
+        open={confirmReplaceAll}
+        title={t('search.replaceAll')}
+        onClose={() => setConfirmReplaceAll(false)}
+      >
+        <p className="find-confirm-copy">{t('search.replaceAllConfirm', { count: matches.length })}</p>
+        <DialogActions>
+          <Button variant="surface" onClick={() => setConfirmReplaceAll(false)}>{t('common.cancel')}</Button>
+          <Button variant="primary" onClick={replaceAll}>{t('common.confirm')}</Button>
+        </DialogActions>
+      </Dialog>
       {matchResult.error && scope === 'document' ? <div className="find-error">{matchResult.error}</div> : null}
       {scope === 'workspace' ? (
         <WorkspaceContentResults
@@ -261,6 +295,20 @@ export function FindBar({
       ) : null}
     </div>
   );
+}
+
+/* A textarea only scrolls to the caret when focused, so nudge it manually. */
+function scrollSelectionIntoView(textarea: HTMLTextAreaElement, index: number): void {
+  const style = window.getComputedStyle(textarea);
+  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.75;
+  const line = textarea.value.slice(0, index).split('\n').length - 1;
+  const target = line * lineHeight;
+  const scroller = textarea.closest<HTMLElement>('.editor-content') ?? textarea;
+  const top = scroller.scrollTop;
+  const bottom = top + scroller.clientHeight;
+  if (target < top || target > bottom - lineHeight * 2) {
+    scroller.scrollTop = Math.max(0, target - scroller.clientHeight / 3);
+  }
 }
 
 function OptionButton({

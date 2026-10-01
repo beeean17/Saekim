@@ -1,3 +1,5 @@
+import { translateCurrent } from '../../i18n/current';
+import { notifyError } from '../../core/notifications';
 import type { PreviewContribution } from '../../app/feature';
 import { Backend } from '../../platform/common/backend';
 import type { BlockLayout } from '../../types/metadata';
@@ -66,6 +68,7 @@ export const blockLayoutPreviewEnhancement: PreviewContribution = {
 
       void writeBlockLayouts(changes).catch((error) => {
         console.error('failed to save block layouts', error);
+        notifyError(translateCurrent('layout.saveFailed'), error, { key: 'block-layout-save' });
       });
     };
 

@@ -152,6 +152,11 @@ export interface CommandContribution {
   run(): void | Promise<void>;
   isEnabled?(): boolean;
   defaultShortcut?: string;
+  /*
+   * Leave the shortcut to a focused text field other than the document editor,
+   * so that field keeps its native behaviour (its own undo, say).
+   */
+  yieldsToTextFields?: boolean;
   keywords?: string[];
   menu?: { section: string; label?: string; group?: string; order?: number };
 }
@@ -161,12 +166,19 @@ export type CommandContributionFactory = (ctx: CommandRuntimeContext) => Command
 export interface CommandRuntimeContext {
   file: {
     newFile(): void;
+    newFolder(): void;
+    canCreateFolder(): boolean;
+    canUndoFileCreation(): boolean;
+    undoFileCreation(): void;
     openFile(): void;
     openFolder(): void;
+    refreshWorkspace(): void;
     save(): void;
     saveAs(): void;
     print(): void;
     close(): void;
+    /* Save/print/close/export only mean something with a document open. */
+    hasDocument(): boolean;
   };
   window: {
     newWindow(): void;
@@ -176,6 +188,10 @@ export interface CommandRuntimeContext {
     hasTarget(): boolean;
     toggleBold(): void;
     toggleItalic(): void;
+    undo(): void;
+    redo(): void;
+    canUndo(): boolean;
+    canRedo(): boolean;
   };
   view: {
     openSettings(): void;
@@ -185,6 +201,8 @@ export interface CommandRuntimeContext {
     zoomIn(): void;
     zoomOut(): void;
     resetZoom(): void;
+    toggleFullscreen(): void;
+    canToggleFullscreen(): boolean;
   };
   search: {
     openFind(): void;

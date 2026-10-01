@@ -27,11 +27,30 @@ export function ExternalChangeDialog(_props: AppOverlayProps) {
         <p>
           {t('external.description', { name: request?.fileName ?? '' })}
         </p>
+        <p className="external-change-dialog-warning">{t('external.overwriteHint')}</p>
       </div>
+      {/*
+        Cancel comes first and is the button that receives initial focus, so the
+        dialog opens on the choice that cannot lose anyone's work. Overwrite is
+        the destructive option and is styled as such rather than as the default.
+      */}
       <DialogActions>
-        <Button variant="surface" onClick={() => resolveExternalChangeDecision('reload')}>{t('external.reload')}</Button>
-        <Button variant="surface" onClick={() => resolveExternalChangeDecision('save-as')}>{t('external.saveAs')}</Button>
-        <Button variant="primary" onClick={() => resolveExternalChangeDecision('overwrite')}>{t('external.overwrite')}</Button>
+        <Button variant="ghost" onClick={() => resolveExternalChangeDecision('cancel')}>
+          {t('external.cancel')}
+        </Button>
+        <Button variant="surface" onClick={() => resolveExternalChangeDecision('save-as')}>
+          {t('external.saveAs')}
+        </Button>
+        <Button variant="surface" onClick={() => resolveExternalChangeDecision('reload')}>
+          {t('external.reload')}
+        </Button>
+        <Button
+          className="ui-button-danger"
+          variant="surface"
+          onClick={() => resolveExternalChangeDecision('overwrite')}
+        >
+          {t('external.overwrite')}
+        </Button>
       </DialogActions>
     </Dialog>
   );

@@ -14,6 +14,12 @@ export interface WindowChromeProfile {
   readonly titlebarClassName: string;
   readonly showsApplicationMenu: boolean;
   readonly syncsNativeTitlebarColor: boolean;
+  /**
+   * True where the operating system's own menu already offers full screen on
+   * its standard key. The app must then leave that key alone: binding it here
+   * as well toggles the window twice and lands it back where it started.
+   */
+  readonly providesNativeFullscreenCommand: boolean;
 }
 
 export interface PlatformProfile {

@@ -10,6 +10,7 @@ class MacOSPlatformProfile extends BaseDesktopPlatformProfile {
         titlebarClassName: '',
         showsApplicationMenu: false,
         syncsNativeTitlebarColor: true,
+        providesNativeFullscreenCommand: true,
       },
     });
   }

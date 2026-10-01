@@ -422,6 +422,27 @@ pub fn rename_workspace_entry(path: String, new_name: String) -> CommandResult<S
 }
 
 #[tauri::command]
+pub fn create_workspace_file(
+    app: AppHandle,
+    parent_path: String,
+    name: String,
+) -> CommandResult<OpenFilePayload> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = (app, parent_path, name);
+        return fail("workspace file operations are not available on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    match create_workspace_file_path(Path::new(&parent_path), &name)
+        .and_then(|created| read_file_payload(&app, created.to_string_lossy().into_owned()))
+    {
+        Ok(created) => ok(created),
+        Err(error) => fail(error),
+    }
+}
+
+#[tauri::command]
 pub fn create_workspace_folder(parent_path: String, name: String) -> CommandResult<String> {
     #[cfg(target_os = "android")]
     {
@@ -2153,6 +2174,32 @@ fn create_workspace_folder_path(parent: &Path, name: &str) -> Result<PathBuf, St
 }
 
 #[cfg(not(target_os = "android"))]
+fn create_workspace_file_path(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    if !parent.is_dir() {
+        return Err("workspace parent is not a directory".to_string());
+    }
+    validate_workspace_entry_name(name)?;
+    let destination = parent.join(name);
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&destination)
+        .map_err(|error| {
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                "a workspace entry with that name already exists".to_string()
+            } else {
+                format!("failed to create workspace file: {error}")
+            }
+        })?;
+    if let Err(error) = file.sync_all() {
+        drop(file);
+        let _ = fs::remove_file(&destination);
+        return Err(format!("failed to sync workspace file: {error}"));
+    }
+    Ok(destination)
+}
+
+#[cfg(not(target_os = "android"))]
 fn duplicate_workspace_file_path(path: &Path) -> Result<PathBuf, String> {
     ensure_workspace_entry_exists(path)?;
     if !path.is_file() {
@@ -2374,6 +2421,10 @@ mod workspace_search_tests {
     fn creates_renames_and_duplicates_workspace_entries_without_overwriting() {
         let root = workspace_search_temp_dir("file-operations");
         fs::create_dir_all(&root).unwrap();
+        let new_file = create_workspace_file_path(&root, "untitled.md").unwrap();
+        assert!(new_file.is_file());
+        assert_eq!(fs::read_to_string(&new_file).unwrap(), "");
+        assert!(create_workspace_file_path(&root, "untitled.md").is_err());
         let created = create_workspace_folder_path(&root, "notes").unwrap();
         assert!(created.is_dir());
 
@@ -2394,6 +2445,7 @@ mod workspace_search_tests {
         let renamed = rename_workspace_entry_path(&source, "final.md").unwrap();
         assert_eq!(fs::read_to_string(&renamed).unwrap(), "body");
         assert!(rename_workspace_entry_path(&renamed, "draft copy.md").is_err());
+        assert!(create_workspace_file_path(&root, "../outside.md").is_err());
         assert!(create_workspace_folder_path(&root, "../outside").is_err());
         fs::remove_dir_all(root).unwrap();
     }

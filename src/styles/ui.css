@@ -89,3 +89,26 @@
     min-height: 44px;
   }
 }
+
+/*
+ * Base styling for the Dialog primitive. Every dialog used to supply its own
+ * backdrop class, so one without a custom class rendered unpositioned in the
+ * document flow.
+ */
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg-app) 46%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.ui-dialog {
+  max-width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  color: var(--text-primary);
+}

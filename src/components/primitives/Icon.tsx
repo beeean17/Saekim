@@ -42,7 +42,12 @@ type IconName =
   | 'edit'
   | 'split'
   | 'eye'
-  | 'info';
+  | 'info'
+  | 'check'
+  | 'alert'
+  | 'close'
+  | 'pointer'
+  | 'move';
 
 const paths: Record<IconName, JSX.Element> = {
   sidebar: (
@@ -310,6 +315,34 @@ const paths: Record<IconName, JSX.Element> = {
       <circle cx="12" cy="12" r="10" />
       <line x1="12" y1="16" x2="12" y2="12" />
       <line x1="12" y1="8" x2="12.01" y2="8" />
+    </>
+  ),
+  check: <polyline points="20 6 9 17 4 12" />,
+  alert: (
+    <>
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </>
+  ),
+  close: (
+    <>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </>
+  ),
+  /* Preview interaction modes: reading versus rearranging. Deliberately not the
+     pencil or the eye, which the header's view toggle already uses for
+     "editor only" and "preview only". */
+  pointer: <path d="M4 3l6.5 15.6 2.3-6.8 6.8-2.3z" />,
+  move: (
+    <>
+      <polyline points="5 9 2 12 5 15" />
+      <polyline points="9 5 12 2 15 5" />
+      <polyline points="15 19 12 22 9 19" />
+      <polyline points="19 9 22 12 19 15" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <line x1="12" y1="2" x2="12" y2="22" />
     </>
   ),
 };

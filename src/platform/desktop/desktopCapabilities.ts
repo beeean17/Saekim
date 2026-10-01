@@ -14,5 +14,6 @@ export const desktopCapabilities: ReadonlySet<PlatformCapability> = new Set([
   'metadata.sqlite',
   'externalFile.open',
   'window.chrome',
+  'window.fullscreen',
   'native.menu',
 ]);

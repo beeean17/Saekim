@@ -11,6 +11,7 @@ import type {
   WorkspaceSearchPage,
   WorkspaceSearchRequest,
 } from '../../types/workspace';
+import { requestChoice } from '../../core/dialogs/confirm';
 import { translateCurrent } from '../../i18n/current';
 
 const sessionKey = 'saekim-browser-session';
@@ -32,6 +33,7 @@ export const browserBackend: BackendAdapter = {
     readFolderChildren,
     searchWorkspace,
     renameEntry: unsupported('Workspace rename'),
+    createFile: unsupported('Workspace file creation'),
     createFolder: unsupported('Workspace folder creation'),
     duplicateFile: unsupported('Workspace file duplication'),
     trashEntry: unsupported('Workspace trash'),
@@ -73,11 +75,12 @@ export const browserBackend: BackendAdapter = {
     confirmUnsavedChanges,
     respondToCloseRequest: noop,
     setWindowMinSize: noop,
-    startWindowDrag: noop,
     setWindowBackgroundColor: noop,
     setWindowDocumentState: noop,
     openNewWindow,
     runWindowAction: noop,
+    toggleFullscreen,
+    isFullscreen,
   },
 };
 
@@ -99,7 +102,29 @@ async function listenNoop(): Promise<() => void> {
 }
 
 async function confirmUnsavedChanges(fileNames: readonly string[]): Promise<CloseDecision> {
-  return globalThis.confirm(translateCurrent('document.closeUnsaved', { files: fileNames.join(', ') })) ? 'save' : 'cancel';
+  /* Save / discard / cancel, in the app's own dialog. */
+  const choice = await requestChoice({
+    title: translateCurrent('document.unsavedChanges'),
+    message: translateCurrent('document.closeUnsaved', { files: fileNames.join(', ') }),
+    confirmLabel: translateCurrent('command.save'),
+    discardLabel: translateCurrent('document.discard'),
+    cancelLabel: translateCurrent('common.cancel'),
+  });
+  if (choice === 'confirm') return 'save';
+  return choice === 'discard' ? 'discard' : 'cancel';
+}
+
+async function toggleFullscreen(): Promise<boolean> {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+    return false;
+  }
+  await document.documentElement.requestFullscreen();
+  return true;
+}
+
+async function isFullscreen(): Promise<boolean> {
+  return Boolean(document.fullscreenElement);
 }
 
 async function openFileDialog(): Promise<OpenFilePayload | null> {

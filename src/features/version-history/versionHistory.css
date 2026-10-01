@@ -104,3 +104,44 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 }
+
+.version-history-confirm {
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.version-history-confirm-copy {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.version-history-confirm .ui-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.version-history-confirm .ui-button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.version-history-confirm .ui-button-surface {
+  background: var(--bg-elevated);
+}
+
+.version-history-confirm .ui-button-primary {
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: var(--accent);
+}

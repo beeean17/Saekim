@@ -86,6 +86,11 @@ export function measureWrappedLineHeights(
     fontStyle: computedStyle.fontStyle,
     letterSpacing: computedStyle.letterSpacing,
     lineHeight: `${rowHeight}px`,
+    // The probe must shape text exactly like the editor, or wrapped-line
+    // heights drift and the gutter stops lining up with the text.
+    fontVariantLigatures: computedStyle.fontVariantLigatures,
+    fontFeatureSettings: computedStyle.fontFeatureSettings,
+    fontKerning: computedStyle.fontKerning,
     tabSize: computedStyle.tabSize,
     whiteSpace: computedStyle.whiteSpace,
     overflowWrap: computedStyle.overflowWrap,
@@ -116,6 +121,9 @@ export function editorLineMetricStyleKey(computedStyle: CSSStyleDeclaration): st
     computedStyle.fontStyle,
     computedStyle.letterSpacing,
     computedStyle.lineHeight,
+    computedStyle.fontVariantLigatures,
+    computedStyle.fontFeatureSettings,
+    computedStyle.fontKerning,
     computedStyle.paddingLeft,
     computedStyle.paddingRight,
     computedStyle.paddingTop,

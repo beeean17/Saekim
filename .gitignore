@@ -131,6 +131,7 @@ debug.log
 
 # ============ Temporary Files ============
 
+tmp/
 *.tmp
 *.temp
 *.bak

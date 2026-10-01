@@ -55,6 +55,7 @@ export const androidBackend: BackendAdapter = {
     readFolderChildren,
     searchWorkspace,
     renameEntry: unsupported('Workspace rename'),
+    createFile: unsupported('Workspace file creation'),
     createFolder: unsupported('Workspace folder creation'),
     duplicateFile: unsupported('Workspace file duplication'),
     trashEntry: unsupported('Workspace trash'),
@@ -96,11 +97,13 @@ export const androidBackend: BackendAdapter = {
     confirmUnsavedChanges,
     respondToCloseRequest,
     setWindowMinSize: noop,
-    startWindowDrag: noop,
     setWindowBackgroundColor: noop,
     setWindowDocumentState: noop,
     openNewWindow: noop,
     runWindowAction: noop,
+    /* Android has no resizable window; the app is already edge to edge. */
+    toggleFullscreen: async () => false,
+    isFullscreen: async () => false,
   },
 };
 

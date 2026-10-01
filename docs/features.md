@@ -188,7 +188,7 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 | `open_file_dialog` / `open_folder_dialog` | 네이티브 선택 다이얼로그 |
 | `read_file` / `read_folder` / `read_folder_children` | 읽기 |
 | `search_workspace` | 전체 워크스페이스 파일명·내용 검색 (커서 페이지 지원) |
-| `rename_workspace_entry` / `create_workspace_folder` | 트리 항목 이름 변경 / 폴더 생성 |
+| `rename_workspace_entry` / `create_workspace_file` / `create_workspace_folder` | 트리 항목 이름 변경 / 파일·폴더 생성 |
 | `duplicate_workspace_file` / `trash_workspace_entry` | 충돌 없는 파일 복제 / OS 휴지통 이동 |
 | `save_file` / `save_file_as` | 저장 |
 | `take_pending_open_files` | 외부 열기 큐 소비 |
@@ -217,11 +217,22 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 ### 3.8 파일 작업
 
 - 데스크톱 트리 항목의 우클릭 또는 `Shift+F10` 메뉴에서 이름 변경, 파일 복제,
-  폴더 내부 새 폴더 생성, 휴지통 이동 지원
-- 워크스페이스 경로 표시줄의 폴더 버튼으로 루트에 새 폴더 생성
+  폴더 내부 새 파일·새 폴더 생성, 휴지통 이동 지원
+- 폴더 좌클릭은 처음에 대상 선택만 하고, 선택된 폴더를 다시 클릭할 때 펼치기·접기를 수행하며,
+  우클릭 대상은 좌클릭 선택과 구분되는 옅은 강조로 표시
+- 상단 File 메뉴의 New File·New Folder는 현재 탐색기에서 좌클릭으로 하이라이트한 폴더를 생성 위치로 사용
+- 탐색기 새로고침은 상단 File·Edit 아이콘 옆의 버튼 또는 `Cmd/Ctrl+R`로 실행
+- New File은 선택한 폴더에 `untitled.md` 이름 입력을 열고 Enter 또는 포커스 이탈 시
+  실제 파일을 생성하며, Escape 시 디스크 변경 없이 취소
+- 기본 이름에서는 확장자를 제외한 `untitled`만 선택해 `.md`를 유지하면서도 전체 이름 수정 가능
+- 생성 직후 빈 파일은 `Cmd/Ctrl+Z`로 OS 휴지통에 보내 생성 실행 취소
+- New Folder도 선택한 폴더에 새 폴더를 생성하며, 새 폴더 생성은
+  브라우저 기본 prompt가 아닌 포커스·Escape·오류 상태를 제어하는 앱 내부 입력 대화상자를 사용
+- 이름 변경은 탐색기에서 현재 파일·폴더 이름 칸을 입력칸으로 바꾸며 Enter 또는 포커스 이탈로 확정하고
+  Escape로 취소. 파일 이름은 확장자를 남긴 채 기본 이름 부분만 선택
 - 복제 이름은 `name copy.ext`, `name copy 2.ext` 순으로 충돌 없이 선택
 - 삭제는 영구 삭제하지 않고 OS 휴지통으로만 이동하며, 열린 dirty 파일은 기존
-  저장·버리기·취소 확인 흐름을 먼저 통과
+  저장·버리기·취소 확인 흐름을 먼저 통과한 뒤 삭제된 경로의 탭을 자동으로 닫음
 - 열린 파일이나 폴더의 이름을 바꾸면 탭, 히스토리, 닫은 탭 경로를 함께 갱신
 - Android SAF와 브라우저 개발 어댑터는 `folder.operations` capability가 없어 UI를 노출하지 않음
 
@@ -279,6 +290,8 @@ sh bash zsh fish py rs go java c h cpp hpp cs rb php swift kt kts
 
 툴바에서 여는 검색형 삽입 모달입니다 (`EditorHelperModal.tsx`).
 검색 → 미리보기 → 삽입 흐름이 세 카탈로그 모두 동일합니다.
+단, Android의 KaTeX와 Mermaid 카탈로그는 좁은 화면에서 오른쪽 렌더 미리보기를
+표시하지 않고 단일 열 검색 결과와 하단 삽입 동작만 제공합니다.
 
 | 카탈로그 | 항목 수 | 내용 |
 | --- | :-: | --- |
@@ -293,7 +306,8 @@ Markdown 카탈로그의 이미지 항목에서는 원본 경로 링크 삽입�
 
 - 사이드바의 탐색기/아웃라인 탭은 `sidebar` 기능 기여 레지스트리에서 구성
 - MarkdownIt이 렌더링에 사용하는 토큰의 source map으로 ATX·Setext 제목의 레벨과 행을 추출
-- 현재 커서가 속한 가장 가까운 제목을 표시하고 H1~H6 계층만큼 들여쓰기
+- 현재 커서가 속한 가장 가까운 제목을 배경으로 표시하고 별도의 왼쪽 강조 막대는 사용하지 않음
+- H1~H6 레벨에 따라 제목을 부모·자식 트리로 구성하며, 하위 제목이 있는 항목의 화살표로 전체 가지를 펼치거나 접음
 - 제목을 선택하면 해당 소스 행을 편집기에서 선택·스크롤하고, 미리보기의 같은
   `data-source-line` 제목으로 이동
 - 편집기 이동은 `useScrollSync`와 같은 줄 높이 측정 인프라를 재사용
@@ -555,10 +569,10 @@ $HOME/** $PICTURE/** $DESKTOP/** $DOCUMENT/** $DOWNLOAD/**
 
 ## 11. PDF 내보내기
 
-데스크톱에서는 프리뷰 DOM을 웹뷰의 네이티브 PDF API로 출력해 텍스트 선택·검색과
-링크를 유지합니다. macOS는 WKWebView `createPDF`, Windows는 WebView2
-`PrintToPdfAsync`를 사용합니다. 네이티브 출력을 지원하지 않거나 실패하면
-html2canvas + jsPDF 래스터 렌더러로 폴백합니다.
+Windows에서는 프리뷰 DOM을 WebView2 `PrintToPdfAsync`로 출력해 텍스트 선택·검색과
+링크를 유지합니다. macOS의 WKWebView `createPDF`는 라이브 웹뷰 영역 밖의 A4 문서를
+빈 페이지로 만들 수 있어 현재는 html2canvas + jsPDF 페이지 렌더러를 사용합니다.
+네이티브 출력을 지원하지 않거나 실패한 환경도 같은 렌더러로 폴백합니다.
 
 ### 11.1 페이지 구성
 
@@ -583,9 +597,9 @@ html2canvas + jsPDF 래스터 렌더러로 폴백합니다.
 
 ### 11.4 저장
 
-`pick_pdf_export_path`로 경로를 받은 뒤 `print_webview_pdf`가 네이티브 PDF를
-직접 기록합니다. 폴백에서는 `write_pdf_export`가 base64를 디코딩해 파일로
-씁니다. 각 단계가 stderr에 로그를 남깁니다.
+`pick_pdf_export_path`로 경로를 받은 뒤 지원하는 환경에서는 `print_webview_pdf`가
+네이티브 PDF를 직접 기록합니다. macOS를 포함한 폴백에서는 `write_pdf_export`가
+base64를 디코딩해 파일로 씁니다. 각 단계가 stderr에 로그를 남깁니다.
 
 ---
 
@@ -676,6 +690,8 @@ CSS 변수로 폭을 제어합니다 — `--sidebar-w`, `--sidebar-current-w`,
 `compact`에서는 분할 뷰와 사이드바 리사이저가 비활성화되고,
 `split` 상태였다면 `edit`으로 자동 강등됩니다.
 `window.visualViewport`를 우선 사용해 모바일 키보드에도 대응합니다.
+Android compact 화면에서는 편집·보기 전환을 하단 탭 대신 상단 카메라 영역
+오른쪽의 아이콘 버튼으로 제공하며, 설정 버튼 바로 왼쪽에 배치합니다.
 
 ### 13.4 크기 제약
 
@@ -725,6 +741,8 @@ Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용�
 | 단축키 | 동작 |
 | --- | --- |
 | `Cmd/Ctrl+N` | 새 파일 |
+| `Cmd/Ctrl+Z` | 편집 실행 취소, 생성 직후 빈 파일에서는 파일 생성 실행 취소. 편집기 밖 입력칸에서는 그 입력칸의 기본 실행 취소 |
+| `Cmd/Ctrl+Shift+Z` | 편집 다시 실행 |
 | `Cmd/Ctrl+Shift+N` | 새 창 |
 | `Cmd/Ctrl+O` | 파일 열기 |
 | `Cmd/Ctrl+Shift+O` | 폴더 열기 |
@@ -742,6 +760,8 @@ Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용�
 
 저장 상태, 파일 형식, 인코딩·EOL, PDF 내보내기 상태, 커서 행·열, 한국어를
 고려한 단어 수를 표시합니다.
+Android에서는 상단의 파일명을 상태바로 옮기고 EOL과 커서 행·열을 숨깁니다.
+단어 수는 폭이 440px를 넘을 때만 함께 표시합니다.
 
 ---
 
@@ -763,8 +783,12 @@ Windows/Linux는 `SidebarMenu` / `Header`가 그리는 인앱 메뉴를 사용�
 - 지원 범위: Android 7.0(API 24) 이상, target/compile SDK 36
 - ARM64 디버그 APK를 Pixel 9 Pro 에뮬레이터에서 세로·가로 회전, 시스템 다크 모드,
   소프트 키보드와 헬퍼 모달 조합까지 검증
-- compact 화면에서 파일 탐색 오버레이 드로어와 편집/보기 하단 탭을 제공하고,
+- compact 화면에서 파일 탐색 오버레이 드로어와 상단 편집/보기 아이콘을 제공하고,
   coarse pointer에서는 주요 터치 타깃을 최소 44px로 확장
+- 상단 파일명은 하단 상태바로 옮기고 카메라 영역 왼쪽에는 폴더 버튼,
+  오른쪽에는 편집·보기·설정 버튼을 배치
+- 파일 탐색 드로어는 화면 최상단부터 열리며 폴더·File·Edit·새로고침 버튼을
+  카메라 영역 왼쪽에 정렬하고 공간이 부족하면 가로 스크롤
 - 안전 영역, 동적 뷰포트 높이, 모션 감소, 터치 스크롤 특성을 CSS 기기 쿼리로 처리
 
 - Kotlin 플러그인 2종

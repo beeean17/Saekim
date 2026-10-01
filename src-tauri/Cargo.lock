@@ -3300,12 +3300,9 @@ name = "saekim"
 version = "4.0.0"
 dependencies = [
  "base64 0.22.1",
- "block2",
  "dirs",
  "futures-util",
  "objc2",
- "objc2-foundation",
- "objc2-web-kit",
  "regex",
  "reqwest",
  "rusqlite",

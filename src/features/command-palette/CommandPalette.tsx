@@ -5,6 +5,7 @@ import { Dialog } from '../../components/ui/overlay/Dialog';
 import { SearchField } from '../../components/ui/primitives/SearchField';
 import { useCommandPaletteStore } from './store';
 import { useI18n } from '../../i18n/useI18n';
+import type { TranslationKey } from '../../i18n/messages';
 
 const MAX_RESULTS = 50;
 
@@ -48,6 +49,9 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
       <SearchField
         autoFocus
         className="command-palette-search"
+        label={t('commandPalette.placeholder')}
+        controls="command-palette-list"
+        activeDescendant={commands[activeIndex] ? `command-option-${activeIndex}` : undefined}
         placeholder={t('commandPalette.placeholder')}
         value={query}
         onChange={setQuery}
@@ -66,7 +70,13 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
           }
         }}
       />
-      <div className="command-palette-list" ref={listRef} role="listbox" aria-label={t('commandPalette.commands')}>
+      <div
+        className="command-palette-list"
+        id="command-palette-list"
+        ref={listRef}
+        role="listbox"
+        aria-label={t('commandPalette.commands')}
+      >
         {commands.length > 0 ? (
           commands.map((command, index) => {
             const disabled = command.isEnabled?.() === false;
@@ -77,15 +87,19 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
                 className="command-palette-item"
                 data-command-index={index}
                 disabled={disabled}
+                id={`command-option-${index}`}
                 key={command.id}
                 role="option"
+                tabIndex={-1}
                 type="button"
                 onClick={() => run(command)}
                 onMouseMove={() => setActiveIndex(index)}
               >
                 <span className="command-palette-copy">
                   <span className="command-palette-label">{command.label}</span>
-                  <span className="command-palette-id">{command.id}</span>
+                  {sectionLabelKey(command.menu?.section) ? (
+                    <span className="command-palette-section">{t(sectionLabelKey(command.menu?.section)!)}</span>
+                  ) : null}
                 </span>
                 {command.defaultShortcut ? <kbd>{formatShortcut(command.defaultShortcut)}</kbd> : null}
               </button>
@@ -99,13 +113,49 @@ export function CommandPalette({ commandRegistry }: AppOverlayProps) {
   );
 }
 
+/* Commands carry a developer-facing id; users get the menu the command lives
+   in instead, which is the part they can actually recognise. */
+function sectionLabelKey(section: string | undefined): TranslationKey | null {
+  switch (section) {
+    case 'file':
+      return 'menu.file';
+    case 'edit':
+      return 'menu.edit';
+    case 'view':
+      return 'menu.view';
+    case 'window':
+      return 'menu.window';
+    default:
+      return null;
+  }
+}
+
 function filterCommands(registry: AppOverlayProps['commandRegistry'], query: string): CommandContribution[] {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return Array.from(registry.values())
-    .filter((command) => {
-      const haystack = [command.label, command.id, ...(command.keywords ?? [])].join(' ').toLocaleLowerCase();
-      return terms.every((term) => haystack.includes(term));
-    })
-    .sort((left, right) => left.label.localeCompare(right.label))
-    .slice(0, MAX_RESULTS);
+  const scored = Array.from(registry.values())
+    .map((command) => ({ command, score: scoreCommand(command, terms) }))
+    .filter((entry) => entry.score > 0);
+
+  /* Rank by how well the visible label matches, then alphabetically, so typing
+     "save" puts Save first instead of whatever sorts earliest. */
+  scored.sort((left, right) =>
+    right.score - left.score || left.command.label.localeCompare(right.command.label),
+  );
+
+  return scored.slice(0, MAX_RESULTS).map((entry) => entry.command);
+}
+
+function scoreCommand(command: CommandContribution, terms: string[]): number {
+  const label = command.label.toLocaleLowerCase();
+  const haystack = [command.label, command.id, ...(command.keywords ?? [])].join(' ').toLocaleLowerCase();
+  if (terms.length === 0) return command.isEnabled?.() === false ? 1 : 2;
+  if (!terms.every((term) => haystack.includes(term))) return 0;
+
+  let score = 1;
+  for (const term of terms) {
+    if (label.startsWith(term)) score += 4;
+    else if (label.includes(term)) score += 2;
+  }
+  if (command.isEnabled?.() === false) score -= 1;
+  return Math.max(1, score);
 }

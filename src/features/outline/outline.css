@@ -5,6 +5,52 @@
   padding: 8px 6px 12px;
 }
 
+.outline-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outline-tree.outline-children {
+  padding-left: 12px;
+}
+
+.outline-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+}
+
+.outline-toggle,
+.outline-toggle-spacer {
+  display: flex;
+  width: 18px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+}
+
+.outline-toggle {
+  padding: 0;
+  color: var(--text-faint);
+  border-radius: var(--radius-sm);
+}
+
+.outline-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.outline-chevron {
+  width: 10px;
+  height: 10px;
+  transition: transform 0.15s ease;
+}
+
+.outline-toggle[aria-expanded='true'] .outline-chevron {
+  transform: rotate(90deg);
+}
+
 .outline-item {
   display: grid;
   width: 100%;
@@ -12,7 +58,7 @@
   gap: 5px;
   align-items: center;
   min-height: 30px;
-  padding: 4px 8px 4px calc(8px + var(--outline-level) * 12px);
+  padding: 4px 8px 4px 2px;
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -23,10 +69,6 @@
 .outline-item[aria-current='location'] {
   color: var(--text-primary);
   background: var(--bg-elevated);
-}
-
-.outline-item[aria-current='location'] {
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .outline-level,

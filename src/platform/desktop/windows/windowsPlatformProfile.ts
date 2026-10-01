@@ -10,6 +10,7 @@ class WindowsPlatformProfile extends BaseDesktopPlatformProfile {
         titlebarClassName: 'windows-titlebar menu-titlebar',
         showsApplicationMenu: true,
         syncsNativeTitlebarColor: true,
+        providesNativeFullscreenCommand: false,
       },
     });
   }

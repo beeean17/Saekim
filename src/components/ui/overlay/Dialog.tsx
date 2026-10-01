@@ -12,6 +12,13 @@ interface DialogProps {
   children: ReactNode;
 }
 
+/*
+ * Escape must reach only the dialog on top. Every open dialog registers here,
+ * so a confirmation opened from inside another dialog no longer dismisses both
+ * of them with a single keypress.
+ */
+const dialogStack: symbol[] = [];
+
 export function Dialog({
   open,
   title,
@@ -22,18 +29,24 @@ export function Dialog({
   children,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const identity = useRef<symbol>(Symbol('dialog'));
   const dialogClassName = className === 'ui-dialog' ? className : `ui-dialog ${className}`;
   const backdropClasses = backdropClassName === 'ui-dialog-backdrop' ? backdropClassName : `ui-dialog-backdrop ${backdropClassName}`;
 
   useEffect(() => {
     if (!open) return;
+    const token = identity.current;
+    dialogStack.push(token);
+
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusFrame = window.requestAnimationFrame(() => {
       firstFocusableElement(dialogRef.current)?.focus();
     });
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (dialogStack[dialogStack.length - 1] !== token) return;
       if (event.key === 'Escape') {
+        event.stopPropagation();
         onClose();
         return;
       }
@@ -53,6 +66,8 @@ export function Dialog({
 
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      const index = dialogStack.indexOf(token);
+      if (index >= 0) dialogStack.splice(index, 1);
       window.cancelAnimationFrame(focusFrame);
       window.removeEventListener('keydown', onKeyDown);
       previousFocus?.focus();

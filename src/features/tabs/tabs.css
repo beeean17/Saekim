@@ -1,14 +1,65 @@
+.document-tab-bar {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border);
+}
+
 .document-tab-strip {
   display: flex;
   min-width: 0;
   height: 34px;
-  flex: 0 0 34px;
+  flex: 1 1 auto;
   align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
-  background: var(--bg-sunken);
-  border-bottom: 1px solid var(--border);
   scrollbar-width: thin;
+}
+
+/* Shown only when tabs stop fitting: a list of every open document. */
+.document-tab-overflow {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 4px;
+  border-left: 1px solid var(--border);
+}
+
+.document-tab-overflow-button {
+  width: var(--control-size-sm);
+  height: var(--control-size-sm);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+}
+
+.document-tab-overflow-button:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.document-tab-overflow-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 4px;
+  z-index: 160;
+  display: grid;
+  width: max-content;
+  min-width: 180px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: 60vh;
+  overflow-y: auto;
+  gap: 1px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.document-tab-overflow-menu .app-menu-item {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
 }
 
 .document-tab {
@@ -48,11 +99,12 @@
   white-space: nowrap;
 }
 
+/* Unsaved is warning-coloured everywhere: title bar, status bar and here. */
 .document-tab-dirty {
   width: 7px;
   height: 7px;
   flex: 0 0 7px;
-  background: var(--accent);
+  background: var(--warning);
   border-radius: 50%;
 }
 
@@ -76,4 +128,21 @@
 
 .app[data-viewport-profile="compact"] .document-tab {
   min-width: 104px;
+}
+
+@media (pointer: coarse) {
+  .document-tab-close {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+  }
+
+  .document-tab {
+    min-width: 148px;
+  }
+
+  .document-tab-strip {
+    height: 48px;
+    flex: 0 0 48px;
+  }
 }

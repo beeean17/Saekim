@@ -40,11 +40,11 @@ export function PreviewInteractionModeControls({ disabled }: PreviewInteractionM
 
 function previewModeOptions(t: ReturnType<typeof useI18n>['t']) {
   return [
-    { mode: 'view', icon: 'eye', title: t('preview.view') },
-    { mode: 'arrange', icon: 'edit', title: t('preview.arrange') },
+    { mode: 'view', icon: 'pointer', title: t('preview.view') },
+    { mode: 'arrange', icon: 'move', title: t('preview.arrange') },
   ] as const satisfies readonly {
     readonly mode: PreviewInteractionMode;
-    readonly icon: 'eye' | 'edit';
+    readonly icon: 'pointer' | 'move';
     readonly title: string;
   }[];
 }

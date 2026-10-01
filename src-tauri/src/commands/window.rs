@@ -184,18 +184,6 @@ pub fn respond_to_close_request(
 
 #[cfg(desktop)]
 #[tauri::command]
-pub fn start_window_drag(window: tauri::Window) -> Result<(), String> {
-    window.start_dragging().map_err(|error| error.to_string())
-}
-
-#[cfg(not(desktop))]
-#[tauri::command]
-pub fn start_window_drag(_window: tauri::Window) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(desktop)]
-#[tauri::command]
 pub async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     let mut config = app
         .config()

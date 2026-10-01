@@ -5,6 +5,7 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   copyImageToAssets,
+  createFile,
   createFolder,
   downloadImageToAssets,
   duplicateFile,
@@ -52,6 +53,8 @@ const externalOpenEvent = 'saekim-open-external-files';
 const imageDownloadProgressEvent = 'image-download-progress';
 const closeRequestedEvent = 'saekim-close-requested';
 const menuEvents = {
+  undo: 'saekim-menu-undo',
+  redo: 'saekim-menu-redo',
   newFile: 'saekim-menu-new-file',
   newWindow: 'saekim-menu-new-window',
   openFile: 'saekim-menu-open-file',
@@ -88,6 +91,7 @@ export const tauriDesktopBackend: BackendAdapter = {
     readFolderChildren,
     searchWorkspace,
     renameEntry,
+    createFile,
     createFolder,
     duplicateFile,
     trashEntry,
@@ -129,11 +133,12 @@ export const tauriDesktopBackend: BackendAdapter = {
     confirmUnsavedChanges,
     respondToCloseRequest,
     setWindowMinSize,
-    startWindowDrag,
     setWindowBackgroundColor,
     setWindowDocumentState,
     openNewWindow,
     runWindowAction,
+    toggleFullscreen,
+    isFullscreen,
   },
 };
 
@@ -201,6 +206,8 @@ async function listenNativeMenuCommands(handlers: NativeMenuCommandHandlers): Pr
   };
 
   try {
+    await registerMenuEvent<void>(menuEvents.undo, 'undo', () => handlers.onUndo());
+    await registerMenuEvent<void>(menuEvents.redo, 'redo', () => handlers.onRedo());
     await registerMenuEvent<void>(menuEvents.newFile, 'newFile', () => handlers.onNewFile());
     await registerMenuEvent<void>(menuEvents.newWindow, 'newWindow', () => handlers.onNewWindow());
     await registerMenuEvent<void>(menuEvents.openFile, 'openFile', () => handlers.onOpen());
@@ -247,10 +254,6 @@ async function setWindowMinSize(width: number, height: number): Promise<void> {
   await invoke('set_window_min_size', { width, height });
 }
 
-async function startWindowDrag(): Promise<void> {
-  await invoke('start_window_drag');
-}
-
 async function setWindowBackgroundColor(color: string): Promise<void> {
   await getCurrentWebviewWindow().setBackgroundColor(color);
 }
@@ -266,6 +269,17 @@ async function openNewWindow(): Promise<void> {
 async function runWindowAction(action: WindowAction): Promise<void> {
   const window = getCurrentWebviewWindow();
   await window[action]();
+}
+
+async function toggleFullscreen(): Promise<boolean> {
+  const window = getCurrentWebviewWindow();
+  const next = !(await window.isFullscreen());
+  await window.setFullscreen(next);
+  return next;
+}
+
+async function isFullscreen(): Promise<boolean> {
+  return getCurrentWebviewWindow().isFullscreen();
 }
 
 function isExternalUrl(url: string): boolean {

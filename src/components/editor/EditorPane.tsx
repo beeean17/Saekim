@@ -9,10 +9,12 @@ import { getLineIndentChange, indentSelectedLines, insertHardLineBreak, insertTe
 import { getFileTypeLabel } from '../../core/document/fileType';
 import { useCursorPosition } from '../../hooks/useCursorPosition';
 import { useLineNumberSync } from '../../hooks/useLineNumberSync';
+import { Platform } from '../../platform/common/platform';
 import { useSettingsStore } from '../../store/settings';
 import { selectActiveFile, useWorkspaceStore } from '../../store/workspace';
 import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../ui/feedback/EmptyState';
+import { Button } from '../ui/primitives/Button';
 import { Toolbar as UiToolbar, ToolbarButton, ToolbarGroup } from '../ui/toolbar/Toolbar';
 import { useI18n } from '../../i18n/useI18n';
 
@@ -42,7 +44,28 @@ export function EditorPane({
     [activeFile, refresh, textareaRef],
   );
 
+  /*
+   * A drop anywhere in the window inserts at the caret, so the editor says so
+   * while a drag is in flight. Without this the only feedback was the OS
+   * cursor, and nothing told the user where the image would land.
+   */
+  const [dropActive, setDropActive] = useState(false);
+
   useEffect(() => {
+    let dragDepth = 0;
+
+    const onDragEnter = (event: DragEvent) => {
+      if (!event.dataTransfer || !carriesFiles(event.dataTransfer)) return;
+      dragDepth += 1;
+      setDropActive(true);
+    };
+
+    const onDragLeave = (event: DragEvent) => {
+      if (!event.dataTransfer || !carriesFiles(event.dataTransfer)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) setDropActive(false);
+    };
+
     const onDragOver = (event: DragEvent) => {
       for (const handler of editorContributions.handlers) {
         handler.windowDragOver?.(event, handlerContext);
@@ -51,22 +74,34 @@ export function EditorPane({
     };
 
     const onDrop = (event: DragEvent) => {
+      dragDepth = 0;
+      setDropActive(false);
       for (const handler of editorContributions.handlers) {
         handler.windowDrop?.(event, handlerContext);
         if (event.defaultPrevented) return;
       }
     };
 
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragleave', onDragLeave);
     window.addEventListener('dragover', onDragOver);
     window.addEventListener('drop', onDrop);
     return () => {
+      window.removeEventListener('dragenter', onDragEnter);
+      window.removeEventListener('dragleave', onDragLeave);
       window.removeEventListener('dragover', onDragOver);
       window.removeEventListener('drop', onDrop);
     };
   }, [editorContributions.handlers, handlerContext]);
 
   return (
-    <section className="editor-pane" data-disabled={!activeFile}>
+    <section
+      className={`editor-pane ${dropActive && activeFile ? 'is-drop-target' : ''}`.trim()}
+      data-disabled={!activeFile}
+    >
+      {dropActive && activeFile ? (
+        <div className="editor-drop-hint" role="status">{t('editor.dropImageHere')}</div>
+      ) : null}
       {editorContributions.topBars.map((contribution) => {
         const TopBar = contribution.component;
         return <TopBar key={contribution.id} />;
@@ -79,7 +114,9 @@ export function EditorPane({
             activeLine={cursor.row}
             editorScrollRef={editorScrollRef}
             value={activeFile.content}
-            onChange={(value) => updateContent(activeFile.id, value)}
+            /* Passing the caret lets the undo stack both coalesce keystrokes
+               and put the cursor back where the edit happened. */
+            onChange={(value, selection) => updateContent(activeFile.id, value, selection)}
             editorHandlers={editorContributions.handlers}
             handlerContext={handlerContext}
             textareaRef={textareaRef}
@@ -90,6 +127,33 @@ export function EditorPane({
           className="empty-document-state"
           title={t('empty.title')}
           description={t('empty.description')}
+          actions={
+            <>
+              <Button
+                className="empty-document-action"
+                variant="primary"
+                onClick={() => dispatchCommand(commandRegistry, 'file.open')}
+              >
+                {t('empty.openFile')}
+              </Button>
+              <Button
+                className="empty-document-action"
+                variant="surface"
+                onClick={() => dispatchCommand(commandRegistry, 'file.new')}
+              >
+                {t('empty.newFile')}
+              </Button>
+              {commandRegistry.has('folder.open') ? (
+                <Button
+                  className="empty-document-action"
+                  variant="surface"
+                  onClick={() => dispatchCommand(commandRegistry, 'folder.open')}
+                >
+                  {t('empty.openFolder')}
+                </Button>
+              ) : null}
+            </>
+          }
         />
       )}
     </section>
@@ -132,6 +196,9 @@ function EditorToolbar({
   const fileType = useMemo(() => (activeFile ? getFileTypeLabel(activeFile.name, activeFile.path, enabledFeatures) : '-'), [activeFile]);
   const activeHelper = contributions.helpers.find((helper) => helper.mode === helperMode) ?? null;
   const imageActions = contributions.imageActions[0] ?? null;
+  const helperPreviewVisible = activeHelper
+    ? shouldShowHelperPreview(activeHelper.mode, Platform.shellRuntime === 'android')
+    : true;
 
   useEffect(() => {
     if (disabled) setHelperMode(null);
@@ -166,6 +233,7 @@ function EditorToolbar({
       {activeHelper ? (
         <EditorHelperModal
           helper={activeHelper}
+          showPreview={helperPreviewVisible}
           onClose={() => setHelperMode(null)}
           onInsert={(helper, item) => {
             insertHelperItem(textareaRef.current, helper, item);
@@ -181,6 +249,14 @@ function EditorToolbar({
       ) : null}
     </>
   );
+}
+
+function carriesFiles(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).some((type) => type === 'Files' || type === 'text/uri-list');
+}
+
+export function shouldShowHelperPreview(mode: string, android: boolean): boolean {
+  return !android || (mode !== 'katex' && mode !== 'mermaid');
 }
 
 function insertHelperItem(textarea: HTMLTextAreaElement | null, helper: EditorHelperContribution, item: EditorHelperItemBase): void {
@@ -203,7 +279,7 @@ function EditorContent({
   handlerContext,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, selection?: { start: number; end: number }) => void;
   editorScrollRef: RefObject<HTMLDivElement>;
   textareaRef: RefObject<HTMLTextAreaElement>;
   activeLine: number;
@@ -281,6 +357,8 @@ function EditorContent({
       <textarea
         ref={textareaRef}
         className="editor-textarea"
+        /* The one text field whose undo the app owns; see textFieldFocus. */
+        data-document-editor=""
         value={value}
         spellCheck={false}
         wrap="soft"
@@ -333,8 +411,9 @@ function EditorContent({
           }
         }}
         onChange={(event) => {
-          onChange(event.currentTarget.value);
-          updateSelectionLines(event.currentTarget);
+          const textarea = event.currentTarget;
+          onChange(textarea.value, { start: textarea.selectionStart, end: textarea.selectionEnd });
+          updateSelectionLines(textarea);
         }}
       />
     </div>

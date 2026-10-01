@@ -11,6 +11,7 @@ import type { ViewMode } from '../../types/workspace';
 import { CompactViewTabs, Header } from './Header';
 import { SettingsPanel } from './SettingsPanel';
 import { StatusBar } from './StatusBar';
+import { NotificationCenter } from '../../core/notifications';
 
 const COLLAPSED_SIDEBAR_WIDTH = 56;
 
@@ -62,7 +63,9 @@ export function AppShell({
       style={layoutStyle}
     >
       <Header
+        android={runtime === 'android'}
         commandRegistry={commandRegistry}
+        compact={viewportProfile.profile === 'compact'}
         effectiveViewMode={effectiveViewMode}
         availableViewModes={availableViewModes}
       />
@@ -76,8 +79,11 @@ export function AppShell({
         return <Overlay commandRegistry={commandRegistry} key={overlay.id} />;
       })}
       {children}
-      <CompactViewTabs availableViewModes={availableViewModes} effectiveViewMode={effectiveViewMode} />
-      <StatusBar textareaRef={textareaRef} />
+      {runtime !== 'android' ? (
+        <CompactViewTabs availableViewModes={availableViewModes} effectiveViewMode={effectiveViewMode} />
+      ) : null}
+      <StatusBar android={runtime === 'android'} textareaRef={textareaRef} />
+      <NotificationCenter />
     </div>
   );
 }

@@ -11,7 +11,55 @@ export const fontSizeOptions = [
 ] as const;
 
 export const defaultEditorFontSize = fontSizeOptions[1].value;
-const defaultEditorFontFamily = 'Pretendard Variable';
+
+/*
+ * Every option carries a full fallback stack. A bare family name silently
+ * renders in the browser default when the font is missing, which is how
+ * picking a monospace font used to end up proportional on machines that do
+ * not ship it.
+ */
+export const editorFontOptions = [
+  {
+    id: 'Pretendard Variable',
+    labelKey: 'settings.editorFont.sans',
+    stack: '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif',
+  },
+  {
+    id: 'IBM Plex Sans KR',
+    labelKey: 'settings.editorFont.plex',
+    stack: '"IBM Plex Sans KR", "Pretendard Variable", Pretendard, -apple-system, sans-serif',
+  },
+  {
+    id: 'monospace',
+    labelKey: 'settings.editorFont.mono',
+    stack: 'ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, "D2Coding", "Liberation Mono", monospace',
+  },
+] as const;
+
+export type EditorFontId = (typeof editorFontOptions)[number]['id'];
+
+const defaultEditorFontFamily: string = editorFontOptions[0].id;
+
+/* Legacy sessions stored raw CSS family names; map them onto the curated set. */
+const legacyEditorFontAliases: Record<string, string> = {
+  Pretendard: 'Pretendard Variable',
+  'JetBrains Mono': 'monospace',
+  'SFMono-Regular': 'monospace',
+  Menlo: 'monospace',
+  Monaco: 'monospace',
+  'ui-monospace': 'monospace',
+};
+
+export function normalizeEditorFontFamily(family: string | undefined): string {
+  if (!family) return defaultEditorFontFamily;
+  const aliased = legacyEditorFontAliases[family] ?? family;
+  return editorFontOptions.some((option) => option.id === aliased) ? aliased : defaultEditorFontFamily;
+}
+
+function editorFontStack(family: string): string {
+  const option = editorFontOptions.find((candidate) => candidate.id === normalizeEditorFontFamily(family));
+  return (option ?? editorFontOptions[0]).stack;
+}
 
 interface SettingsState {
   language: AppLanguage;
@@ -26,7 +74,8 @@ interface SettingsState {
   setFontSize: (fontSize: number) => void;
   setEditorFontFamily: (editorFontFamily: string) => void;
   setHtmlPreviewMode: (htmlPreviewMode: HtmlPreviewMode) => void;
-  setShowLineNumbers: (showLineNumbers: boolean) => void;
+  /* null means "decide from the viewport", which is the shipped default. */
+  setShowLineNumbers: (showLineNumbers: boolean | null) => void;
   restoreSettings: (settings: SettingsSession) => void;
 }
 
@@ -58,7 +107,7 @@ function applyEditorSettings(fontSize: number, editorFontFamily: string): void {
   const fontSizeOption = fontSizeOptions.find((option) => option.value === normalizedFontSize) ?? fontSizeOptions[1];
 
   document.documentElement.style.setProperty('--editor-font-size', `${normalizedFontSize}px`);
-  document.documentElement.style.setProperty('--editor-font-family', editorFontFamily);
+  document.documentElement.style.setProperty('--editor-font-family', editorFontStack(editorFontFamily));
   document.documentElement.dataset.editorFontSize = fontSizeOption.id;
 }
 
@@ -105,7 +154,8 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
       return { fontSize: normalizedFontSize };
     });
   },
-  setEditorFontFamily: (editorFontFamily) => {
+  setEditorFontFamily: (requestedFontFamily) => {
+    const editorFontFamily = normalizeEditorFontFamily(requestedFontFamily);
     set((state) => {
       applyEditorSettings(state.fontSize, editorFontFamily);
       return { editorFontFamily };
@@ -117,13 +167,15 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
     const language: AppLanguage = settings.language === 'en' ? 'en' : defaultLanguage;
     const resolvedTheme = applyTheme(settings.theme);
     const fontSize = normalizeFontSize(settings.fontSize);
-    applyEditorSettings(fontSize, settings.editorFontFamily);
+    const editorFontFamily = normalizeEditorFontFamily(settings.editorFontFamily);
+    applyEditorSettings(fontSize, editorFontFamily);
     applyLanguage(language);
     set({
       ...settings,
       language,
       resolvedTheme,
       fontSize,
+      editorFontFamily,
       htmlPreviewMode: settings.htmlPreviewMode ?? 'browser',
       showLineNumbers: settings.showLineNumbers ?? null,
     });

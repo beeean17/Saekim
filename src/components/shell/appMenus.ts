@@ -3,7 +3,7 @@ import { Backend } from '../../platform/common/backend';
 import { currentPlatformCapabilities } from '../../platform/common/capabilities';
 import type { CommandContribution } from '../../app/feature';
 import type { ViewMode } from '../../types/workspace';
-import { openProjectWebsite, showKeyboardShortcuts } from '../../app/help';
+import { openProjectWebsite, showAboutDialog, showKeyboardShortcuts } from '../../app/help';
 import { translate } from '../../i18n/messages';
 import { useSettingsStore } from '../../store/settings';
 
@@ -46,7 +46,10 @@ export function buildAppMenus({
   const language = useSettingsStore.getState().language;
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   const fileItems = registeredMenuItems(commandRegistry, 'file');
-  const editItems = registeredMenuItems(commandRegistry, 'edit');
+  const allEditItems = registeredMenuItems(commandRegistry, 'edit');
+  const historyIds = ['edit.undo', 'edit.redo'];
+  const historyItems = allEditItems.filter((item) => item.commandId && historyIds.includes(item.commandId));
+  const editItems = allEditItems.filter((item) => !item.commandId || !historyIds.includes(item.commandId));
   const viewItems = registeredMenuItems(commandRegistry, 'view').map((item) => ({
     ...item,
     checked: item.commandId === `view.${effectiveViewMode}` ? true : item.checked,
@@ -60,17 +63,22 @@ export function buildAppMenus({
     {
       id: 'edit',
       label: t('menu.edit'),
-      items: [
-        { label: t('menu.undo'), shortcut: 'Ctrl+Z', action: () => runDocumentCommand('undo', getDocumentCommandTarget()) },
-        { label: t('menu.redo'), shortcut: 'Ctrl+Y', action: () => runDocumentCommand('redo', getDocumentCommandTarget()) },
+      /*
+       * Shortcut hints go through formatShortcut so they read as Cmd glyphs on
+       * macOS and Ctrl elsewhere, instead of the Windows spelling everywhere.
+       * Undo/redo are registered commands now, so the label, the enabled state
+       * and the key all come from one place.
+       */
+      items: compactSeparators([
+        ...historyItems,
         { separator: true },
-        { label: t('menu.cut'), shortcut: 'Ctrl+X', action: () => runDocumentCommand('cut', getDocumentCommandTarget()) },
-        { label: t('menu.copy'), shortcut: 'Ctrl+C', action: () => runDocumentCommand('copy', getDocumentCommandTarget()) },
-        { label: t('menu.paste'), shortcut: 'Ctrl+V', action: () => void runPasteCommand(getDocumentCommandTarget()) },
+        { label: t('menu.cut'), shortcut: formatShortcut('mod+x'), action: () => runDocumentCommand('cut', getDocumentCommandTarget()) },
+        { label: t('menu.copy'), shortcut: formatShortcut('mod+c'), action: () => runDocumentCommand('copy', getDocumentCommandTarget()) },
+        { label: t('menu.paste'), shortcut: formatShortcut('mod+v'), action: () => void runPasteCommand(getDocumentCommandTarget()) },
         { separator: true },
         ...editItems,
-        { label: t('menu.selectAll'), shortcut: 'Ctrl+A', action: () => runDocumentCommand('selectAll', getDocumentCommandTarget()) },
-      ],
+        { label: t('menu.selectAll'), shortcut: formatShortcut('mod+a'), action: () => runDocumentCommand('selectAll', getDocumentCommandTarget()) },
+      ]),
     },
     {
       id: 'view',
@@ -103,7 +111,7 @@ export function buildAppMenus({
       { label: t('menu.github'), action: openProjectWebsite },
       { label: t('menu.shortcuts'), action: showKeyboardShortcuts },
       { separator: true },
-      { label: t('menu.about'), action: () => window.alert(`Saekim ${__APP_VERSION__}`) },
+      { label: t('menu.about'), action: showAboutDialog },
     ],
   });
 
@@ -136,6 +144,21 @@ function commandMenuItem(commandRegistry: CommandRegistry, command: CommandContr
     disabled: command.isEnabled?.() === false,
     action: () => dispatchCommand(commandRegistry, command.id),
   };
+}
+
+/** Drops leading, trailing and doubled separators left behind by regrouping. */
+function compactSeparators(items: AppMenuItem[]): AppMenuItem[] {
+  const compacted: AppMenuItem[] = [];
+  for (const item of items) {
+    if (!item.separator) {
+      compacted.push(item);
+      continue;
+    }
+    if (compacted.length === 0 || compacted[compacted.length - 1].separator) continue;
+    compacted.push(item);
+  }
+  while (compacted.length > 0 && compacted[compacted.length - 1].separator) compacted.pop();
+  return compacted;
 }
 
 function withLeadingSeparator(items: AppMenuItem[]): AppMenuItem[] {

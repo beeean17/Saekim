@@ -1,3 +1,5 @@
+import { translateCurrent } from '../i18n/current';
+import { notifyError } from '../core/notifications';
 import { useCallback, useEffect, useRef } from 'react';
 import { Backend } from '../platform/common/backend';
 import { currentPlatformCapabilities } from '../platform/common/capabilities';
@@ -37,6 +39,7 @@ export function useExternalFileOpen(openFile: (path: string) => Promise<void>, e
       }
     } catch (error) {
       console.error('외부 파일 열기 실패:', error);
+      notifyError(translateCurrent('workspace.openFileFailed'), error);
     } finally {
       openingRef.current = false;
       if (queuedPathsRef.current.length > 0) {
