@@ -25,6 +25,8 @@
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans-kr": "^5.2.8",
+    "@shikijs/langs": "^3.23.0",
+    "@shikijs/themes": "^3.23.0",
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",

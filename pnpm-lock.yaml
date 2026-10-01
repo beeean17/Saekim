@@ -11,6 +11,12 @@ importers:
       '@fontsource/ibm-plex-sans-kr':
         specifier: ^5.2.8
         version: 5.2.8
+      '@shikijs/langs':
+        specifier: ^3.23.0
+        version: 3.23.0
+      '@shikijs/themes':
+        specifier: ^3.23.0
+        version: 3.23.0
       '@tauri-apps/api':
         specifier: ^2.5.0
         version: 2.11.0
