@@ -79,7 +79,6 @@ interface WorkspaceState {
   cancelFolderCreation: () => void;
   canUndoFileCreation: () => boolean;
   undoFileCreation: () => Promise<boolean>;
-  selectFolder: (path: string) => void;
   toggleFolder: (path: string) => Promise<void>;
   setActiveFile: (id: string) => void;
   closeFile: (id: string) => void;
@@ -318,10 +317,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       notifyError(translateCurrent('sidebar.fileActionFailed', { message: errorMessage(error) }), error);
       return false;
     }
-  },
-  selectFolder: (path) => {
-    const state = get();
-    if (isWorkspaceFolderPath(state, path)) set({ selectedFolderPath: path });
   },
   toggleFolder: async (path) => {
     const node = findTreeNode(get().tree, path);

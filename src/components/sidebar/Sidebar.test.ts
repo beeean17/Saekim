@@ -54,7 +54,12 @@ describe('inline workspace file creation', () => {
     expect(rendered.onCommit).not.toHaveBeenCalled();
   });
 
-  it('selects a folder on the first click and toggles it on the second click', () => {
+  it('selects and toggles a folder on a single click', () => {
+    /*
+     * Selecting first and toggling on a second click doubled the clicks
+     * needed to reach a nested file. toggleFolder also selects the folder,
+     * so it stays the New File target.
+     */
     const folder: FileTreeNode = {
       id: '/workspace/notes',
       name: 'notes',
@@ -68,7 +73,6 @@ describe('inline workspace file creation', () => {
     document.body.append(container);
     const root = createRoot(container);
     mountedRoots.push(root);
-    const onSelectFolder = vi.fn();
     const onToggle = vi.fn(async () => {});
     const render = (selectedFolderPath: string | null) => {
       act(() => {
@@ -84,7 +88,6 @@ describe('inline workspace file creation', () => {
           onCancelRename: vi.fn(),
           onCommitFileCreation: vi.fn(async () => {}),
           onCommitRename: vi.fn(async () => {}),
-          onSelectFolder,
           onToggle,
           onOpen: vi.fn(),
           onPreviewImage: vi.fn(),
@@ -96,12 +99,12 @@ describe('inline workspace file creation', () => {
     const button = container.querySelector('button');
     expect(button).not.toBeNull();
     act(() => button?.click());
-    expect(onSelectFolder).toHaveBeenCalledWith(folder.path);
-    expect(onToggle).not.toHaveBeenCalled();
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onToggle).toHaveBeenCalledWith(folder.path);
 
     render(folder.path);
     act(() => container.querySelector('button')?.click());
-    expect(onToggle).toHaveBeenCalledWith(folder.path);
+    expect(onToggle).toHaveBeenCalledTimes(2);
   });
 
   it('replaces the current file name with an inline rename input', async () => {
@@ -130,7 +133,6 @@ describe('inline workspace file creation', () => {
         onCancelRename,
         onCommitFileCreation: vi.fn(async () => {}),
         onCommitRename,
-        onSelectFolder: vi.fn(),
         onToggle: vi.fn(async () => {}),
         onOpen: vi.fn(),
         onPreviewImage: vi.fn(),

@@ -87,7 +87,6 @@ export function Sidebar({
   const commitFileCreation = useWorkspaceStore((state) => state.commitFileCreation);
   const cancelFileCreation = useWorkspaceStore((state) => state.cancelFileCreation);
   const cancelFolderCreation = useWorkspaceStore((state) => state.cancelFolderCreation);
-  const selectFolder = useWorkspaceStore((state) => state.selectFolder);
   const toggleFolder = useWorkspaceStore((state) => state.toggleFolder);
   const updateContent = useWorkspaceStore((state) => state.updateContent);
   const saveFile = useWorkspaceStore((state) => state.saveFile);
@@ -437,7 +436,6 @@ export function Sidebar({
                     onOpen={(path) => void openFile(path)}
                     onPreviewImage={(node) => setImagePreview({ path: node.path, name: node.name })}
                     contextTargetPath={treeMenu?.node.path ?? null}
-                    onSelectFolder={selectFolder}
                     onContextMenu={fileOperationsAvailable ? (node, position) => setTreeMenu({ node, position }) : undefined}
                   />
                 ))}
@@ -784,7 +782,6 @@ export function FileTreeNodeView({
   onCancelRename,
   onCommitFileCreation,
   onCommitRename,
-  onSelectFolder,
   onToggle,
   onOpen,
   onPreviewImage,
@@ -801,7 +798,6 @@ export function FileTreeNodeView({
   onCancelRename: () => void;
   onCommitFileCreation: (name: string, focusEditor: boolean) => Promise<void>;
   onCommitRename: (node: FileTreeNode, name: string) => Promise<void>;
-  onSelectFolder: (path: string) => void;
   onToggle: (path: string) => Promise<void>;
   onOpen: (path: string) => void;
   onPreviewImage: (node: FileTreeNode) => void;
@@ -831,10 +827,9 @@ export function FileTreeNodeView({
             onPointerDown={preventRightClickSelection}
             onContextMenu={(event) => showTreeContextMenu(event, node, onContextMenu)}
             onKeyDown={(event) => showTreeContextMenuFromKeyboard(event, node, onContextMenu)}
-            onClick={() => {
-              if (node.path === selectedFolderPath) void onToggle(node.path);
-              else onSelectFolder(node.path);
-            }}
+            /* One click selects the folder (the New File target) and opens or
+               closes it, so reaching a nested file costs a click per level. */
+            onClick={() => void onToggle(node.path)}
           >
             <Icon name="chevronRight" className="ic chev" />
             <span>{node.name}</span>
@@ -864,7 +859,6 @@ export function FileTreeNodeView({
                 onCancelRename={onCancelRename}
                 onCommitFileCreation={onCommitFileCreation}
                 onCommitRename={onCommitRename}
-                onSelectFolder={onSelectFolder}
                 onToggle={onToggle}
                 onOpen={onOpen}
                 onPreviewImage={onPreviewImage}
